@@ -5,6 +5,7 @@ use rmcp::service::RequestContext;
 use rmcp::{RoleServer, ServerHandler, prompt_handler, prompt_router, tool_handler, tool_router};
 
 use crate::config::AppConfig;
+use crate::resources;
 
 #[derive(Clone)]
 pub struct MetsukeServer {
@@ -43,6 +44,7 @@ impl ServerHandler for MetsukeServer {
             capabilities: ServerCapabilities::builder()
                 .enable_tools()
                 .enable_prompts()
+                .enable_resources()
                 .build(),
             server_info: Implementation {
                 name: "metsuke".into(),
@@ -56,5 +58,29 @@ impl ServerHandler for MetsukeServer {
                     .into(),
             ),
         }
+    }
+
+    fn list_resources(
+        &self,
+        _request: Option<PaginatedRequestParam>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<ListResourcesResult, ErrorData>> + Send + '_ {
+        std::future::ready(Ok(resources::list_resources()))
+    }
+
+    fn list_resource_templates(
+        &self,
+        _request: Option<PaginatedRequestParam>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<ListResourceTemplatesResult, ErrorData>> + Send + '_ {
+        std::future::ready(Ok(resources::list_resource_templates()))
+    }
+
+    fn read_resource(
+        &self,
+        request: ReadResourceRequestParam,
+        _context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<ReadResourceResult, ErrorData>> + Send + '_ {
+        std::future::ready(resources::read_resource(&request.uri))
     }
 }

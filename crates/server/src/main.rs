@@ -2,6 +2,7 @@ mod blocking;
 mod config;
 mod github_app;
 mod prompts;
+mod resources;
 mod server;
 mod tools;
 mod validation;
