@@ -1,0 +1,29 @@
+[package]
+name = "metsuke"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "目付 — SDLC process inspector. Remote MCP Server + GitHub App powered by libverify."
+
+[[bin]]
+name = "metsuke"
+path = "src/main.rs"
+
+[dependencies]
+libverify-core.workspace = true
+libverify-policy.workspace = true
+libverify-output.workspace = true
+libverify-github.workspace = true
+
+rmcp.workspace = true
+axum.workspace = true
+tokio.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
