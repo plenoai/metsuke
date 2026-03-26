@@ -32,3 +32,9 @@ variable "desired_count" {
   type    = number
   default = 1
 }
+
+variable "github_repo" {
+  type        = string
+  default     = "HikaruEgashira/metsuke"
+  description = "GitHub repository for OIDC trust (owner/repo)"
+}
