@@ -5,19 +5,18 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-description = "目付 — SDLC process inspector. Remote MCP Server + GitHub App powered by libverify."
-
-[lints.rust]
-dead_code = "allow"
+description = "目付 — SDLC process inspector. Remote MCP Server powered by libverify."
 
 [[bin]]
 name = "metsuke"
 path = "src/main.rs"
 
+[lints.rust]
+dead_code = "allow"
+
 [dependencies]
 libverify-core.workspace = true
 libverify-policy.workspace = true
-libverify-output.workspace = true
 libverify-github.workspace = true
 
 rmcp.workspace = true
@@ -30,10 +29,3 @@ schemars.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-jsonwebtoken.workspace = true
-hmac.workspace = true
-sha2.workspace = true
-hex.workspace = true
-dashmap.workspace = true
-reqwest.workspace = true
-base64 = "0.22"

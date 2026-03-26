@@ -1,14 +1,10 @@
 mod blocking;
 mod config;
-mod github_app;
-mod prompts;
-mod resources;
 mod server;
 mod tools;
 mod validation;
 
 use config::AppConfig;
-use github_app::webhook::{WebhookState, handle_webhook};
 use rmcp::transport::StreamableHttpService;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use server::MetsukeServer;
@@ -34,16 +30,8 @@ async fn main() -> anyhow::Result<()> {
         Default::default(),
     );
 
-    let webhook_state = WebhookState {
-        secret: config.github_webhook_secret.clone().unwrap_or_default(),
-    };
-
     let app = axum::Router::new()
         .nest_service("/mcp", service)
-        .route(
-            "/webhook",
-            axum::routing::post(handle_webhook).with_state(webhook_state),
-        )
         .route("/health", axum::routing::get(|| async { "ok" }));
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
