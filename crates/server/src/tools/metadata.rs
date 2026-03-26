@@ -85,12 +85,27 @@ impl MetsukeServer {
     #[tool(description = "List all available policy presets")]
     pub async fn list_policies(&self) -> Result<CallToolResult, ErrorData> {
         let presets = [
-            ("default", "All controls strict — indeterminate/violated fail"),
+            (
+                "default",
+                "All controls strict — indeterminate/violated fail",
+            ),
             ("oss", "Tolerates unsigned commits and self-reviewed merges"),
-            ("aiops", "Escalates all indeterminate to review instead of fail"),
-            ("soc1", "Strict on ICFR-relevant controls; advisory on dev quality"),
-            ("soc2", "Strict on CC6/CC7/CC8; review on build-track indeterminate"),
-            ("slsa-l1", "SLSA Level 1 enforcement (Source + Build + Dependencies)"),
+            (
+                "aiops",
+                "Escalates all indeterminate to review instead of fail",
+            ),
+            (
+                "soc1",
+                "Strict on ICFR-relevant controls; advisory on dev quality",
+            ),
+            (
+                "soc2",
+                "Strict on CC6/CC7/CC8; review on build-track indeterminate",
+            ),
+            (
+                "slsa-l1",
+                "SLSA Level 1 enforcement (Source + Build + Dependencies)",
+            ),
             ("slsa-l2", "SLSA Level 2 enforcement"),
             ("slsa-l3", "SLSA Level 3 enforcement"),
             ("slsa-l4", "SLSA Level 4 enforcement"),

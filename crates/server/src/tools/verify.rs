@@ -6,6 +6,7 @@ use serde::Deserialize;
 
 use crate::blocking::run_blocking;
 use crate::server::MetsukeServer;
+use crate::validation::{validate_git_ref, validate_github_name, validate_policy};
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct VerifyPrArgs {
@@ -67,6 +68,11 @@ impl MetsukeServer {
         &self,
         Parameters(args): Parameters<VerifyPrArgs>,
     ) -> Result<CallToolResult, ErrorData> {
+        validate_github_name(&args.owner, "owner")?;
+        validate_github_name(&args.repo, "repo")?;
+        if let Some(ref p) = args.policy {
+            validate_policy(p)?;
+        }
         let token = self.github_token().map_err(mcp_err)?;
         let owner = args.owner;
         let repo = args.repo;
@@ -102,6 +108,11 @@ impl MetsukeServer {
         &self,
         Parameters(args): Parameters<VerifyReleaseArgs>,
     ) -> Result<CallToolResult, ErrorData> {
+        validate_github_name(&args.owner, "owner")?;
+        validate_github_name(&args.repo, "repo")?;
+        if let Some(ref p) = args.policy {
+            validate_policy(p)?;
+        }
         let token = self.github_token().map_err(mcp_err)?;
         let owner = args.owner;
         let repo = args.repo;
@@ -139,6 +150,12 @@ impl MetsukeServer {
         &self,
         Parameters(args): Parameters<VerifyRepoArgs>,
     ) -> Result<CallToolResult, ErrorData> {
+        validate_github_name(&args.owner, "owner")?;
+        validate_github_name(&args.repo, "repo")?;
+        validate_git_ref(&args.reference)?;
+        if let Some(ref p) = args.policy {
+            validate_policy(p)?;
+        }
         let token = self.github_token().map_err(mcp_err)?;
         let owner = args.owner;
         let repo = args.repo;
