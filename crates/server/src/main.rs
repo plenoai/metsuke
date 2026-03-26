@@ -1,7 +1,6 @@
 mod blocking;
 mod config;
 mod server;
-mod tools;
 mod validation;
 
 use config::AppConfig;
