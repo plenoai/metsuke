@@ -55,10 +55,10 @@ impl InstallationTokenCache {
         };
 
         // Check cache
-        if let Some(cached) = self.tokens.get(&installation_id) {
-            if cached.expires_at > Instant::now() + Duration::from_secs(300) {
-                return Ok(cached.token.clone());
-            }
+        if let Some(cached) = self.tokens.get(&installation_id)
+            && cached.expires_at > Instant::now() + Duration::from_secs(300)
+        {
+            return Ok(cached.token.clone());
         }
 
         // Fetch new token
