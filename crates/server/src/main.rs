@@ -1,12 +1,22 @@
+mod auth;
 mod blocking;
 mod config;
+mod db;
+mod github_app;
 mod server;
 mod validation;
+mod web;
 
+use std::sync::Arc;
+
+use auth::BearerAuthLayer;
 use config::AppConfig;
+use db::Database;
+use github_app::GitHubApp;
 use rmcp::transport::StreamableHttpService;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use server::MetsukeServer;
+use tower::ServiceBuilder;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -22,16 +32,31 @@ async fn main() -> anyhow::Result<()> {
     let config = AppConfig::from_env()?;
     let addr = config.bind_address();
 
-    let mcp_config = config.clone();
+    let db = Arc::new(Database::open(&config.database_url)?);
+
+    let github_app = Arc::new(GitHubApp::new(
+        config.github_app_id,
+        &config.github_app_private_key,
+        config.github_app_client_id.clone(),
+        config.github_app_client_secret.clone(),
+    )?);
+
+    let mcp_db = db.clone();
+    let mcp_app = github_app.clone();
     let service = StreamableHttpService::new(
-        move || Ok(MetsukeServer::new(mcp_config.clone())),
+        move || Ok(MetsukeServer::new(mcp_db.clone(), mcp_app.clone())),
         LocalSessionManager::default().into(),
         Default::default(),
     );
 
+    let authed_mcp = ServiceBuilder::new()
+        .layer(BearerAuthLayer::new(db.clone()))
+        .service(service);
+
     let app = axum::Router::new()
-        .nest_service("/mcp", service)
-        .route("/health", axum::routing::get(|| async { "ok" }));
+        .nest_service("/mcp", authed_mcp)
+        .route("/health", axum::routing::get(|| async { "ok" }))
+        .merge(web::router(db, github_app, &config));
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("metsuke listening on {addr}");

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::*;
@@ -5,13 +7,16 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
+use crate::auth::REQUEST_USER_ID;
 use crate::blocking::run_blocking;
-use crate::config::AppConfig;
+use crate::db::Database;
+use crate::github_app::GitHubApp;
 use crate::validation::{validate_git_ref, validate_github_name, validate_policy};
 
 #[derive(Clone)]
 pub struct MetsukeServer {
-    config: AppConfig,
+    db: Arc<Database>,
+    github_app: Arc<GitHubApp>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
@@ -72,18 +77,29 @@ fn default_ref() -> String {
 
 #[tool_router]
 impl MetsukeServer {
-    pub fn new(config: AppConfig) -> Self {
+    pub fn new(db: Arc<Database>, github_app: Arc<GitHubApp>) -> Self {
         Self {
-            config,
+            db,
+            github_app,
             tool_router: Self::tool_router(),
         }
     }
 
-    fn github_token(&self) -> anyhow::Result<String> {
-        self.config
-            .github_token
-            .clone()
-            .ok_or_else(|| anyhow::anyhow!("GH_TOKEN not configured"))
+    async fn get_github_token(&self, owner: &str) -> anyhow::Result<String> {
+        let user_id = REQUEST_USER_ID
+            .try_with(|id| *id)
+            .map_err(|_| anyhow::anyhow!("No authenticated user"))?;
+        let installation_id = self
+            .db
+            .get_installation_for_owner(user_id, owner)?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "No GitHub App installation found for '{owner}'. Install the app at https://github.com/apps/pleno-metsuke"
+                )
+            })?;
+        self.github_app
+            .create_installation_token(installation_id)
+            .await
     }
 
     #[tool(description = "Verify a pull request against SDLC controls and a policy preset")]
@@ -96,7 +112,7 @@ impl MetsukeServer {
         if let Some(ref p) = args.policy {
             validate_policy(p)?;
         }
-        let token = self.github_token().map_err(mcp_err)?;
+        let token = self.get_github_token(&args.owner).await.map_err(mcp_err)?;
         let owner = args.owner;
         let repo = args.repo;
         let pr_number = args.pr_number;
@@ -136,7 +152,10 @@ impl MetsukeServer {
         if let Some(ref p) = args.policy {
             validate_policy(p)?;
         }
-        let token = self.github_token().map_err(mcp_err)?;
+        let token = self
+            .get_github_token(&args.owner)
+            .await
+            .map_err(mcp_err)?;
         let owner = args.owner;
         let repo = args.repo;
         let base_tag = args.base_tag;
@@ -179,7 +198,10 @@ impl MetsukeServer {
         if let Some(ref p) = args.policy {
             validate_policy(p)?;
         }
-        let token = self.github_token().map_err(mcp_err)?;
+        let token = self
+            .get_github_token(&args.owner)
+            .await
+            .map_err(mcp_err)?;
         let owner = args.owner;
         let repo = args.repo;
         let reference = args.reference;

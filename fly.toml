@@ -17,6 +17,10 @@ primary_region = 'nrt'
   path = "/health"
   timeout = "5s"
 
+[mounts]
+  source = "metsuke_data"
+  destination = "/data"
+
 [[vm]]
   size = 'shared-cpu-1x'
   memory = '256mb'

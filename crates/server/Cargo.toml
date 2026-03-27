@@ -16,7 +16,14 @@ libverify-github.workspace = true
 
 rmcp.workspace = true
 axum.workspace = true
+tower.workspace = true
+http-body-util.workspace = true
+bytes.workspace = true
 tokio.workspace = true
+reqwest.workspace = true
+rusqlite.workspace = true
+jsonwebtoken.workspace = true
+uuid.workspace = true
 
 serde.workspace = true
 serde_json.workspace = true
