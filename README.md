@@ -33,10 +33,10 @@ https://metsuke.fly.dev/mcp
 }
 ```
 
-**Agent Skills** (`.claude/skills/` をコピー):
-- `/verify-pr owner/repo#123` — PR検証
-- `/verify-release owner/repo v1.0..v1.1` — リリース検証
-- `/verify-repo owner/repo` — リポジトリ依存性検証
+**Agent Skills**:
+```bash
+npx skills add plenoai/metsuke
+```
 
 ## GitHub App
 
