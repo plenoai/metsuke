@@ -8,52 +8,46 @@ Metsuke is a Remote MCP Server that provides SDLC compliance verification as too
 
 ## Features
 
-- **10 MCP Tools**: PR/release/repo verification, gap analysis, compliance posture, policy comparison
-- **3 MCP Prompts**: Guided workflows for compliance audits, PR reviews, and policy onboarding
+- **3 MCP Tools**: `verify_pr`, `verify_release`, `verify_repo`
 - **28 SDLC Controls**: SLSA v1.2 (Source/Build/Dependencies) + SOC2 CC7/CC8
 - **9 Policy Presets**: default, oss, aiops, soc1, soc2, slsa-l1 through slsa-l4
-- **GitHub App**: Install on your org for automatic PR/release verification via webhooks
-- **Secure by Design**: Input validation, HMAC webhook verification, no token logging
+- **GitHub App**: [Install on your org](https://github.com/apps/pleno-metsuke)
+- **Agent Skills**: `/verify-pr`, `/verify-release`, `/verify-repo`
 
-## Quick Start
+## Connect
 
-```bash
-# Run with a GitHub token
-GH_TOKEN=ghp_xxx cargo run
-
-# Or with Docker
-docker run -p 8080:8080 -e GH_TOKEN=ghp_xxx ghcr.io/hikaruegashira/metsuke
-
-# Connect from Claude Code
-# Add to your MCP config:
-# { "url": "http://localhost:8080/mcp" }
+**Remote MCP Server**:
+```
+https://metsuke.fly.dev/mcp
 ```
 
-## GitHub App Setup
-
-1. Create a GitHub App at https://github.com/settings/apps/new
-2. Set permissions: `contents:read`, `pull_requests:read`, `checks:read+write`, `statuses:read`, `metadata:read`
-3. Subscribe to events: `pull_request`, `release`, `installation`
-4. Generate a private key
-5. Deploy with environment variables:
-
-```bash
-GITHUB_APP_ID=123456
-GITHUB_APP_PRIVATE_KEY=$(base64 < private-key.pem)
-GITHUB_WEBHOOK_SECRET=your-secret
+**Claude Code** (`~/.claude/settings.json`):
+```json
+{
+  "mcpServers": {
+    "metsuke": {
+      "type": "url",
+      "url": "https://metsuke.fly.dev/mcp"
+    }
+  }
+}
 ```
+
+**Agent Skills** (`.claude/skills/` をコピー):
+- `/verify-pr owner/repo#123` — PR検証
+- `/verify-release owner/repo v1.0..v1.1` — リリース検証
+- `/verify-repo owner/repo` — リポジトリ依存性検証
+
+## GitHub App
+
+Install: https://github.com/apps/pleno-metsuke
 
 ## Build
 
 ```bash
-# Cargo
 cargo build --release
-
-# Nix Flakes
 nix build .#default     # binary
 nix build .#docker      # Docker image
-
-# Docker
 docker build -t metsuke .
 ```
 
