@@ -1,6 +1,6 @@
 ---
 name: verify-pr
-description: PRのSDLCコンプライアンスをMetsuke MCPサーバーで検証する。Trigger: PR検証, verify pr, コンプライアンスチェック
+description: "PRのSDLCコンプライアンスをMetsuke MCPサーバーで検証する。Trigger: PR検証, verify pr, コンプライアンスチェック"
 ---
 
 # verify-pr

@@ -1,6 +1,6 @@
 ---
 name: verify-repo
-description: リポジトリの依存性署名をMetsuke MCPサーバーで検証する。Trigger: リポジトリ検証, verify repo, 依存性チェック
+description: "リポジトリの依存性署名をMetsuke MCPサーバーで検証する。Trigger: リポジトリ検証, verify repo, 依存性チェック"
 ---
 
 # verify-repo

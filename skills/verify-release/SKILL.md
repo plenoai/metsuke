@@ -1,6 +1,6 @@
 ---
 name: verify-release
-description: リリースタグ範囲のSDLCコンプライアンスをMetsuke MCPサーバーで検証する。Trigger: リリース検証, verify release
+description: "リリースタグ範囲のSDLCコンプライアンスをMetsuke MCPサーバーで検証する。Trigger: リリース検証, verify release"
 ---
 
 # verify-release
