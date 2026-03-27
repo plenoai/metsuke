@@ -11,12 +11,7 @@ description = "目付 — SDLC process inspector. Remote MCP Server powered by l
 name = "metsuke"
 path = "src/main.rs"
 
-[lints.rust]
-dead_code = "allow"
-
 [dependencies]
-libverify-core.workspace = true
-libverify-policy.workspace = true
 libverify-github.workspace = true
 
 rmcp.workspace = true

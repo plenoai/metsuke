@@ -1047,9 +1047,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "libverify-core",
  "libverify-github",
- "libverify-policy",
  "rmcp",
  "schemars",
  "serde",
