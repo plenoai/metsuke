@@ -17,6 +17,7 @@ use crate::validation::{validate_git_ref, validate_github_name, validate_policy}
 pub struct MetsukeServer {
     db: Arc<Database>,
     github_app: Arc<GitHubApp>,
+    user_id: Option<i64>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
@@ -78,17 +79,20 @@ fn default_ref() -> String {
 #[tool_router]
 impl MetsukeServer {
     pub fn new(db: Arc<Database>, github_app: Arc<GitHubApp>) -> Self {
+        // Capture user_id from task_local at factory time (before rmcp spawns session task)
+        let user_id = REQUEST_USER_ID.try_with(|id| *id).ok();
         Self {
             db,
             github_app,
+            user_id,
             tool_router: Self::tool_router(),
         }
     }
 
     async fn get_github_token(&self, owner: &str) -> anyhow::Result<String> {
-        let user_id = REQUEST_USER_ID
-            .try_with(|id| *id)
-            .map_err(|_| anyhow::anyhow!("No authenticated user"))?;
+        let user_id = self
+            .user_id
+            .ok_or_else(|| anyhow::anyhow!("No authenticated user"))?;
         let installation_id = self
             .db
             .get_installation_for_owner(user_id, owner)?
