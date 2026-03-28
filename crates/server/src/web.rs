@@ -46,6 +46,10 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             "/api/repos/{owner}/{repo}/verify",
             axum::routing::post(api_verify_repo),
         )
+        .route(
+            "/api/verification-cache",
+            axum::routing::get(api_verification_cache),
+        )
         .with_state(state)
 }
 
@@ -915,6 +919,7 @@ async fn api_verify_repo(
     };
 
     let policy = query.policy;
+    let policy_used = policy.clone();
     let owner_c = owner.clone();
     let repo_c = repo.clone();
 
@@ -930,13 +935,81 @@ async fn api_verify_repo(
     .await;
 
     match result {
-        Ok(r) => Json(r).into_response(),
+        Ok(r) => {
+            // Cache the result
+            if let Ok(json) = serde_json::to_string(&r) {
+                let mut pass = 0i64;
+                let mut fail = 0i64;
+                let mut review = 0i64;
+                let mut na = 0i64;
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json) {
+                    if let Some(findings) = val
+                        .get("report")
+                        .and_then(|r| r.get("findings"))
+                        .and_then(|f| f.as_array())
+                    {
+                        for f in findings {
+                            match f.get("status").and_then(|s| s.as_str()) {
+                                Some("Satisfied") => pass += 1,
+                                Some("Violated") => fail += 1,
+                                Some("Indeterminate") => review += 1,
+                                _ => na += 1,
+                            }
+                        }
+                    }
+                }
+                let policy_str = policy_used.as_deref().unwrap_or("default");
+                let _ = state.db.save_verification_result(
+                    user_id, &owner, &repo, policy_str, pass, fail, review, na, &json,
+                );
+            }
+            Json(r).into_response()
+        }
         Err(e) => (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             format!("{e}"),
         )
             .into_response(),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Cached verification results API
+// ---------------------------------------------------------------------------
+
+async fn api_verification_cache(headers: HeaderMap, State(state): State<WebState>) -> Response {
+    let session_id = match get_session_from_cookie(&headers) {
+        Some(s) => s,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
+        Ok(Some(u)) => u,
+        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let entries = state
+        .db
+        .get_verification_results_for_user(user_id)
+        .unwrap_or_default();
+
+    let json: Vec<serde_json::Value> = entries
+        .iter()
+        .map(|e| {
+            serde_json::json!({
+                "owner": e.owner,
+                "repo": e.repo,
+                "policy": e.policy,
+                "pass": e.pass_count,
+                "fail": e.fail_count,
+                "review": e.review_count,
+                "na": e.na_count,
+                "verified_at": e.verified_at,
+            })
+        })
+        .collect();
+
+    Json(json).into_response()
 }
 
 // ---------------------------------------------------------------------------
@@ -1054,13 +1127,40 @@ async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Respon
 <script>
 const POLICY_OPTIONS = `{options}`;
 
+function renderBadges(pass, fail, review) {{
+  let b = '';
+  if (pass > 0) b += `<span class="badge badge-pass">PASS ${{pass}}</span>`;
+  if (review > 0) b += `<span class="badge badge-review">REVIEW ${{review}}</span>`;
+  if (fail > 0) b += `<span class="badge badge-fail">FAIL ${{fail}}</span>`;
+  return b;
+}}
+
+function filterRepos() {{
+  const q = (document.getElementById('search-input')?.value || '').toLowerCase();
+  document.querySelectorAll('.repo-card').forEach(card => {{
+    const name = card.dataset.name || '';
+    const desc = card.dataset.desc || '';
+    const lang = card.dataset.lang || '';
+    const match = name.includes(q) || desc.includes(q) || lang.includes(q);
+    card.style.display = match ? '' : 'none';
+  }});
+}}
+
 async function loadRepos() {{
   try {{
-    const resp = await fetch('/api/repos');
-    if (!resp.ok) throw new Error('Failed to fetch');
-    const repos = await resp.json();
-    const container = document.getElementById('repo-list');
+    const [repoResp, cacheResp] = await Promise.all([
+      fetch('/api/repos'),
+      fetch('/api/verification-cache'),
+    ]);
+    const repos = repoResp.ok ? await repoResp.json() : [];
+    const cache = cacheResp.ok ? await cacheResp.json() : [];
 
+    const cacheMap = {{}};
+    for (const c of cache) {{
+      cacheMap[`${{c.owner}}/${{c.repo}}`] = c;
+    }}
+
+    const container = document.getElementById('repo-list');
     document.getElementById('repos-title').textContent = `Repositories (${{repos.length}})`;
 
     if (repos.length === 0) {{
@@ -1068,8 +1168,17 @@ async function loadRepos() {{
       return;
     }}
 
-    const html = '<div class="repo-grid">' + repos.map(r => `
-      <div class="repo-card" id="repo-${{r.full_name.replace('/', '-')}}">
+    const searchBar = `<div style="margin-bottom:0.75rem">
+      <input type="search" id="search-input" class="policy-select" style="width:100%;padding:0.5rem 0.75rem;font-size:0.8rem" placeholder="リポジトリを検索…" oninput="filterRepos()" aria-label="リポジトリを検索">
+    </div>`;
+
+    const cards = repos.map(r => {{
+      const cached = cacheMap[r.full_name];
+      const cachedBadges = cached ? renderBadges(cached.pass, cached.fail, cached.review) : '';
+      const cachedTime = cached ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${{cached.verified_at}}</span>` : '';
+      const desc = r.description ? `<div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">${{r.description}}</div>` : '';
+
+      return `<div class="repo-card" id="repo-${{r.full_name.replace('/', '-')}}" data-name="${{r.full_name.toLowerCase()}}" data-desc="${{(r.description || '').toLowerCase()}}" data-lang="${{(r.language || '').toLowerCase()}}">
         <div class="repo-info">
           <div class="repo-name">
             <a href="/repos/${{r.owner}}/${{r.name}}">${{r.full_name}}</a>
@@ -1077,21 +1186,23 @@ async function loadRepos() {{
               <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
             </a>
           </div>
+          ${{desc}}
           <div class="repo-meta">
             ${{r.private ? '<span class="badge badge-private">private</span>' : ''}}
             ${{r.language ? `<span>${{r.language}}</span>` : ''}}
             ${{r.default_branch ? `<span>${{r.default_branch}}</span>` : ''}}
+            ${{cachedTime}}
           </div>
         </div>
         <div class="repo-actions">
-          <div class="result-summary" id="result-${{r.full_name.replace('/', '-')}}"></div>
+          <div class="result-summary" id="result-${{r.full_name.replace('/', '-')}}">${{cachedBadges}}</div>
           <select class="policy-select" id="policy-${{r.full_name.replace('/', '-')}}">${{POLICY_OPTIONS}}</select>
-          <button class="verify-btn" onclick="verifyRepo('${{r.owner}}', '${{r.name}}', this)">検証</button>
+          <button class="verify-btn" onclick="verifyRepo('${{r.owner}}', '${{r.name}}', this)">${{cached ? '再検証' : '検証'}}</button>
         </div>
-      </div>
-    `).join('') + '</div>';
+      </div>`;
+    }}).join('');
 
-    container.innerHTML = html;
+    container.innerHTML = searchBar + '<div class="repo-grid">' + cards + '</div>';
     allRepos = repos;
     if (repos.length > 0) {{
       document.getElementById('verify-all-btn').style.display = '';
@@ -1125,12 +1236,7 @@ async function verifyRepo(owner, repo, btn) {{
         else if (f.status === 'Indeterminate') review++;
       }}
     }}
-
-    let badges = '';
-    if (pass > 0) badges += `<span class="badge badge-pass">PASS ${{pass}}</span>`;
-    if (review > 0) badges += `<span class="badge badge-review">REVIEW ${{review}}</span>`;
-    if (fail > 0) badges += `<span class="badge badge-fail">FAIL ${{fail}}</span>`;
-    resultEl.innerHTML = badges;
+    resultEl.innerHTML = renderBadges(pass, fail, review);
 
     btn.textContent = '再検証';
   }} catch (e) {{

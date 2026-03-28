@@ -72,6 +72,20 @@ impl Database {
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 expires_at TEXT NOT NULL,
                 refresh_expires_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS verification_results (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                owner TEXT NOT NULL,
+                repo TEXT NOT NULL,
+                policy TEXT NOT NULL DEFAULT 'default',
+                pass_count INTEGER NOT NULL DEFAULT 0,
+                fail_count INTEGER NOT NULL DEFAULT 0,
+                review_count INTEGER NOT NULL DEFAULT 0,
+                na_count INTEGER NOT NULL DEFAULT 0,
+                result_json TEXT NOT NULL,
+                verified_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(user_id, owner, repo, policy)
             );",
         )?;
         Ok(())
@@ -412,6 +426,73 @@ impl Database {
             Err(e) => Err(e.into()),
         }
     }
+
+    // --- Verification Results ---
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn save_verification_result(
+        &self,
+        user_id: i64,
+        owner: &str,
+        repo: &str,
+        policy: &str,
+        pass_count: i64,
+        fail_count: i64,
+        review_count: i64,
+        na_count: i64,
+        result_json: &str,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO verification_results (user_id, owner, repo, policy, pass_count, fail_count, review_count, na_count, result_json, verified_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))
+             ON CONFLICT(user_id, owner, repo, policy) DO UPDATE SET
+                pass_count = excluded.pass_count,
+                fail_count = excluded.fail_count,
+                review_count = excluded.review_count,
+                na_count = excluded.na_count,
+                result_json = excluded.result_json,
+                verified_at = datetime('now')",
+            rusqlite::params![user_id, owner, repo, policy, pass_count, fail_count, review_count, na_count, result_json],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_verification_results_for_user(
+        &self,
+        user_id: i64,
+    ) -> Result<Vec<VerificationCacheEntry>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT owner, repo, policy, pass_count, fail_count, review_count, na_count, verified_at
+             FROM verification_results WHERE user_id = ?1
+             ORDER BY verified_at DESC",
+        )?;
+        let rows = stmt.query_map([user_id], |row| {
+            Ok(VerificationCacheEntry {
+                owner: row.get(0)?,
+                repo: row.get(1)?,
+                policy: row.get(2)?,
+                pass_count: row.get(3)?,
+                fail_count: row.get(4)?,
+                review_count: row.get(5)?,
+                na_count: row.get(6)?,
+                verified_at: row.get(7)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+}
+
+pub struct VerificationCacheEntry {
+    pub owner: String,
+    pub repo: String,
+    pub policy: String,
+    pub pass_count: i64,
+    pub fail_count: i64,
+    pub review_count: i64,
+    pub na_count: i64,
+    pub verified_at: String,
 }
 
 pub struct OAuthClient {
