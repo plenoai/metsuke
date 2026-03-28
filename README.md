@@ -6,6 +6,8 @@ SDLC process inspector — Remote MCP Server + GitHub App powered by [libverify]
 
 Metsuke is a Remote MCP Server that provides SDLC compliance verification as tools that AI agents (Claude Code, etc.) can invoke. Named after the Edo-period inspector officials (目付), it continuously monitors and evaluates your organization's development processes.
 
+![overview](./overview.png)
+
 ## Features
 
 - **3 MCP Tools**: `verify_pr`, `verify_release`, `verify_repo`
