@@ -626,8 +626,23 @@ async fn dashboard(headers: HeaderMap, State(state): State<WebState>) -> Respons
           <div id="ov-installs" style="font-size:2rem;font-weight:800;color:var(--accent-indigo)">{install_count}</div>
           <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);letter-spacing:0.1em">INSTALLS</div>
         </div>
+        <div style="text-align:center;min-width:80px">
+          <div id="ov-verified" style="font-size:2rem;font-weight:800;color:var(--accent-green)">—</div>
+          <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);letter-spacing:0.1em">VERIFIED</div>
+        </div>
+        <div style="text-align:center;min-width:80px">
+          <div id="ov-failing" style="font-size:2rem;font-weight:800;color:var(--accent-vermillion)">—</div>
+          <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);letter-spacing:0.1em">FAILING</div>
+        </div>
         <div style="flex:1;display:flex;justify-content:flex-end">
           <a class="btn" href="/repos" style="font-size:0.75rem">リポジトリ一覧を見る →</a>
+        </div>
+      </div>
+      <div id="ov-bar" style="margin-top:0.75rem;height:6px;background:var(--bg-deep);border-radius:3px;overflow:hidden;display:none">
+        <div style="display:flex;height:100%">
+          <div id="ov-bar-pass" style="background:var(--accent-green);height:100%;transition:width 0.5s ease"></div>
+          <div id="ov-bar-review" style="background:var(--accent-gold);height:100%;transition:width 0.5s ease"></div>
+          <div id="ov-bar-fail" style="background:var(--accent-vermillion);height:100%;transition:width 0.5s ease"></div>
         </div>
       </div>
     </div>
@@ -791,8 +806,25 @@ function copyText(id, btn) {{
     setTimeout(() => {{ btn.textContent = 'COPY'; btn.classList.remove('copied'); }}, 1500);
   }});
 }}
-fetch('/api/repos').then(r => r.json()).then(repos => {{
+Promise.all([
+  fetch('/api/repos').then(r => r.ok ? r.json() : []),
+  fetch('/api/verification-cache').then(r => r.ok ? r.json() : []),
+]).then(([repos, cache]) => {{
   document.getElementById('ov-repos').textContent = repos.length;
+  const verified = new Set(cache.map(c => `${{c.owner}}/${{c.repo}}`));
+  document.getElementById('ov-verified').textContent = verified.size;
+  const failing = new Set(cache.filter(c => c.fail > 0).map(c => `${{c.owner}}/${{c.repo}}`));
+  document.getElementById('ov-failing').textContent = failing.size;
+  let totalP = 0, totalR = 0, totalF = 0;
+  cache.forEach(c => {{ totalP += c.pass; totalR += c.review; totalF += c.fail; }});
+  const total = totalP + totalR + totalF;
+  if (total > 0) {{
+    const bar = document.getElementById('ov-bar');
+    bar.style.display = '';
+    document.getElementById('ov-bar-pass').style.width = `${{(totalP/total*100).toFixed(1)}}%`;
+    document.getElementById('ov-bar-review').style.width = `${{(totalR/total*100).toFixed(1)}}%`;
+    document.getElementById('ov-bar-fail').style.width = `${{(totalF/total*100).toFixed(1)}}%`;
+  }}
 }}).catch(() => {{}});
 </script>
 </body>
@@ -1038,9 +1070,18 @@ async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Respon
 <div class="shell">
   {header}
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
     <div class="section-title" id="repos-title" style="margin-bottom:0">Repositories</div>
-    <button class="btn" id="verify-all-btn" onclick="verifyAll()" style="font-size:0.72rem;display:none">全リポジトリを検証</button>
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap" id="toolbar" class="toolbar-hidden">
+      <select class="policy-select" id="sort-select" onchange="sortRepos(this.value)" aria-label="ソート順">
+        <option value="name">名前順</option>
+        <option value="fail-desc">FAIL多い順</option>
+        <option value="fail-asc">FAIL少ない順</option>
+        <option value="unverified">未検証優先</option>
+      </select>
+      <button class="verify-btn" id="export-csv-btn" onclick="exportCSV()" style="display:none">CSV出力</button>
+      <button class="btn" id="verify-all-btn" onclick="verifyAll()" style="font-size:0.72rem;display:none">全リポジトリを検証</button>
+    </div>
   </div>
   <div id="verify-all-progress" style="display:none;margin-bottom:1rem">
     <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">
@@ -1203,8 +1244,10 @@ async function loadRepos() {{
 
     container.innerHTML = searchBar + '<div class="repo-grid">' + cards + '</div>';
     allRepos = repos;
+    allCache = cacheMap;
     if (repos.length > 0) {{
       document.getElementById('verify-all-btn').style.display = '';
+      document.getElementById('export-csv-btn').style.display = '';
     }}
   }} catch (e) {{
     document.getElementById('repo-list').innerHTML =
@@ -1247,6 +1290,55 @@ async function verifyRepo(owner, repo, btn) {{
 }}
 
 let allRepos = [];
+let allCache = {{}};
+
+function sortRepos(mode) {{
+  const grid = document.querySelector('.repo-grid');
+  if (!grid) return;
+  const cards = Array.from(grid.children);
+  cards.sort((a, b) => {{
+    const nameA = a.dataset.name || '';
+    const nameB = b.dataset.name || '';
+    const cA = allCache[nameA.replace('-', '/')] || {{}};
+    const cB = allCache[nameB.replace('-', '/')] || {{}};
+    if (mode === 'fail-desc') return (cB.fail || 0) - (cA.fail || 0);
+    if (mode === 'fail-asc') return (cA.fail || 0) - (cB.fail || 0);
+    if (mode === 'unverified') {{
+      const vA = cA.verified_at ? 1 : 0;
+      const vB = cB.verified_at ? 1 : 0;
+      return vA - vB;
+    }}
+    return nameA.localeCompare(nameB);
+  }});
+  cards.forEach(c => grid.appendChild(c));
+}}
+
+function exportCSV() {{
+  const rows = [['Repository','Language','Private','Policy','Pass','Fail','Review','N/A','Verified At']];
+  allRepos.forEach(r => {{
+    const c = allCache[r.full_name] || {{}};
+    rows.push([
+      r.full_name,
+      r.language || '',
+      r.private ? 'yes' : 'no',
+      c.policy || '',
+      c.pass || 0,
+      c.fail || 0,
+      c.review || 0,
+      c.na || 0,
+      c.verified_at || 'not verified',
+    ]);
+  }});
+  const csv = rows.map(r => r.map(v => `"${{String(v).replace(/"/g, '""')}}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {{ type: 'text/csv;charset=utf-8;' }});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `metsuke-verification-${{new Date().toISOString().slice(0,10)}}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}}
+
 async function verifyAll() {{
   const btn = document.getElementById('verify-all-btn');
   const progressWrap = document.getElementById('verify-all-progress');
