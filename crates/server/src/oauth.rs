@@ -42,7 +42,6 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         .route("/oauth/authorize", axum::routing::get(authorize))
         .route("/oauth/token", axum::routing::post(token))
         .route("/oauth/register", axum::routing::post(register))
-        .route("/oauth/callback", axum::routing::get(oauth_callback))
         .with_state(state)
 }
 
@@ -245,8 +244,8 @@ async fn authorize(
         internal_state
     };
 
-    // Redirect to GitHub OAuth
-    let github_redirect = format!("{}/oauth/callback", state.base_url);
+    // Redirect to GitHub OAuth (reuse registered callback URL)
+    let github_redirect = format!("{}/auth/callback", state.base_url);
     let url = format!(
         "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=read:user&state={}",
         state.github_app.client_id(),
@@ -257,25 +256,14 @@ async fn authorize(
 }
 
 // --- OAuth Callback (GitHub → Metsuke → MCP Client) ---
+// Called from web.rs auth_callback when state parameter is present.
 
-#[derive(Deserialize)]
-struct OAuthCallbackParams {
-    code: String,
-    #[serde(default)]
-    state: Option<String>,
-}
-
-async fn oauth_callback(
-    Query(params): Query<OAuthCallbackParams>,
-    State(state): State<OAuthState>,
+pub async fn handle_oauth_callback(
+    code: &str,
+    combined_state: &str,
+    db: &Database,
+    github_app: &GitHubApp,
 ) -> Response {
-    let combined_state = match params.state {
-        Some(s) => s,
-        None => {
-            return (StatusCode::BAD_REQUEST, "Missing state parameter").into_response();
-        }
-    };
-
     // Split internal_state and client_state
     let (internal_state, client_state) = if let Some(idx) = combined_state.find(':') {
         let (is, cs_b64) = combined_state.split_at(idx);
@@ -286,11 +274,11 @@ async fn oauth_callback(
             .and_then(|b| String::from_utf8(b).ok());
         (is.to_string(), cs)
     } else {
-        (combined_state, None)
+        (combined_state.to_string(), None)
     };
 
     // Retrieve stored OAuth state
-    let oauth_state = match state.db.consume_oauth_state(&internal_state) {
+    let oauth_state = match db.consume_oauth_state(&internal_state) {
         Ok(Some(s)) => s,
         _ => {
             return (StatusCode::BAD_REQUEST, "Invalid or expired state").into_response();
@@ -298,7 +286,7 @@ async fn oauth_callback(
     };
 
     // Exchange GitHub code for token and get user
-    let token_resp = match state.github_app.exchange_code(&params.code).await {
+    let token_resp = match github_app.exchange_code(code).await {
         Ok(t) => t,
         Err(e) => {
             tracing::error!("GitHub OAuth exchange failed: {e:#}");
@@ -322,10 +310,7 @@ async fn oauth_callback(
         }
     };
 
-    let user_id = match state
-        .db
-        .upsert_user(user.id, &user.login, user.avatar_url.as_deref())
-    {
+    let user_id = match db.upsert_user(user.id, &user.login, user.avatar_url.as_deref()) {
         Ok(id) => id,
         Err(e) => {
             tracing::error!("DB error: {e:#}");
@@ -339,7 +324,7 @@ async fn oauth_callback(
 
     // Generate authorization code
     let auth_code = generate_random_token();
-    if let Err(e) = state.db.create_authorization_code(
+    if let Err(e) = db.create_authorization_code(
         &auth_code,
         &oauth_state.client_id,
         user_id,

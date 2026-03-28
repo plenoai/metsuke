@@ -333,6 +333,8 @@ body::after {
 #[derive(Deserialize)]
 struct AuthCallback {
     code: String,
+    #[serde(default)]
+    state: Option<String>,
 }
 
 async fn login(State(state): State<WebState>) -> Redirect {
@@ -349,6 +351,18 @@ async fn auth_callback(
     Query(params): Query<AuthCallback>,
     State(state): State<WebState>,
 ) -> Response {
+    // If state parameter is present, this is an MCP OAuth 2.1 callback
+    if let Some(ref oauth_state) = params.state {
+        return crate::oauth::handle_oauth_callback(
+            &params.code,
+            oauth_state,
+            &state.db,
+            &state.github_app,
+        )
+        .await;
+    }
+
+    // Otherwise, this is the standard web login flow
     let token_resp = match state.github_app.exchange_code(&params.code).await {
         Ok(t) => t,
         Err(e) => {
