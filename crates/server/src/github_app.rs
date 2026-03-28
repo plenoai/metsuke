@@ -47,6 +47,24 @@ pub struct InstallationAccount {
     pub account_type: String,
 }
 
+#[derive(Deserialize)]
+struct RepoListResponse {
+    total_count: i64,
+    repositories: Vec<Repository>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct Repository {
+    pub id: i64,
+    pub name: String,
+    pub full_name: String,
+    pub private: bool,
+    pub description: Option<String>,
+    pub default_branch: Option<String>,
+    pub language: Option<String>,
+    pub updated_at: Option<String>,
+}
+
 impl GitHubApp {
     pub fn new(
         app_id: u64,
@@ -134,6 +152,34 @@ impl GitHubApp {
             .json()
             .await
             .context("Failed to exchange OAuth code")
+    }
+
+    pub async fn list_installation_repos(&self, installation_id: i64) -> Result<Vec<Repository>> {
+        let token = self.create_installation_token(installation_id).await?;
+        let client = reqwest::Client::new();
+        let mut repos = Vec::new();
+        let mut page = 1u32;
+        loop {
+            let resp: RepoListResponse = client
+                .get("https://api.github.com/installation/repositories")
+                .query(&[("per_page", "100"), ("page", &page.to_string())])
+                .header("Authorization", format!("Bearer {token}"))
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "metsuke")
+                .send()
+                .await?
+                .error_for_status()
+                .context("Failed to list installation repositories")?
+                .json()
+                .await?;
+            let count = resp.repositories.len();
+            repos.extend(resp.repositories);
+            if count < 100 || repos.len() as i64 >= resp.total_count {
+                break;
+            }
+            page += 1;
+        }
+        Ok(repos)
     }
 
     pub async fn get_user(access_token: &str) -> Result<GitHubUser> {

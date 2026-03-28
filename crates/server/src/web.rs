@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use axum::Router;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::http::header::SET_COOKIE;
-use axum::response::{Html, IntoResponse, Redirect, Response};
-use serde::Deserialize;
+use axum::response::{Html, IntoResponse, Json, Redirect, Response};
+use serde::{Deserialize, Serialize};
 
+use crate::blocking::run_blocking;
 use crate::config::AppConfig;
 use crate::db::Database;
 use crate::github_app::GitHubApp;
@@ -34,6 +35,12 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         .route(
             "/auth/install/callback",
             axum::routing::get(install_callback),
+        )
+        .route("/repos", axum::routing::get(repos_page))
+        .route("/api/repos", axum::routing::get(api_repos))
+        .route(
+            "/api/repos/{owner}/{repo}/verify",
+            axum::routing::post(api_verify_repo),
         )
         .with_state(state)
 }
@@ -801,6 +808,10 @@ body::before {{
         <div class="brand">目付</div>
         <div class="brand-sub">Metsuke</div>
       </div>
+      <nav style="display:flex;gap:0.75rem;margin-left:1rem">
+        <a href="/dashboard" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-primary);text-decoration:none;padding:0.35rem 0.7rem;border:1px solid var(--accent-vermillion);border-radius:4px">Dashboard</a>
+        <a href="/repos" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);text-decoration:none;padding:0.35rem 0.7rem;border:1px solid transparent;border-radius:4px">Repos</a>
+      </nav>
     </div>
     <div class="user-badge">
       <strong>{login}</strong>
@@ -865,6 +876,547 @@ function copyText(id, btn) {{
         login = login,
         install_list = install_list,
         base_url = state.base_url,
+    ))
+    .into_response()
+}
+
+// --- API Endpoints ---
+
+#[derive(Serialize)]
+struct RepoWithOwner {
+    owner: String,
+    name: String,
+    full_name: String,
+    private: bool,
+    description: Option<String>,
+    language: Option<String>,
+    default_branch: Option<String>,
+    updated_at: Option<String>,
+}
+
+async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Response {
+    let session_id = match get_session_from_cookie(&headers) {
+        Some(s) => s,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
+        Ok(Some(u)) => u,
+        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let installations = state
+        .db
+        .get_installations_for_user(user_id)
+        .unwrap_or_default();
+
+    let mut repos: Vec<RepoWithOwner> = Vec::new();
+    for (installation_id, account_login, _account_type) in &installations {
+        match state
+            .github_app
+            .list_installation_repos(*installation_id)
+            .await
+        {
+            Ok(repo_list) => {
+                for r in repo_list {
+                    repos.push(RepoWithOwner {
+                        owner: account_login.clone(),
+                        name: r.name,
+                        full_name: r.full_name,
+                        private: r.private,
+                        description: r.description,
+                        language: r.language,
+                        default_branch: r.default_branch,
+                        updated_at: r.updated_at,
+                    });
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to list repos for {account_login}: {e:#}");
+            }
+        }
+    }
+
+    Json(repos).into_response()
+}
+
+#[derive(Deserialize)]
+struct VerifyQuery {
+    policy: Option<String>,
+}
+
+async fn api_verify_repo(
+    headers: HeaderMap,
+    Path((owner, repo)): Path<(String, String)>,
+    Query(query): Query<VerifyQuery>,
+    State(state): State<WebState>,
+) -> Response {
+    let session_id = match get_session_from_cookie(&headers) {
+        Some(s) => s,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
+        Ok(Some(u)) => u,
+        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let installation_id = match state.db.get_installation_for_owner(user_id, &owner) {
+        Ok(Some(id)) => id,
+        Ok(None) => {
+            return (
+                axum::http::StatusCode::NOT_FOUND,
+                "No installation found for this owner",
+            )
+                .into_response()
+        }
+        Err(e) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{e}"),
+            )
+                .into_response()
+        }
+    };
+
+    let token = match state
+        .github_app
+        .create_installation_token(installation_id)
+        .await
+    {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{e}"),
+            )
+                .into_response()
+        }
+    };
+
+    let policy = query.policy;
+    let owner_c = owner.clone();
+    let repo_c = repo.clone();
+    let result = run_blocking(move || {
+        let config = libverify_github::GitHubConfig {
+            token,
+            repo: format!("{owner_c}/{repo_c}"),
+            host: "api.github.com".into(),
+        };
+        let client = libverify_github::GitHubClient::new(&config)?;
+        libverify_github::verify_repo(
+            &client,
+            &owner_c,
+            &repo_c,
+            "HEAD",
+            policy.as_deref(),
+            false,
+        )
+    })
+    .await;
+
+    match result {
+        Ok(r) => Json(r).into_response(),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{e}"),
+        )
+            .into_response(),
+    }
+}
+
+// --- Repos Page ---
+
+async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Response {
+    let session_id = match get_session_from_cookie(&headers) {
+        Some(s) => s,
+        None => return Redirect::to("/").into_response(),
+    };
+
+    let (_user_id, login) = match state.db.get_user_by_session(&session_id) {
+        Ok(Some(u)) => u,
+        _ => return Redirect::to("/").into_response(),
+    };
+
+    Html(format!(
+        r#"<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repositories — Metsuke</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {{
+  --bg-deep: #0c0e1a;
+  --bg-surface: #141627;
+  --bg-elevated: #1c1f36;
+  --border: #2a2d47;
+  --border-subtle: #1f2139;
+  --text-primary: #e8e6e3;
+  --text-secondary: #8a8da0;
+  --accent-vermillion: #c73e3a;
+  --accent-vermillion-glow: rgba(199, 62, 58, 0.12);
+  --accent-gold: #c9a84c;
+  --accent-gold-dim: rgba(201, 168, 76, 0.1);
+  --accent-indigo: #4a5fd7;
+  --accent-green: #3a9a5c;
+  --accent-green-dim: rgba(58, 154, 92, 0.1);
+  --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+}}
+*, *::before, *::after {{ margin: 0; padding: 0; box-sizing: border-box; }}
+body {{
+  font-family: var(--font-display);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  position: relative;
+}}
+body::before {{
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='%232a2d47' stroke-width='0.5' opacity='0.3'/%3E%3C/svg%3E");
+  background-size: 60px 60px;
+  z-index: 0;
+  pointer-events: none;
+}}
+.shell {{
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}}
+.header {{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+}}
+.header-left {{
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}}
+.brand {{
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  color: var(--text-primary);
+}}
+.brand-sub {{
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}}
+.nav-links {{
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}}
+.nav-link {{
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}}
+.nav-link:hover, .nav-link.active {{
+  color: var(--text-primary);
+  border-color: var(--border);
+}}
+.nav-link.active {{
+  border-color: var(--accent-vermillion);
+}}
+.user-badge {{
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}}
+.user-badge strong {{
+  color: var(--text-primary);
+}}
+.section-title {{
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}}
+.section-title::before {{
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  background: var(--accent-vermillion);
+}}
+.loading {{
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}}
+.loading::after {{
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent-vermillion);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}}
+@keyframes spin {{
+  to {{ transform: rotate(360deg); }}
+}}
+.repo-grid {{
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}}
+.repo-card {{
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.2s ease;
+}}
+.repo-card:hover {{
+  border-color: #3a3d57;
+}}
+.repo-info {{
+  flex: 1;
+  min-width: 0;
+}}
+.repo-name {{
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}}
+.repo-name a {{
+  color: var(--text-primary);
+  text-decoration: none;
+}}
+.repo-name a:hover {{
+  color: var(--accent-gold);
+}}
+.repo-meta {{
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}}
+.repo-actions {{
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin-left: 1rem;
+}}
+.verify-btn {{
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}}
+.verify-btn:hover {{
+  border-color: var(--accent-vermillion);
+  box-shadow: 0 0 12px var(--accent-vermillion-glow);
+}}
+.verify-btn:disabled {{
+  opacity: 0.5;
+  cursor: not-allowed;
+}}
+.verify-btn.running {{
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}}
+.badge {{
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}}
+.badge-pass {{
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
+  border: 1px solid rgba(58, 154, 92, 0.25);
+}}
+.badge-fail {{
+  background: var(--accent-vermillion-glow);
+  color: var(--accent-vermillion);
+  border: 1px solid rgba(199, 62, 58, 0.25);
+}}
+.badge-review {{
+  background: var(--accent-gold-dim);
+  color: var(--accent-gold);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+}}
+.badge-private {{
+  background: rgba(74, 95, 215, 0.1);
+  color: var(--accent-indigo);
+  border: 1px solid rgba(74, 95, 215, 0.2);
+}}
+.result-summary {{
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}}
+.empty-state {{
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}}
+@keyframes fadeIn {{
+  from {{ opacity: 0; transform: translateY(8px); }}
+  to {{ opacity: 1; transform: translateY(0); }}
+}}
+@media (max-width: 600px) {{
+  .shell {{ padding: 1.5rem 1rem 3rem; }}
+  .header {{ flex-direction: column; align-items: flex-start; gap: 1rem; }}
+  .repo-card {{ flex-direction: column; align-items: flex-start; gap: 0.75rem; }}
+  .repo-actions {{ margin-left: 0; }}
+}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="header">
+    <div class="header-left">
+      <div>
+        <a class="brand" href="/dashboard">目付</a>
+        <div class="brand-sub">Metsuke</div>
+      </div>
+      <nav class="nav-links">
+        <a class="nav-link" href="/dashboard">Dashboard</a>
+        <a class="nav-link active" href="/repos">Repos</a>
+      </nav>
+    </div>
+    <div class="user-badge">
+      <strong>{login}</strong>
+    </div>
+  </header>
+
+  <div class="section-title">Repositories</div>
+  <div id="repo-list">
+    <div class="loading">リポジトリを取得中</div>
+  </div>
+</div>
+
+<script>
+async function loadRepos() {{
+  try {{
+    const resp = await fetch('/api/repos');
+    if (!resp.ok) throw new Error('Failed to fetch');
+    const repos = await resp.json();
+    const container = document.getElementById('repo-list');
+
+    if (repos.length === 0) {{
+      container.innerHTML = '<div class="empty-state">リポジトリが見つかりません。GitHub Appをインストールしてください。</div>';
+      return;
+    }}
+
+    const html = '<div class="repo-grid">' + repos.map(r => `
+      <div class="repo-card" id="repo-${{r.full_name.replace('/', '-')}}">
+        <div class="repo-info">
+          <div class="repo-name">
+            <a href="https://github.com/${{r.full_name}}" target="_blank" rel="noopener">${{r.full_name}}</a>
+          </div>
+          <div class="repo-meta">
+            ${{r.private ? '<span class="badge badge-private">private</span>' : ''}}
+            ${{r.language ? `<span>${{r.language}}</span>` : ''}}
+            ${{r.default_branch ? `<span>${{r.default_branch}}</span>` : ''}}
+          </div>
+        </div>
+        <div class="repo-actions">
+          <div class="result-summary" id="result-${{r.full_name.replace('/', '-')}}"></div>
+          <button class="verify-btn" onclick="verifyRepo('${{r.owner}}', '${{r.name}}', this)">検証</button>
+        </div>
+      </div>
+    `).join('') + '</div>';
+
+    container.innerHTML = html;
+  }} catch (e) {{
+    document.getElementById('repo-list').innerHTML =
+      '<div class="empty-state">リポジトリの取得に失敗しました。</div>';
+  }}
+}}
+
+async function verifyRepo(owner, repo, btn) {{
+  btn.disabled = true;
+  btn.classList.add('running');
+  btn.textContent = '検証中…';
+  const resultEl = document.getElementById(`result-${{owner}}-${{repo}}`);
+  resultEl.innerHTML = '';
+
+  try {{
+    const resp = await fetch(`/api/repos/${{owner}}/${{repo}}/verify`, {{ method: 'POST' }});
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+
+    const pass = data.pass || 0;
+    const fail = data.fail || 0;
+    const review = data.review || 0;
+
+    let badges = '';
+    if (pass > 0) badges += `<span class="badge badge-pass">PASS ${{pass}}</span>`;
+    if (review > 0) badges += `<span class="badge badge-review">REVIEW ${{review}}</span>`;
+    if (fail > 0) badges += `<span class="badge badge-fail">FAIL ${{fail}}</span>`;
+    resultEl.innerHTML = badges;
+
+    btn.textContent = '再検証';
+  }} catch (e) {{
+    resultEl.innerHTML = '<span class="badge badge-fail">ERROR</span>';
+    btn.textContent = '再試行';
+  }}
+  btn.disabled = false;
+  btn.classList.remove('running');
+}}
+
+loadRepos();
+</script>
+</body>
+</html>"#,
+        login = login,
     ))
     .into_response()
 }
