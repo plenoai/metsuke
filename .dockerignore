@@ -1,0 +1,7 @@
+.git
+.github
+target
+*.md
+flake.nix
+flake.lock
+.envrc
