@@ -16,12 +16,13 @@
   <header class="header" role="banner">
     <div class="header-left">
       <div>
-        <a class="brand" href="/dashboard" aria-label="Metsuke ホーム">目付</a>
+        <a class="brand" href="/repos" aria-label="Metsuke ホーム">目付</a>
         <div class="brand-sub">Metsuke</div>
       </div>
       <nav class="nav-links" aria-label="メインナビゲーション">
-        <a class="nav-link{% if active_page == "dashboard" %} active{% endif %}" href="/dashboard">Dashboard</a>
         <a class="nav-link{% if active_page == "repos" %} active{% endif %}" href="/repos">Repos</a>
+        <a class="nav-link{% if active_page == "audit" %} active{% endif %}" href="/audit">Audit</a>
+        <a class="nav-link{% if active_page == "settings" %} active{% endif %}" href="/settings">Settings</a>
       </nav>
     </div>
     <div class="user-badge">

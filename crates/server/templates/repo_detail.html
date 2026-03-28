@@ -65,11 +65,12 @@
         </a>
       </div>
       <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+        <a class="btn" href="/repos/{{ owner }}/{{ repo }}/releases" style="text-decoration:none;font-size:0.8rem">リリース検証</a>
         <a class="verify-btn" href="/repos/{{ owner }}/{{ repo }}/pulls" style="text-decoration:none">PR検証</a>
         <select class="policy-select" id="policy-select">
           {% for p in policy_options %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
         </select>
-        <button class="btn" id="verify-btn" onclick="runVerify()">検証を実行</button>
+        <button class="verify-btn" id="verify-btn" onclick="runVerify()">リポジトリ検証</button>
       </div>
     </div>
   </div>
@@ -99,22 +100,22 @@ async function runVerify() {
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
 
-    const findings = (data.report && data.report.findings) || [];
-    const profileName = (data.report && data.report.profile_name) || policy;
+    const findings = data.findings || [];
+    const profileName = data.profile_name || policy;
 
     let pass = 0, fail = 0, review = 0, na = 0;
     for (const f of findings) {
-      if (f.status === 'Satisfied') pass++;
-      else if (f.status === 'Violated') fail++;
-      else if (f.status === 'Indeterminate') review++;
-      else if (f.status === 'NotApplicable') na++;
+      if (f.status === 'satisfied') pass++;
+      else if (f.status === 'violated') fail++;
+      else if (f.status === 'indeterminate') review++;
+      else if (f.status === 'not_applicable') na++;
     }
 
     function statusBadge(status) {
-      if (status === 'Satisfied') return '<span class="badge badge-pass">PASS</span>';
-      if (status === 'Violated') return '<span class="badge badge-fail">FAIL</span>';
-      if (status === 'Indeterminate') return '<span class="badge badge-review">REVIEW</span>';
-      if (status === 'NotApplicable') return '<span class="badge badge-na">N/A</span>';
+      if (status === 'satisfied') return '<span class="badge badge-pass">PASS</span>';
+      if (status === 'violated') return '<span class="badge badge-fail">FAIL</span>';
+      if (status === 'indeterminate') return '<span class="badge badge-review">REVIEW</span>';
+      if (status === 'not_applicable') return '<span class="badge badge-na">N/A</span>';
       return '<span class="badge">' + status + '</span>';
     }
 

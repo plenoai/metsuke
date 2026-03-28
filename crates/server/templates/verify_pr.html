@@ -216,27 +216,31 @@ async function verifyPR() {
   btn.style.color = '';
 }
 
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function renderResult(data, prNum) {
   const area = document.getElementById('result-area');
-  const findings = (data.report && data.report.findings) || [];
+  const findings = data.findings || [];
   let pass = 0, fail = 0, review = 0, na = 0;
   for (const f of findings) {
-    if (f.status === 'Satisfied') pass++;
-    else if (f.status === 'Violated') fail++;
-    else if (f.status === 'Indeterminate') review++;
+    if (f.status === 'satisfied') pass++;
+    else if (f.status === 'violated') fail++;
+    else if (f.status === 'indeterminate') review++;
     else na++;
   }
 
   const rows = findings.map(f => {
     let badge = '';
-    if (f.status === 'Satisfied') badge = '<span class="badge badge-pass">PASS</span>';
-    else if (f.status === 'Violated') badge = '<span class="badge badge-fail">FAIL</span>';
-    else if (f.status === 'Indeterminate') badge = '<span class="badge badge-review">REVIEW</span>';
+    if (f.status === 'satisfied') badge = '<span class="badge badge-pass">PASS</span>';
+    else if (f.status === 'violated') badge = '<span class="badge badge-fail">FAIL</span>';
+    else if (f.status === 'indeterminate') badge = '<span class="badge badge-review">REVIEW</span>';
     else badge = '<span class="badge badge-na">N/A</span>';
     return `<tr>
-      <td>${f.control_id}</td>
+      <td>${esc(f.control_id)}</td>
       <td>${badge}</td>
-      <td class="rationale-cell">${f.rationale || ''}</td>
+      <td class="rationale-cell">${esc(f.rationale)}</td>
     </tr>`;
   }).join('');
 
@@ -279,9 +283,9 @@ async function loadPRs() {
     container.innerHTML = '<div class="pr-list">' + prs.map(pr => `
       <div class="pr-item">
         <div class="pr-item-info">
-          <div class="pr-item-title">#${pr.number} ${pr.title}</div>
+          <div class="pr-item-title">#${pr.number} ${esc(pr.title)}</div>
           <div class="pr-item-meta">
-            <span>${pr.user.login}</span>
+            <span>${esc(pr.user.login)}</span>
             <span>${new Date(pr.updated_at).toLocaleDateString('ja-JP')}</span>
             ${pr.draft ? '<span class="pr-draft">draft</span>' : ''}
           </div>
@@ -309,12 +313,12 @@ async function verifyPRById(num, btn) {
     const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
-    const findings = (data.report && data.report.findings) || [];
+    const findings = data.findings || [];
     let pass = 0, fail = 0, review = 0;
     for (const f of findings) {
-      if (f.status === 'Satisfied') pass++;
-      else if (f.status === 'Violated') fail++;
-      else if (f.status === 'Indeterminate') review++;
+      if (f.status === 'satisfied') pass++;
+      else if (f.status === 'violated') fail++;
+      else if (f.status === 'indeterminate') review++;
     }
     let badges = '';
     if (pass > 0) badges += `<span class="badge badge-pass">P${pass}</span>`;

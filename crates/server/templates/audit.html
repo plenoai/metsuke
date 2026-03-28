@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Audit{% endblock %}
+
+{% block head %}
+<style>
+.audit-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.audit-table th {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-deep);
+  white-space: nowrap;
+}
+.audit-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+.audit-table tr:hover td {
+  background: var(--bg-elevated);
+}
+.type-badge {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.type-release {
+  background: rgba(74, 95, 215, 0.15);
+  color: var(--accent-indigo);
+  border: 1px solid rgba(74, 95, 215, 0.25);
+}
+.type-pr {
+  background: rgba(201, 168, 76, 0.1);
+  color: var(--accent-gold);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+}
+.type-repo {
+  background: rgba(138, 141, 160, 0.1);
+  color: var(--text-secondary);
+  border: 1px solid rgba(138, 141, 160, 0.2);
+}
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.pagination button {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  transition: border-color 0.2s ease;
+}
+.pagination button:hover:not(:disabled) {
+  border-color: var(--accent-gold);
+}
+.pagination button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+@media (max-width: 600px) {
+  .audit-table { font-size: 0.65rem; }
+  .audit-table th, .audit-table td { padding: 0.4rem; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="section-title">Audit Log</div>
+
+  <div class="audit-toolbar">
+    <select class="policy-select" id="filter-type" onchange="loadAudit()">
+      <option value="">全タイプ</option>
+      <option value="release">Release</option>
+      <option value="pr">PR</option>
+      <option value="repo">Repo</option>
+    </select>
+    <button class="verify-btn" id="export-csv-btn" onclick="exportAuditCSV()">CSV出力</button>
+  </div>
+
+  <div id="audit-content"><div class="loading">監査ログを取得中</div></div>
+  <div id="audit-pagination" class="pagination"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentOffset = 0;
+const PAGE_SIZE = 50;
+let allEntries = [];
+
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function typeBadge(type) {
+  if (type === 'release') return '<span class="type-badge type-release">release</span>';
+  if (type === 'pr') return '<span class="type-badge type-pr">pr</span>';
+  return '<span class="type-badge type-repo">repo</span>';
+}
+
+function resultBadges(e) {
+  let b = '';
+  if (e.pass > 0) b += `<span class="badge badge-pass">P${e.pass}</span>`;
+  if (e.review > 0) b += `<span class="badge badge-review">R${e.review}</span>`;
+  if (e.fail > 0) b += `<span class="badge badge-fail">F${e.fail}</span>`;
+  return b;
+}
+
+async function loadAudit() {
+  const type = document.getElementById('filter-type').value;
+  const container = document.getElementById('audit-content');
+  container.innerHTML = '<div class="loading">監査ログを取得中</div>';
+
+  try {
+    let url = `/api/audit-history?limit=${PAGE_SIZE}&offset=${currentOffset}`;
+    if (type) url += `&type=${encodeURIComponent(type)}`;
+    const resp = await fetch(url);
+    const entries = resp.ok ? await resp.json() : [];
+    allEntries = entries;
+
+    if (entries.length === 0 && currentOffset === 0) {
+      container.innerHTML = '<div class="empty-state">監査ログはまだありません。リポジトリやリリースの検証を実行してください。</div>';
+      document.getElementById('audit-pagination').innerHTML = '';
+      return;
+    }
+
+    const rows = entries.map(e => `<tr>
+      <td style="white-space:nowrap;color:var(--text-secondary);font-size:0.68rem">${new Date(e.verified_at + 'Z').toLocaleString('ja-JP')}</td>
+      <td>${typeBadge(e.type)}</td>
+      <td><a href="/repos/${encodeURIComponent(e.owner)}/${encodeURIComponent(e.repo)}" style="color:var(--text-primary);text-decoration:none">${esc(e.owner)}/${esc(e.repo)}</a></td>
+      <td style="font-size:0.72rem">${esc(e.target_ref)}</td>
+      <td style="font-size:0.68rem;color:var(--text-secondary)">${esc(e.policy)}</td>
+      <td style="display:flex;gap:0.2rem">${resultBadges(e)}</td>
+    </tr>`).join('');
+
+    container.innerHTML = `<div class="card" style="padding:0;overflow-x:auto">
+      <table class="audit-table">
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Repository</th><th>Target</th><th>Policy</th><th>Result</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+    // Pagination
+    const pag = document.getElementById('audit-pagination');
+    pag.innerHTML = `
+      <button onclick="prevPage()" ${currentOffset === 0 ? 'disabled' : ''}>前へ</button>
+      <span style="color:var(--text-secondary);align-self:center">${currentOffset + 1} - ${currentOffset + entries.length}</span>
+      <button onclick="nextPage()" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
+    `;
+  } catch (e) {
+    container.innerHTML = '<div class="empty-state">監査ログの取得に失敗しました</div>';
+  }
+}
+
+function prevPage() {
+  currentOffset = Math.max(0, currentOffset - PAGE_SIZE);
+  loadAudit();
+}
+
+function nextPage() {
+  currentOffset += PAGE_SIZE;
+  loadAudit();
+}
+
+function exportAuditCSV() {
+  const rows = [['Date','Type','Owner','Repo','Target','Policy','Pass','Fail','Review','N/A']];
+  allEntries.forEach(e => {
+    rows.push([
+      e.verified_at, e.type, e.owner, e.repo, e.target_ref, e.policy,
+      e.pass, e.fail, e.review, e.na || 0,
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `metsuke-audit-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+loadAudit();
+</script>
+{% endblock %}

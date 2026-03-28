@@ -73,20 +73,24 @@ impl Database {
                 expires_at TEXT NOT NULL,
                 refresh_expires_at TEXT
             );
-            CREATE TABLE IF NOT EXISTS verification_results (
+            CREATE TABLE IF NOT EXISTS audit_log (
                 id INTEGER PRIMARY KEY,
                 user_id INTEGER NOT NULL REFERENCES users(id),
+                verification_type TEXT NOT NULL,
                 owner TEXT NOT NULL,
                 repo TEXT NOT NULL,
+                target_ref TEXT NOT NULL,
                 policy TEXT NOT NULL DEFAULT 'default',
                 pass_count INTEGER NOT NULL DEFAULT 0,
                 fail_count INTEGER NOT NULL DEFAULT 0,
                 review_count INTEGER NOT NULL DEFAULT 0,
                 na_count INTEGER NOT NULL DEFAULT 0,
                 result_json TEXT NOT NULL,
-                verified_at TEXT NOT NULL DEFAULT (datetime('now')),
-                UNIQUE(user_id, owner, repo, policy)
-            );",
+                verified_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_log_repo ON audit_log(owner, repo);
+            CREATE INDEX IF NOT EXISTS idx_audit_log_type ON audit_log(verification_type);",
         )?;
         Ok(())
     }
@@ -427,14 +431,16 @@ impl Database {
         }
     }
 
-    // --- Verification Results ---
+    // --- Audit Log ---
 
     #[allow(clippy::too_many_arguments)]
-    pub fn save_verification_result(
+    pub fn append_audit_entry(
         &self,
         user_id: i64,
+        verification_type: &str,
         owner: &str,
         repo: &str,
+        target_ref: &str,
         policy: &str,
         pass_count: i64,
         fail_count: i64,
@@ -444,49 +450,112 @@ impl Database {
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO verification_results (user_id, owner, repo, policy, pass_count, fail_count, review_count, na_count, result_json, verified_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))
-             ON CONFLICT(user_id, owner, repo, policy) DO UPDATE SET
-                pass_count = excluded.pass_count,
-                fail_count = excluded.fail_count,
-                review_count = excluded.review_count,
-                na_count = excluded.na_count,
-                result_json = excluded.result_json,
-                verified_at = datetime('now')",
-            rusqlite::params![user_id, owner, repo, policy, pass_count, fail_count, review_count, na_count, result_json],
+            "INSERT INTO audit_log (user_id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, result_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            rusqlite::params![user_id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, result_json],
         )?;
         Ok(())
     }
 
-    pub fn get_verification_results_for_user(
+    pub fn get_audit_history(
         &self,
         user_id: i64,
-    ) -> Result<Vec<VerificationCacheEntry>> {
+        verification_type: Option<&str>,
+        owner: Option<&str>,
+        repo: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<AuditEntry>> {
+        let conn = self.conn.lock().unwrap();
+        let mut sql = String::from(
+            "SELECT id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, verified_at
+             FROM audit_log WHERE user_id = ?1",
+        );
+        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(user_id)];
+        let mut idx = 2;
+
+        if let Some(vt) = verification_type {
+            sql.push_str(&format!(" AND verification_type = ?{idx}"));
+            params.push(Box::new(vt.to_string()));
+            idx += 1;
+        }
+        if let Some(o) = owner {
+            sql.push_str(&format!(" AND owner = ?{idx}"));
+            params.push(Box::new(o.to_string()));
+            idx += 1;
+        }
+        if let Some(r) = repo {
+            sql.push_str(&format!(" AND repo = ?{idx}"));
+            params.push(Box::new(r.to_string()));
+            idx += 1;
+        }
+        sql.push_str(&format!(
+            " ORDER BY verified_at DESC LIMIT ?{idx} OFFSET ?{}",
+            idx + 1
+        ));
+        params.push(Box::new(limit));
+        params.push(Box::new(offset));
+
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(param_refs.as_slice(), |row| {
+            Ok(AuditEntry {
+                id: row.get(0)?,
+                verification_type: row.get(1)?,
+                owner: row.get(2)?,
+                repo: row.get(3)?,
+                target_ref: row.get(4)?,
+                policy: row.get(5)?,
+                pass_count: row.get(6)?,
+                fail_count: row.get(7)?,
+                review_count: row.get(8)?,
+                na_count: row.get(9)?,
+                verified_at: row.get(10)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// Latest verification per (owner, repo, type) for cache display on repos list
+    pub fn get_latest_verifications_for_user(&self, user_id: i64) -> Result<Vec<AuditEntry>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT owner, repo, policy, pass_count, fail_count, review_count, na_count, verified_at
-             FROM verification_results WHERE user_id = ?1
-             ORDER BY verified_at DESC",
+            "SELECT a.id, a.verification_type, a.owner, a.repo, a.target_ref, a.policy,
+                    a.pass_count, a.fail_count, a.review_count, a.na_count, a.verified_at
+             FROM audit_log a
+             INNER JOIN (
+                 SELECT MAX(id) as max_id FROM audit_log
+                 WHERE user_id = ?1
+                 GROUP BY owner, repo, verification_type
+             ) latest ON a.id = latest.max_id
+             ORDER BY a.verified_at DESC",
         )?;
         let rows = stmt.query_map([user_id], |row| {
-            Ok(VerificationCacheEntry {
-                owner: row.get(0)?,
-                repo: row.get(1)?,
-                policy: row.get(2)?,
-                pass_count: row.get(3)?,
-                fail_count: row.get(4)?,
-                review_count: row.get(5)?,
-                na_count: row.get(6)?,
-                verified_at: row.get(7)?,
+            Ok(AuditEntry {
+                id: row.get(0)?,
+                verification_type: row.get(1)?,
+                owner: row.get(2)?,
+                repo: row.get(3)?,
+                target_ref: row.get(4)?,
+                policy: row.get(5)?,
+                pass_count: row.get(6)?,
+                fail_count: row.get(7)?,
+                review_count: row.get(8)?,
+                na_count: row.get(9)?,
+                verified_at: row.get(10)?,
             })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 }
 
-pub struct VerificationCacheEntry {
+pub struct AuditEntry {
+    pub id: i64,
+    pub verification_type: String,
     pub owner: String,
     pub repo: String,
+    pub target_ref: String,
     pub policy: String,
     pub pass_count: i64,
     pub fail_count: i64,

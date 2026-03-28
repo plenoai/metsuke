@@ -81,6 +81,25 @@ pub struct PullRequestUser {
     pub login: String,
 }
 
+#[derive(Deserialize, Serialize, Clone)]
+pub struct Release {
+    pub id: i64,
+    pub tag_name: String,
+    pub name: Option<String>,
+    pub draft: bool,
+    pub prerelease: bool,
+    pub created_at: String,
+    pub published_at: Option<String>,
+    pub author: ReleaseAuthor,
+    pub html_url: String,
+    pub body: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct ReleaseAuthor {
+    pub login: String,
+}
+
 impl GitHubApp {
     pub fn new(
         app_id: u64,
@@ -219,6 +238,31 @@ impl GitHubApp {
             .json()
             .await
             .context("Failed to parse pull requests")
+    }
+
+    pub async fn list_releases(
+        &self,
+        installation_id: i64,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<Release>> {
+        let token = self.create_installation_token(installation_id).await?;
+        let client = reqwest::Client::new();
+        client
+            .get(format!(
+                "https://api.github.com/repos/{owner}/{repo}/releases"
+            ))
+            .query(&[("per_page", "30")])
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "metsuke")
+            .send()
+            .await?
+            .error_for_status()
+            .context("Failed to list releases")?
+            .json()
+            .await
+            .context("Failed to parse releases")
     }
 
     pub async fn get_user(access_token: &str) -> Result<GitHubUser> {
