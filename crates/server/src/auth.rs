@@ -27,9 +27,7 @@ impl OAuthAuthLayer {
     pub fn new(db: Arc<Database>, base_url: &str) -> Self {
         Self {
             db,
-            resource_metadata_url: format!(
-                "{base_url}/.well-known/oauth-protected-resource"
-            ),
+            resource_metadata_url: format!("{base_url}/.well-known/oauth-protected-resource"),
         }
     }
 }
@@ -61,8 +59,7 @@ fn unauthorized_response(resource_metadata_url: &str) -> Response<BoxBody<Bytes,
     .boxed();
 
     // RFC 9728: include resource_metadata in WWW-Authenticate
-    let www_authenticate =
-        format!("Bearer resource_metadata=\"{resource_metadata_url}\"");
+    let www_authenticate = format!("Bearer resource_metadata=\"{resource_metadata_url}\"");
 
     Response::builder()
         .status(StatusCode::UNAUTHORIZED)

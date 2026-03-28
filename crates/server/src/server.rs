@@ -152,10 +152,7 @@ impl MetsukeServer {
         if let Some(ref p) = args.policy {
             validate_policy(p)?;
         }
-        let token = self
-            .get_github_token(&args.owner)
-            .await
-            .map_err(mcp_err)?;
+        let token = self.get_github_token(&args.owner).await.map_err(mcp_err)?;
         let owner = args.owner;
         let repo = args.repo;
         let base_tag = args.base_tag;
@@ -198,10 +195,7 @@ impl MetsukeServer {
         if let Some(ref p) = args.policy {
             validate_policy(p)?;
         }
-        let token = self
-            .get_github_token(&args.owner)
-            .await
-            .map_err(mcp_err)?;
+        let token = self.get_github_token(&args.owner).await.map_err(mcp_err)?;
         let owner = args.owner;
         let repo = args.repo;
         let reference = args.reference;

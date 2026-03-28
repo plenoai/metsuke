@@ -159,18 +159,13 @@ impl Database {
         }
     }
 
-    pub fn get_installations_for_user(
-        &self,
-        user_id: i64,
-    ) -> Result<Vec<(i64, String, String)>> {
+    pub fn get_installations_for_user(&self, user_id: i64) -> Result<Vec<(i64, String, String)>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT installation_id, account_login, account_type
              FROM installations WHERE user_id = ?1",
         )?;
-        let rows = stmt.query_map([user_id], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })?;
+        let rows = stmt.query_map([user_id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
@@ -327,7 +322,13 @@ impl Database {
             "SELECT client_id, user_id, scope FROM oauth_tokens
              WHERE refresh_token = ?1 AND refresh_expires_at > datetime('now')",
             [old_refresh_token],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, String>(2)?)),
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
         );
         match existing {
             Ok((client_id, user_id, scope)) => {
@@ -376,7 +377,7 @@ impl Database {
                 scope TEXT NOT NULL DEFAULT 'mcp',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 expires_at TEXT NOT NULL
-            );"
+            );",
         )?;
         conn.execute(
             "INSERT INTO oauth_states (state, client_id, redirect_uri, code_challenge, scope, expires_at)

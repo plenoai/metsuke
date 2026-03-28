@@ -27,8 +27,8 @@ impl AppConfig {
             std::env::var("GITHUB_APP_CLIENT_ID").context("GITHUB_APP_CLIENT_ID required")?;
         let github_app_client_secret = std::env::var("GITHUB_APP_CLIENT_SECRET")
             .context("GITHUB_APP_CLIENT_SECRET required")?;
-        let github_app_private_key = std::env::var("GITHUB_APP_PRIVATE_KEY")
-            .context("GITHUB_APP_PRIVATE_KEY required")?;
+        let github_app_private_key =
+            std::env::var("GITHUB_APP_PRIVATE_KEY").context("GITHUB_APP_PRIVATE_KEY required")?;
         let database_url =
             std::env::var("DATABASE_URL").unwrap_or_else(|_| "/data/metsuke.db".into());
         let base_url =

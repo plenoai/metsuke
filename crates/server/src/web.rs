@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use axum::extract::{Query, State};
-use axum::http::header::SET_COOKIE;
-use axum::http::HeaderMap;
-use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::Router;
+use axum::extract::{Query, State};
+use axum::http::HeaderMap;
+use axum::http::header::SET_COOKIE;
+use axum::response::{Html, IntoResponse, Redirect, Response};
 use serde::Deserialize;
 
 use crate::config::AppConfig;
@@ -137,14 +137,18 @@ fn get_session_from_cookie(headers: &HeaderMap) -> Option<String> {
 }
 
 fn session_cookie(session_id: &str, max_age: i64) -> String {
-    format!(
-        "session={session_id}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age={max_age}"
-    )
+    format!("session={session_id}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age={max_age}")
 }
 
 async fn index(headers: HeaderMap, State(state): State<WebState>) -> Response {
     if let Some(session_id) = get_session_from_cookie(&headers) {
-        if state.db.get_user_by_session(&session_id).ok().flatten().is_some() {
+        if state
+            .db
+            .get_user_by_session(&session_id)
+            .ok()
+            .flatten()
+            .is_some()
+        {
             return Redirect::to("/dashboard").into_response();
         }
     }
@@ -371,7 +375,10 @@ async fn auth_callback(
         Ok(id) => id,
         Err(e) => {
             tracing::error!("DB error: {e:#}");
-            return error_page("内部エラー", "予期しないエラーが発生しました。しばらく経ってから再度お試しください。");
+            return error_page(
+                "内部エラー",
+                "予期しないエラーが発生しました。しばらく経ってから再度お試しください。",
+            );
         }
     };
 
@@ -379,7 +386,10 @@ async fn auth_callback(
         Ok(s) => s,
         Err(e) => {
             tracing::error!("Session creation failed: {e:#}");
-            return error_page("内部エラー", "予期しないエラーが発生しました。しばらく経ってから再度お試しください。");
+            return error_page(
+                "内部エラー",
+                "予期しないエラーが発生しました。しばらく経ってから再度お試しください。",
+            );
         }
     };
 
@@ -396,10 +406,8 @@ async fn logout(headers: HeaderMap, State(state): State<WebState>) -> Response {
         let _ = state.db.delete_session(&session_id);
     }
     let mut resp = Redirect::to("/").into_response();
-    resp.headers_mut().insert(
-        SET_COOKIE,
-        session_cookie("", 0).parse().unwrap(),
-    );
+    resp.headers_mut()
+        .insert(SET_COOKIE, session_cookie("", 0).parse().unwrap());
     resp
 }
 
@@ -423,7 +431,11 @@ async fn install_callback(
         _ => return Redirect::to("/auth/login").into_response(),
     };
 
-    let installation = match state.github_app.get_installation(params.installation_id).await {
+    let installation = match state
+        .github_app
+        .get_installation(params.installation_id)
+        .await
+    {
         Ok(i) => i,
         Err(e) => {
             tracing::error!("Failed to get installation: {e:#}");

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json, Redirect, Response};
-use axum::Router;
 use base64::prelude::*;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -42,10 +42,7 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         .route("/oauth/authorize", axum::routing::get(authorize))
         .route("/oauth/token", axum::routing::post(token))
         .route("/oauth/register", axum::routing::post(register))
-        .route(
-            "/oauth/callback",
-            axum::routing::get(oauth_callback),
-        )
+        .route("/oauth/callback", axum::routing::get(oauth_callback))
         .with_state(state)
 }
 
@@ -96,10 +93,7 @@ struct RegisterResponse {
     token_endpoint_auth_method: String,
 }
 
-async fn register(
-    State(state): State<OAuthState>,
-    Json(req): Json<RegisterRequest>,
-) -> Response {
+async fn register(State(state): State<OAuthState>, Json(req): Json<RegisterRequest>) -> Response {
     if req.redirect_uris.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
@@ -243,7 +237,10 @@ async fn authorize(
 
     // Encode the client state into our internal state so we can return it after GitHub callback
     let combined_state = if let Some(ref client_state) = params.state {
-        format!("{internal_state}:{}", BASE64_URL_SAFE_NO_PAD.encode(client_state.as_bytes()))
+        format!(
+            "{internal_state}:{}",
+            BASE64_URL_SAFE_NO_PAD.encode(client_state.as_bytes())
+        )
     } else {
         internal_state
     };
@@ -275,11 +272,7 @@ async fn oauth_callback(
     let combined_state = match params.state {
         Some(s) => s,
         None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                "Missing state parameter",
-            )
-                .into_response();
+            return (StatusCode::BAD_REQUEST, "Missing state parameter").into_response();
         }
     };
 
@@ -363,8 +356,17 @@ async fn oauth_callback(
     }
 
     // Redirect to client with authorization code
-    let sep = if oauth_state.redirect_uri.contains('?') { "&" } else { "?" };
-    let mut redirect_url = format!("{}{}code={}", oauth_state.redirect_uri, sep, urlencoding::encode(&auth_code));
+    let sep = if oauth_state.redirect_uri.contains('?') {
+        "&"
+    } else {
+        "?"
+    };
+    let mut redirect_url = format!(
+        "{}{}code={}",
+        oauth_state.redirect_uri,
+        sep,
+        urlencoding::encode(&auth_code)
+    );
     if let Some(cs) = client_state {
         redirect_url.push_str(&format!("&state={}", urlencoding::encode(&cs)));
     }
