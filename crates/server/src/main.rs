@@ -3,13 +3,14 @@ mod blocking;
 mod config;
 mod db;
 mod github_app;
+mod oauth;
 mod server;
 mod validation;
 mod web;
 
 use std::sync::Arc;
 
-use auth::BearerAuthLayer;
+use auth::OAuthAuthLayer;
 use config::AppConfig;
 use db::Database;
 use github_app::GitHubApp;
@@ -50,12 +51,13 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let authed_mcp = ServiceBuilder::new()
-        .layer(BearerAuthLayer::new(db.clone()))
+        .layer(OAuthAuthLayer::new(db.clone(), &config.base_url))
         .service(service);
 
     let app = axum::Router::new()
         .nest_service("/mcp", authed_mcp)
         .route("/health", axum::routing::get(|| async { "ok" }))
+        .merge(oauth::router(db.clone(), github_app.clone(), &config))
         .merge(web::router(db, github_app, &config));
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;

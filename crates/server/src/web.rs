@@ -801,13 +801,7 @@ body::before {{
   <div class="section">
     <div class="section-title">MCP Connection</div>
     <div class="card">
-      <p class="mcp-desc">セッショントークンを <code>Bearer</code> トークンとしてMCPクライアントに設定してください。</p>
-
-      <div class="code-label">Session Token</div>
-      <div class="code-wrap">
-        <pre class="code-block" id="token">{session_id}</pre>
-        <button class="copy-btn" onclick="copyText('token', this)">COPY</button>
-      </div>
+      <p class="mcp-desc">MCPクライアントは <code>OAuth 2.1</code> で自動認証されます。以下の設定をMCPクライアントに追加してください。</p>
 
       <div style="margin-top:1.25rem">
         <div class="code-label">Claude Code Settings</div>
@@ -815,14 +809,19 @@ body::before {{
           <pre class="code-block" id="config">{{
   "mcpServers": {{
     "metsuke": {{
-      "url": "{base_url}/mcp",
-      "headers": {{
-        "Authorization": "Bearer {session_id}"
-      }}
+      "url": "{base_url}/mcp"
     }}
   }}
 }}</pre>
           <button class="copy-btn" onclick="copyText('config', this)">COPY</button>
+        </div>
+      </div>
+
+      <div style="margin-top:1rem">
+        <div class="code-label">Discovery Endpoints</div>
+        <div class="code-wrap">
+          <pre class="code-block" id="endpoints">Protected Resource: {base_url}/.well-known/oauth-protected-resource
+Auth Server:        {base_url}/.well-known/oauth-authorization-server</pre>
         </div>
       </div>
     </div>
@@ -842,7 +841,6 @@ function copyText(id, btn) {{
 </html>"#,
         login = login,
         install_list = install_list,
-        session_id = session_id,
         base_url = state.base_url,
     ))
     .into_response()
