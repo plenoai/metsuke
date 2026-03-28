@@ -915,6 +915,7 @@ async fn dashboard(headers: HeaderMap, State(state): State<WebState>) -> Respons
         items.join("")
     };
 
+    let install_count = installations.len();
     let head = common_head("Dashboard");
     let header = nav_header(&login, "dashboard");
 
@@ -925,6 +926,25 @@ async fn dashboard(headers: HeaderMap, State(state): State<WebState>) -> Respons
 <body>
 <div class="shell">
   {header}
+
+  <div class="section">
+    <div class="section-title">Overview</div>
+    <div class="card" id="overview-card">
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center">
+        <div style="text-align:center;min-width:80px">
+          <div id="ov-repos" style="font-size:2rem;font-weight:800;color:var(--text-primary)">—</div>
+          <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);letter-spacing:0.1em">REPOS</div>
+        </div>
+        <div style="text-align:center;min-width:80px">
+          <div id="ov-installs" style="font-size:2rem;font-weight:800;color:var(--accent-indigo)">{install_count}</div>
+          <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);letter-spacing:0.1em">INSTALLS</div>
+        </div>
+        <div style="flex:1;display:flex;justify-content:flex-end">
+          <a class="btn" href="/repos" style="font-size:0.75rem">リポジトリ一覧を見る →</a>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="section">
     <div class="section-title">Installations</div>
@@ -1083,12 +1103,12 @@ function copyText(id, btn) {{
     setTimeout(() => {{ btn.textContent = 'COPY'; btn.classList.remove('copied'); }}, 1500);
   }});
 }}
+fetch('/api/repos').then(r => r.json()).then(repos => {{
+  document.getElementById('ov-repos').textContent = repos.length;
+}}).catch(() => {{}});
 </script>
 </body>
 </html>"#,
-        head = head,
-        header = header,
-        install_list = install_list,
         base_url = state.base_url,
     ))
     .into_response()
@@ -1262,7 +1282,18 @@ async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Respon
 <div class="shell">
   {header}
 
-  <div class="section-title" id="repos-title">Repositories</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+    <div class="section-title" id="repos-title" style="margin-bottom:0">Repositories</div>
+    <button class="btn" id="verify-all-btn" onclick="verifyAll()" style="font-size:0.72rem;display:none">全リポジトリを検証</button>
+  </div>
+  <div id="verify-all-progress" style="display:none;margin-bottom:1rem">
+    <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">
+      <span id="progress-text">0 / 0</span>
+      <div style="margin-top:0.5rem;height:4px;background:var(--bg-deep);border-radius:2px;overflow:hidden">
+        <div id="progress-bar" style="height:100%;background:var(--accent-vermillion);width:0%;transition:width 0.3s ease"></div>
+      </div>
+    </div>
+  </div>
   <div id="repo-list">
     <div class="loading">リポジトリを取得中</div>
   </div>
@@ -1376,6 +1407,10 @@ async function loadRepos() {{
     `).join('') + '</div>';
 
     container.innerHTML = html;
+    allRepos = repos;
+    if (repos.length > 0) {{
+      document.getElementById('verify-all-btn').style.display = '';
+    }}
   }} catch (e) {{
     document.getElementById('repo-list').innerHTML =
       '<div class="empty-state">リポジトリの取得に失敗しました。</div>';
@@ -1419,6 +1454,31 @@ async function verifyRepo(owner, repo, btn) {{
   }}
   btn.disabled = false;
   btn.classList.remove('running');
+}}
+
+let allRepos = [];
+async function verifyAll() {{
+  const btn = document.getElementById('verify-all-btn');
+  const progressWrap = document.getElementById('verify-all-progress');
+  const progressText = document.getElementById('progress-text');
+  const progressBar = document.getElementById('progress-bar');
+  btn.disabled = true;
+  btn.textContent = '検証中…';
+  progressWrap.style.display = 'block';
+  let done = 0;
+  const total = allRepos.length;
+  progressText.textContent = `0 / ${{total}}`;
+  for (const r of allRepos) {{
+    const verifyBtn = document.querySelector(`#repo-${{r.full_name.replace('/', '-')}} .verify-btn`);
+    if (verifyBtn) {{
+      await verifyRepo(r.owner, r.name, verifyBtn);
+    }}
+    done++;
+    progressText.textContent = `${{done}} / ${{total}}`;
+    progressBar.style.width = `${{(done / total * 100).toFixed(1)}}%`;
+  }}
+  btn.disabled = false;
+  btn.textContent = '全リポジトリを検証';
 }}
 
 loadRepos();
