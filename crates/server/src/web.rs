@@ -64,326 +64,7 @@ fn common_head(title: &str) -> String {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-:root {{
-  --bg-deep: #0c0e1a;
-  --bg-surface: #141627;
-  --bg-elevated: #1c1f36;
-  --border: #2a2d47;
-  --border-subtle: #1f2139;
-  --text-primary: #e8e6e3;
-  --text-secondary: #8a8da0;
-  --accent-vermillion: #c73e3a;
-  --accent-vermillion-glow: rgba(199, 62, 58, 0.12);
-  --accent-gold: #c9a84c;
-  --accent-gold-dim: rgba(201, 168, 76, 0.1);
-  --accent-indigo: #4a5fd7;
-  --accent-green: #3a9a5c;
-  --accent-green-dim: rgba(58, 154, 92, 0.1);
-  --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
-}}
-*, *::before, *::after {{ margin: 0; padding: 0; box-sizing: border-box; }}
-body {{
-  font-family: var(--font-display);
-  background: var(--bg-deep);
-  color: var(--text-primary);
-  min-height: 100vh;
-  position: relative;
-}}
-body::before {{
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='%232a2d47' stroke-width='0.5' opacity='0.3'/%3E%3C/svg%3E");
-  background-size: 60px 60px;
-  z-index: 0;
-  pointer-events: none;
-}}
-.shell {{
-  position: relative;
-  z-index: 1;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
-}}
-
-/* header */
-.header {{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border-subtle);
-}}
-.header-left {{
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}}
-.brand {{
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-decoration: none;
-  color: var(--text-primary);
-}}
-.brand-sub {{
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}}
-.nav-links {{
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}}
-.nav-link {{
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  text-decoration: none;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}}
-.nav-link:hover, .nav-link.active {{
-  color: var(--text-primary);
-  border-color: var(--border);
-}}
-.nav-link.active {{
-  border-color: var(--accent-vermillion);
-}}
-.user-badge {{
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}}
-.user-badge strong {{
-  color: var(--text-primary);
-}}
-.logout-link {{
-  color: var(--text-secondary);
-  text-decoration: none;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}}
-.logout-link:hover {{
-  color: var(--accent-vermillion);
-  border-color: var(--accent-vermillion);
-}}
-
-/* section */
-.section {{
-  margin-bottom: 2rem;
-  animation: fadeIn 0.5s ease-out both;
-}}
-.section:nth-child(2) {{ animation-delay: 0.1s; }}
-.section:nth-child(3) {{ animation-delay: 0.2s; }}
-.section-title {{
-  font-size: 0.7rem;
-  font-family: var(--font-mono);
-  font-weight: 500;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--accent-gold);
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}}
-.section-title::before {{
-  content: '';
-  display: inline-block;
-  width: 12px;
-  height: 2px;
-  background: var(--accent-vermillion);
-}}
-
-/* card */
-.card {{
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1.25rem 1.5rem;
-  margin-bottom: 0.75rem;
-  transition: border-color 0.2s ease;
-}}
-.card:hover {{
-  border-color: #3a3d57;
-}}
-
-/* badges */
-.badge {{
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.05em;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  white-space: nowrap;
-}}
-.badge-pass {{
-  background: var(--accent-green-dim);
-  color: var(--accent-green);
-  border: 1px solid rgba(58, 154, 92, 0.25);
-}}
-.badge-fail {{
-  background: var(--accent-vermillion-glow);
-  color: var(--accent-vermillion);
-  border: 1px solid rgba(199, 62, 58, 0.25);
-}}
-.badge-review {{
-  background: var(--accent-gold-dim);
-  color: var(--accent-gold);
-  border: 1px solid rgba(201, 168, 76, 0.25);
-}}
-.badge-na {{
-  background: rgba(138, 141, 160, 0.1);
-  color: var(--text-secondary);
-  border: 1px solid rgba(138, 141, 160, 0.2);
-}}
-.badge-private {{
-  background: rgba(74, 95, 215, 0.1);
-  color: var(--accent-indigo);
-  border: 1px solid rgba(74, 95, 215, 0.2);
-}}
-
-/* buttons */
-.btn {{
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.65rem 1.3rem;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  font-weight: 500;
-  text-decoration: none;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  transition: all 0.2s ease;
-  cursor: pointer;
-  letter-spacing: 0.02em;
-}}
-.btn:hover {{
-  border-color: var(--accent-vermillion);
-  box-shadow: 0 0 16px var(--accent-vermillion-glow);
-}}
-.btn svg {{
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
-}}
-.btn-row {{
-  margin-top: 1rem;
-}}
-.verify-btn {{
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  padding: 0.4rem 0.8rem;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-}}
-.verify-btn:hover {{
-  border-color: var(--accent-vermillion);
-  box-shadow: 0 0 12px var(--accent-vermillion-glow);
-}}
-.verify-btn:disabled {{
-  opacity: 0.5;
-  cursor: not-allowed;
-}}
-.verify-btn.running {{
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
-}}
-
-/* policy selector */
-.policy-select {{
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  padding: 0.35rem 0.5rem;
-  background: var(--bg-deep);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  cursor: pointer;
-  transition: border-color 0.2s ease;
-}}
-.policy-select:hover {{
-  border-color: var(--accent-gold);
-}}
-
-/* loading */
-.loading {{
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-}}
-.loading::after {{
-  content: '';
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent-vermillion);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-left: 0.5rem;
-  vertical-align: middle;
-}}
-
-/* external link icon */
-.gh-link {{
-  color: var(--text-secondary);
-  text-decoration: none;
-  margin-left: 0.4rem;
-  vertical-align: middle;
-  transition: color 0.2s ease;
-}}
-.gh-link:hover {{
-  color: var(--text-primary);
-}}
-.gh-link svg {{
-  width: 13px;
-  height: 13px;
-  fill: currentColor;
-  vertical-align: -1px;
-}}
-
-@keyframes spin {{
-  to {{ transform: rotate(360deg); }}
-}}
-@keyframes fadeIn {{
-  from {{ opacity: 0; transform: translateY(8px); }}
-  to {{ opacity: 1; transform: translateY(0); }}
-}}
-@media (max-width: 600px) {{
-  .shell {{ padding: 1.5rem 1rem 3rem; }}
-  .header {{ flex-direction: column; align-items: flex-start; gap: 1rem; }}
-  .brand {{ font-size: 1.3rem; }}
-}}
-</style>
+<link rel="stylesheet" href="/static/style.css">
 </head>"#,
     )
 }
@@ -403,13 +84,14 @@ fn nav_header(login: &str, active_page: &str) -> String {
         "nav-link"
     };
     format!(
-        r#"<header class="header">
+        r##"<a class="skip-link" href="#main">コンテンツへスキップ</a>
+  <header class="header" role="banner">
     <div class="header-left">
       <div>
-        <a class="brand" href="/dashboard">目付</a>
+        <a class="brand" href="/dashboard" aria-label="Metsuke ホーム">目付</a>
         <div class="brand-sub">Metsuke</div>
       </div>
-      <nav class="nav-links">
+      <nav class="nav-links" aria-label="メインナビゲーション">
         <a class="{dash_class}" href="/dashboard">Dashboard</a>
         <a class="{repos_class}" href="/repos">Repos</a>
       </nav>
@@ -418,7 +100,8 @@ fn nav_header(login: &str, active_page: &str) -> String {
       <strong>{login}</strong>
       <a class="logout-link" href="/auth/logout">logout</a>
     </div>
-  </header>"#,
+  </header>
+  <main id="main" role="main">"##,
     )
 }
 
@@ -987,6 +670,7 @@ Auth Server:        {base_url}/.well-known/oauth-authorization-server</pre>
       </div>
     </div>
   </div>
+  </main>
 </div>
 <style>
 /* dashboard-specific styles */
@@ -1297,6 +981,7 @@ async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Respon
   <div id="repo-list">
     <div class="loading">リポジトリを取得中</div>
   </div>
+  </main>
 </div>
 <style>
 .repo-grid {{
@@ -1539,6 +1224,7 @@ async fn repo_detail_page(
   </div>
 
   <div id="result-area"></div>
+  </main>
 </div>
 
 <style>

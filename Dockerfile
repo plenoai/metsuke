@@ -17,6 +17,8 @@ RUN cargo build --release --bin metsuke
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/metsuke /usr/local/bin/
+COPY --from=builder /app/crates/server/static /app/static
 ENV PORT=8080
+ENV STATIC_DIR=/app/static
 EXPOSE 8080
 CMD ["metsuke"]

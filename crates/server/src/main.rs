@@ -54,8 +54,10 @@ async fn main() -> anyhow::Result<()> {
         .layer(OAuthAuthLayer::new(db.clone(), &config.base_url))
         .service(service);
 
+    let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "crates/server/static".into());
     let app = axum::Router::new()
         .nest_service("/mcp", authed_mcp)
+        .nest_service("/static", tower_http::services::ServeDir::new(&static_dir))
         .route("/health", axum::routing::get(|| async { "ok" }))
         .merge(oauth::router(db.clone(), github_app.clone(), &config))
         .merge(web::router(db, github_app, &config));
