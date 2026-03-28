@@ -942,19 +942,18 @@ async fn api_verify_repo(
                 let mut fail = 0i64;
                 let mut review = 0i64;
                 let mut na = 0i64;
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json) {
-                    if let Some(findings) = val
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json)
+                    && let Some(findings) = val
                         .get("report")
                         .and_then(|r| r.get("findings"))
                         .and_then(|f| f.as_array())
-                    {
-                        for f in findings {
-                            match f.get("status").and_then(|s| s.as_str()) {
-                                Some("Satisfied") => pass += 1,
-                                Some("Violated") => fail += 1,
-                                Some("Indeterminate") => review += 1,
-                                _ => na += 1,
-                            }
+                {
+                    for f in findings {
+                        match f.get("status").and_then(|s| s.as_str()) {
+                            Some("Satisfied") => pass += 1,
+                            Some("Violated") => fail += 1,
+                            Some("Indeterminate") => review += 1,
+                            _ => na += 1,
                         }
                     }
                 }
