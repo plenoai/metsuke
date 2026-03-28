@@ -23,33 +23,14 @@ Metsuke MCPサーバー (https://metsuke.fly.dev/mcp) を使い、PR・リリー
   - `slsa-l3` — SLSA v1.2 Level 3ポリシー
   - `slsa-l4` — SLSA v1.2 Level 4ポリシー（最高レベル）
 
-### レスポンス構造
-
-全ツール共通で `VerificationResult` を返す:
-
-- `profile_name` — 適用されたポリシー名
-- `findings[]` — コントロールごとの評価結果
-  - `control_id` — コントロールID（例: `SLSA-L2-SCM-1`）
-  - `status` — `Satisfied` | `Violated` | `Indeterminate` | `NotApplicable`
-  - `rationale` — 判定理由
-  - `subjects[]` — 対象エンティティ（ファイルパス、コミットSHAなど）
-  - `evidence_gaps[]` — エビデンス収集の欠損（`CollectionFailed`, `Truncated`, `MissingField`, `DiffUnavailable`, `Unsupported`）
-- `outcomes[]` — ポリシーに基づくゲート判定
-  - `control_id` — コントロールID
-  - `severity` — `Info` | `Warning` | `Error`
-  - `decision` — `Pass` | `Review` | `Fail`
-  - `rationale` — 判定理由
-- `severity_labels` — severityの表示ラベル
-- `evidence`（オプション） — 生エビデンスバンドル
-
 ### PR検証 (`pr`)
 
 1. ユーザーの入力から owner, repo, pr_number を抽出する
 2. MCP tool `verify_pr` を呼び出す
 3. 結果をサマリーとして表示する:
-   - `profile_name` と decision ごとの件数（Pass / Review / Fail）
-   - Fail/Review の `control_id`、`severity`、`rationale`
-   - `evidence_gaps` があれば欠損情報を補足
+   - Pass / Review / Fail の件数
+   - 不合格コントロールのIDと理由
+   - エビデンス収集に欠損があればその旨
    - 改善アクションの提案
 
 ### リリース検証 (`release`)
@@ -57,15 +38,15 @@ Metsuke MCPサーバー (https://metsuke.fly.dev/mcp) を使い、PR・リリー
 1. ユーザーの入力から owner, repo, base_tag, head_tag を抽出する
 2. MCP tool `verify_release` を呼び出す
 3. 結果をサマリーとして表示する:
-   - `profile_name` と decision ごとの件数（Pass / Review / Fail）
-   - Fail/Review の `control_id`、`severity`、`rationale`
-   - `findings` の `status` が `Violated` / `Indeterminate` のコントロール詳細
+   - Pass / Review / Fail の件数
+   - 不合格コントロールのIDと理由
+   - リリース間の変更に対するコンプライアンス状態
 
 ### リポジトリ検証 (`repo`)
 
 1. ユーザーの入力から owner, repo, reference (デフォルト: HEAD) を抽出する
 2. MCP tool `verify_repo` を呼び出す
 3. 結果をサマリーとして表示する:
-   - `profile_name` と decision ごとの件数（Pass / Review / Fail）
-   - `findings` から依存性の署名検証状態（`status` と `subjects`）
-   - Fail/Review の `control_id`、`severity`、`rationale`
+   - Pass / Review / Fail の件数
+   - 依存パッケージの署名検証状態
+   - 不合格コントロールのIDと理由
