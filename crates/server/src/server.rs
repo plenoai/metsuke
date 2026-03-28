@@ -22,8 +22,10 @@ pub struct MetsukeServer {
     tool_router: ToolRouter<Self>,
 }
 
-fn mcp_err(msg: impl std::fmt::Display) -> ErrorData {
-    ErrorData::internal_error(msg.to_string(), None)
+fn tool_error(msg: impl std::fmt::Display) -> CallToolResult {
+    let mut result = CallToolResult::success(vec![Content::text(msg.to_string())]);
+    result.is_error = Some(true);
+    result
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -116,14 +118,17 @@ impl MetsukeServer {
         if let Some(ref p) = args.policy {
             validate_policy(p)?;
         }
-        let token = self.get_github_token(&args.owner).await.map_err(mcp_err)?;
+        let token = match self.get_github_token(&args.owner).await {
+            Ok(t) => t,
+            Err(e) => return Ok(tool_error(e)),
+        };
         let owner = args.owner;
         let repo = args.repo;
         let pr_number = args.pr_number;
         let policy = args.policy;
         let with_evidence = args.with_evidence;
 
-        let result = run_blocking(move || {
+        let result = match run_blocking(move || {
             let config = libverify_github::GitHubConfig {
                 token,
                 repo: format!("{owner}/{repo}"),
@@ -140,9 +145,13 @@ impl MetsukeServer {
             )
         })
         .await
-        .map_err(mcp_err)?;
+        {
+            Ok(r) => r,
+            Err(e) => return Ok(tool_error(e)),
+        };
 
-        let json = serde_json::to_string_pretty(&result).map_err(mcp_err)?;
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 
@@ -156,7 +165,10 @@ impl MetsukeServer {
         if let Some(ref p) = args.policy {
             validate_policy(p)?;
         }
-        let token = self.get_github_token(&args.owner).await.map_err(mcp_err)?;
+        let token = match self.get_github_token(&args.owner).await {
+            Ok(t) => t,
+            Err(e) => return Ok(tool_error(e)),
+        };
         let owner = args.owner;
         let repo = args.repo;
         let base_tag = args.base_tag;
@@ -164,7 +176,7 @@ impl MetsukeServer {
         let policy = args.policy;
         let with_evidence = args.with_evidence;
 
-        let result = run_blocking(move || {
+        let result = match run_blocking(move || {
             let config = libverify_github::GitHubConfig {
                 token,
                 repo: format!("{owner}/{repo}"),
@@ -182,9 +194,13 @@ impl MetsukeServer {
             )
         })
         .await
-        .map_err(mcp_err)?;
+        {
+            Ok(r) => r,
+            Err(e) => return Ok(tool_error(e)),
+        };
 
-        let json = serde_json::to_string_pretty(&result).map_err(mcp_err)?;
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 
@@ -199,14 +215,17 @@ impl MetsukeServer {
         if let Some(ref p) = args.policy {
             validate_policy(p)?;
         }
-        let token = self.get_github_token(&args.owner).await.map_err(mcp_err)?;
+        let token = match self.get_github_token(&args.owner).await {
+            Ok(t) => t,
+            Err(e) => return Ok(tool_error(e)),
+        };
         let owner = args.owner;
         let repo = args.repo;
         let reference = args.reference;
         let policy = args.policy;
         let with_evidence = args.with_evidence;
 
-        let result = run_blocking(move || {
+        let result = match run_blocking(move || {
             let config = libverify_github::GitHubConfig {
                 token,
                 repo: format!("{owner}/{repo}"),
@@ -223,9 +242,13 @@ impl MetsukeServer {
             )
         })
         .await
-        .map_err(mcp_err)?;
+        {
+            Ok(r) => r,
+            Err(e) => return Ok(tool_error(e)),
+        };
 
-        let json = serde_json::to_string_pretty(&result).map_err(mcp_err)?;
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 }
