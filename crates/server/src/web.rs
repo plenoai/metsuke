@@ -174,10 +174,10 @@ fn validate_repo_params(owner: &str, repo: &str) -> Option<Response> {
 }
 
 fn validate_policy_param(policy: Option<&str>) -> Option<Response> {
-    if let Some(p) = policy {
-        if let Err(e) = validation::validate_policy(p) {
-            return Some((axum::http::StatusCode::BAD_REQUEST, e.message).into_response());
-        }
+    if let Some(p) = policy
+        && let Err(e) = validation::validate_policy(p)
+    {
+        return Some((axum::http::StatusCode::BAD_REQUEST, e.message).into_response());
     }
     None
 }
