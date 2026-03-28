@@ -945,3 +945,130 @@ async fn repo_detail_page(
     .into_web_template()
     .into_response()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_template_renders() {
+        let t = ErrorTemplate {
+            title: "テスト".into(),
+            message: "エラーメッセージ".into(),
+        };
+        let html = t.render().unwrap();
+        assert!(html.contains("テスト"));
+        assert!(html.contains("エラーメッセージ"));
+        assert!(html.contains("style.css"));
+    }
+
+    #[test]
+    fn dashboard_template_renders() {
+        let t = DashboardTemplate {
+            login: "testuser".into(),
+            active_page: "dashboard",
+            installations: vec![(1, "myorg".into(), "Organization".into())],
+            install_count: 1,
+            base_url: "https://example.com".into(),
+        };
+        let html = t.render().unwrap();
+        assert!(html.contains("testuser"));
+        assert!(html.contains("myorg"));
+        assert!(html.contains("Organization"));
+        assert!(html.contains("https://example.com/mcp"));
+        assert!(!html.contains("はじめに"));
+    }
+
+    #[test]
+    fn dashboard_shows_onboarding_when_no_installs() {
+        let t = DashboardTemplate {
+            login: "newuser".into(),
+            active_page: "dashboard",
+            installations: vec![],
+            install_count: 0,
+            base_url: "https://example.com".into(),
+        };
+        let html = t.render().unwrap();
+        assert!(html.contains("はじめに"));
+    }
+
+    #[test]
+    fn repos_template_renders() {
+        let t = ReposTemplate {
+            login: "testuser".into(),
+            active_page: "repos",
+            policy_options: POLICY_OPTIONS,
+        };
+        let html = t.render().unwrap();
+        assert!(html.contains("Repositories"));
+        assert!(html.contains("testuser"));
+        assert!(html.contains("slsa-l4"));
+    }
+
+    #[test]
+    fn repo_detail_template_renders() {
+        let t = RepoDetailTemplate {
+            login: "testuser".into(),
+            active_page: "repos",
+            owner: "myorg".into(),
+            repo: "myrepo".into(),
+            policy_options: POLICY_OPTIONS,
+        };
+        let html = t.render().unwrap();
+        assert!(html.contains("myorg"));
+        assert!(html.contains("myrepo"));
+        assert!(html.contains("PR検証"));
+    }
+
+    #[test]
+    fn verify_pr_template_renders() {
+        let t = VerifyPrTemplate {
+            login: "testuser".into(),
+            active_page: "repos",
+            owner: "myorg".into(),
+            repo: "myrepo".into(),
+            policy_options: POLICY_OPTIONS,
+        };
+        let html = t.render().unwrap();
+        assert!(html.contains("PR検証"));
+        assert!(html.contains("pr-number"));
+        assert!(html.contains("Open Pull Requests"));
+    }
+
+    #[test]
+    fn nav_highlights_active_page() {
+        let dashboard = DashboardTemplate {
+            login: "u".into(),
+            active_page: "dashboard",
+            installations: vec![],
+            install_count: 0,
+            base_url: "https://x.com".into(),
+        };
+        let html = dashboard.render().unwrap();
+        assert!(html.contains(r#"nav-link active" href="/dashboard"#));
+
+        let repos = ReposTemplate {
+            login: "u".into(),
+            active_page: "repos",
+            policy_options: POLICY_OPTIONS,
+        };
+        let html = repos.render().unwrap();
+        assert!(html.contains(r#"nav-link active" href="/repos"#));
+    }
+
+    #[test]
+    fn policy_options_constant() {
+        assert!(POLICY_OPTIONS.contains(&"default"));
+        assert!(POLICY_OPTIONS.contains(&"slsa-l4"));
+        assert_eq!(POLICY_OPTIONS.len(), 9);
+    }
+
+    #[test]
+    fn session_cookie_format() {
+        let cookie = session_cookie("abc123", 3600);
+        assert!(cookie.contains("session=abc123"));
+        assert!(cookie.contains("HttpOnly"));
+        assert!(cookie.contains("Secure"));
+        assert!(cookie.contains("SameSite=Lax"));
+    }
+}
