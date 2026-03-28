@@ -968,14 +968,14 @@ async fn api_verify_repo(
                 axum::http::StatusCode::NOT_FOUND,
                 "No installation found for this owner",
             )
-                .into_response()
+                .into_response();
         }
         Err(e) => {
             return (
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 format!("{e}"),
             )
-                .into_response()
+                .into_response();
         }
     };
 
@@ -990,7 +990,7 @@ async fn api_verify_repo(
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 format!("{e}"),
             )
-                .into_response()
+                .into_response();
         }
     };
 
@@ -1004,14 +1004,7 @@ async fn api_verify_repo(
             host: "api.github.com".into(),
         };
         let client = libverify_github::GitHubClient::new(&config)?;
-        libverify_github::verify_repo(
-            &client,
-            &owner_c,
-            &repo_c,
-            "HEAD",
-            policy.as_deref(),
-            false,
-        )
+        libverify_github::verify_repo(&client, &owner_c, &repo_c, "HEAD", policy.as_deref(), false)
     })
     .await;
 
