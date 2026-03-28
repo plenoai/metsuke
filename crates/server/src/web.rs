@@ -55,10 +55,18 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             "/repos/{owner}/{repo}",
             axum::routing::get(repo_detail_page),
         )
+        .route(
+            "/repos/{owner}/{repo}/pulls",
+            axum::routing::get(verify_pr_page),
+        )
         .route("/api/repos", axum::routing::get(api_repos))
         .route(
             "/api/repos/{owner}/{repo}/verify",
             axum::routing::post(api_verify_repo),
+        )
+        .route(
+            "/api/repos/{owner}/{repo}/verify-pr/{pr_number}",
+            axum::routing::post(api_verify_pr),
         )
         .route(
             "/api/verification-cache",
@@ -99,6 +107,16 @@ struct ReposTemplate {
 #[derive(Template)]
 #[template(path = "repo_detail.html")]
 struct RepoDetailTemplate {
+    login: String,
+    active_page: &'static str,
+    owner: String,
+    repo: String,
+    policy_options: &'static [&'static str],
+}
+
+#[derive(Template)]
+#[template(path = "verify_pr.html")]
+struct VerifyPrTemplate {
     login: String,
     active_page: &'static str,
     owner: String,
@@ -713,6 +731,121 @@ async fn api_verification_cache(headers: HeaderMap, State(state): State<WebState
         .collect();
 
     Json(json).into_response()
+}
+
+// ---------------------------------------------------------------------------
+// PR verification API
+// ---------------------------------------------------------------------------
+
+async fn api_verify_pr(
+    headers: HeaderMap,
+    Path((owner, repo, pr_number)): Path<(String, String, u32)>,
+    Query(query): Query<VerifyQuery>,
+    State(state): State<WebState>,
+) -> Response {
+    let session_id = match get_session_from_cookie(&headers) {
+        Some(s) => s,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
+        Ok(Some(u)) => u,
+        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let installation_id = match state.db.get_installation_for_owner(user_id, &owner) {
+        Ok(Some(id)) => id,
+        Ok(None) => {
+            return (
+                axum::http::StatusCode::NOT_FOUND,
+                "No installation found for this owner",
+            )
+                .into_response();
+        }
+        Err(e) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{e}"),
+            )
+                .into_response();
+        }
+    };
+
+    let token = match state
+        .github_app
+        .create_installation_token(installation_id)
+        .await
+    {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{e}"),
+            )
+                .into_response();
+        }
+    };
+
+    let policy = query.policy;
+    let owner_c = owner.clone();
+    let repo_c = repo.clone();
+
+    let result = run_blocking(move || {
+        let config = libverify_github::GitHubConfig {
+            token,
+            repo: format!("{owner_c}/{repo_c}"),
+            host: "api.github.com".into(),
+        };
+        let client = libverify_github::GitHubClient::new(&config)?;
+        libverify_github::verify_pr(
+            &client,
+            &owner_c,
+            &repo_c,
+            pr_number,
+            policy.as_deref(),
+            false,
+        )
+    })
+    .await;
+
+    match result {
+        Ok(r) => Json(r).into_response(),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{e}"),
+        )
+            .into_response(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PR verification page
+// ---------------------------------------------------------------------------
+
+async fn verify_pr_page(
+    headers: HeaderMap,
+    Path((owner, repo)): Path<(String, String)>,
+    State(state): State<WebState>,
+) -> Response {
+    let session_id = match get_session_from_cookie(&headers) {
+        Some(s) => s,
+        None => return Redirect::to("/").into_response(),
+    };
+
+    let (_user_id, login) = match state.db.get_user_by_session(&session_id) {
+        Ok(Some(u)) => u,
+        _ => return Redirect::to("/").into_response(),
+    };
+
+    VerifyPrTemplate {
+        login,
+        active_page: "repos",
+        owner,
+        repo,
+        policy_options: POLICY_OPTIONS,
+    }
+    .into_web_template()
+    .into_response()
 }
 
 // ---------------------------------------------------------------------------

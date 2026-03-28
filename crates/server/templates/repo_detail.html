@@ -61,7 +61,8 @@
           GitHub で開く
         </a>
       </div>
-      <div style="display:flex;align-items:center;gap:0.5rem">
+      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+        <a class="verify-btn" href="/repos/{{ owner }}/{{ repo }}/pulls" style="text-decoration:none">PR検証</a>
         <select class="policy-select" id="policy-select">
           {% for p in policy_options %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
         </select>
