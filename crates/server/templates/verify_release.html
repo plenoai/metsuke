@@ -189,56 +189,58 @@ function esc(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function renderReleaseList(releases) {
+  allReleases = releases;
+
+  // Populate tag selects
+  const baseSelect = document.getElementById('base-tag');
+  const headSelect = document.getElementById('head-tag');
+  if (releases.length < 2) {
+    baseSelect.innerHTML = '<option value="">タグが不足しています</option>';
+    headSelect.innerHTML = '<option value="">タグが不足しています</option>';
+  } else {
+    const opts = releases.map(r => `<option value="${esc(r.tag_name)}">${esc(r.tag_name)}</option>`).join('');
+    baseSelect.innerHTML = opts;
+    headSelect.innerHTML = opts;
+    baseSelect.value = releases[1].tag_name;
+    headSelect.value = releases[0].tag_name;
+  }
+
+  // Render release list
+  const container = document.getElementById('release-list');
+  if (releases.length === 0) {
+    container.innerHTML = '<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">リリースはありません</div>';
+    return;
+  }
+  container.innerHTML = '<div class="release-list">' + releases.map((rel, i) => {
+    const prevTag = i < releases.length - 1 ? releases[i + 1].tag_name : null;
+    const date = rel.published_at || rel.created_at;
+    const name = rel.name || rel.tag_name;
+    return `<div class="release-item">
+      <div class="release-item-info">
+        <div class="release-item-tag">
+          ${esc(rel.tag_name)}
+          ${name !== rel.tag_name ? `<span style="font-weight:400;color:var(--text-secondary);font-size:0.75rem;margin-left:0.5rem">${esc(name)}</span>` : ''}
+        </div>
+        <div class="release-item-meta">
+          <span>${esc(rel.author.login)}</span>
+          <span>${new Date(date).toLocaleDateString('ja-JP')}</span>
+          ${rel.prerelease ? '<span class="release-prerelease">pre-release</span>' : ''}
+          ${rel.draft ? '<span class="release-prerelease">draft</span>' : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:0.4rem;align-items:center">
+        <div id="release-result-${i}" class="result-summary" style="display:flex;gap:0.25rem"></div>
+        ${prevTag ? `<button class="verify-btn" onclick="verifyReleaseByTag('${esc(prevTag)}', '${esc(rel.tag_name)}', ${i}, this)">検証</button>` : '<span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-secondary)">初回リリース</span>'}
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
 async function loadReleases() {
   try {
-    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/releases`);
-    const releases = resp.ok ? await resp.json() : [];
-    allReleases = releases;
-
-    // Populate tag selects
-    const baseSelect = document.getElementById('base-tag');
-    const headSelect = document.getElementById('head-tag');
-    if (releases.length < 2) {
-      baseSelect.innerHTML = '<option value="">タグが不足しています</option>';
-      headSelect.innerHTML = '<option value="">タグが不足しています</option>';
-    } else {
-      const opts = releases.map(r => `<option value="${esc(r.tag_name)}">${esc(r.tag_name)}</option>`).join('');
-      baseSelect.innerHTML = opts;
-      headSelect.innerHTML = opts;
-      // Default: base = second release (older), head = first release (newer)
-      baseSelect.value = releases[1].tag_name;
-      headSelect.value = releases[0].tag_name;
-    }
-
-    // Render release list
-    const container = document.getElementById('release-list');
-    if (releases.length === 0) {
-      container.innerHTML = '<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">リリースはありません</div>';
-      return;
-    }
-    container.innerHTML = '<div class="release-list">' + releases.map((rel, i) => {
-      const prevTag = i < releases.length - 1 ? releases[i + 1].tag_name : null;
-      const date = rel.published_at || rel.created_at;
-      const name = rel.name || rel.tag_name;
-      return `<div class="release-item">
-        <div class="release-item-info">
-          <div class="release-item-tag">
-            ${esc(rel.tag_name)}
-            ${name !== rel.tag_name ? `<span style="font-weight:400;color:var(--text-secondary);font-size:0.75rem;margin-left:0.5rem">${esc(name)}</span>` : ''}
-          </div>
-          <div class="release-item-meta">
-            <span>${esc(rel.author.login)}</span>
-            <span>${new Date(date).toLocaleDateString('ja-JP')}</span>
-            ${rel.prerelease ? '<span class="release-prerelease">pre-release</span>' : ''}
-            ${rel.draft ? '<span class="release-prerelease">draft</span>' : ''}
-          </div>
-        </div>
-        <div style="display:flex;gap:0.4rem;align-items:center">
-          <div id="release-result-${i}" class="result-summary" style="display:flex;gap:0.25rem"></div>
-          ${prevTag ? `<button class="verify-btn" onclick="verifyReleaseByTag('${esc(prevTag)}', '${esc(rel.tag_name)}', ${i}, this)">検証</button>` : '<span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-secondary)">初回リリース</span>'}
-        </div>
-      </div>`;
-    }).join('') + '</div>';
+    const releases = await swrFetch(`/api/repos/${OWNER}/${REPO}/releases`);
+    renderReleaseList(releases);
   } catch (e) {
     document.getElementById('release-list').innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem">リリースの取得に失敗しました</div>';
   }

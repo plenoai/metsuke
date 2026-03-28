@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::sync::Arc;
 
 use askama::Template;
@@ -13,6 +14,7 @@ use crate::blocking::run_blocking;
 use crate::config::AppConfig;
 use crate::db::Database;
 use crate::github_app::GitHubApp;
+use crate::swr_cache::{CacheStatus, SwrCache};
 use crate::validation::{self, validate_git_ref};
 
 // ---------------------------------------------------------------------------
@@ -32,6 +34,7 @@ struct WebState {
     db: Arc<Database>,
     github_app: Arc<GitHubApp>,
     base_url: String,
+    cache: SwrCache,
 }
 
 pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig) -> Router {
@@ -39,6 +42,10 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         db,
         github_app,
         base_url: config.base_url.clone(),
+        cache: SwrCache::new(
+            std::time::Duration::from_secs(60),
+            std::time::Duration::from_secs(300),
+        ),
     };
 
     Router::new()
@@ -92,6 +99,48 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         )
         .route("/api/audit-history", axum::routing::get(api_audit_history))
         .with_state(state)
+}
+
+// ---------------------------------------------------------------------------
+// SWR cache helper
+// ---------------------------------------------------------------------------
+
+/// Shared SWR response logic for GitHub API endpoints.
+/// On Fresh: return cached. On Stale: return cached + spawn background refresh.
+/// On Miss: fetch synchronously and cache.
+async fn swr_respond<F, Fut, T>(cache: &SwrCache, key: String, label: &str, fetch_fn: F) -> Response
+where
+    F: FnOnce() -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = anyhow::Result<T>> + Send,
+    T: Serialize + Send + 'static,
+{
+    match cache.get(&key).await {
+        CacheStatus::Fresh(v) => Json(v).into_response(),
+        CacheStatus::Stale(v) => {
+            let cache = cache.clone();
+            let ck = key.clone();
+            let label = label.to_owned();
+            let f = fetch_fn.clone();
+            cache.mark_revalidating(&ck).await;
+            tokio::spawn(async move {
+                match f().await {
+                    Ok(fresh) => cache.set(ck, fresh).await,
+                    Err(e) => tracing::warn!("SWR background revalidation failed for {label}: {e:#}"),
+                }
+            });
+            Json(v).into_response()
+        }
+        CacheStatus::Miss => match fetch_fn().await {
+            Ok(fresh) => {
+                cache.set(key, &fresh).await;
+                Json(fresh).into_response()
+            }
+            Err(e) => {
+                tracing::warn!("SWR fetch failed for {label}: {e:#}");
+                Json(serde_json::Value::Array(vec![])).into_response()
+            }
+        },
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -606,6 +655,15 @@ async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Respons
         _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
+    let cache_key = format!("repos:user:{user_id}");
+    let st = state.clone();
+    swr_respond(&state.cache, cache_key, "repos", move || async move {
+        Ok(fetch_repos(&st, user_id).await)
+    })
+    .await
+}
+
+async fn fetch_repos(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
     let installations = state
         .db
         .get_installations_for_user(user_id)
@@ -637,8 +695,7 @@ async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Respons
             }
         }
     }
-
-    Json(repos).into_response()
+    repos
 }
 
 #[derive(Deserialize)]
@@ -830,17 +887,14 @@ async fn api_list_pulls(
         Err(_) => return Json(Vec::<serde_json::Value>::new()).into_response(),
     };
 
-    match state
-        .github_app
-        .list_pull_requests(installation_id, &owner, &repo)
-        .await
-    {
-        Ok(prs) => Json(prs).into_response(),
-        Err(e) => {
-            tracing::warn!("Failed to list PRs for {owner}/{repo}: {e:#}");
-            Json(Vec::<serde_json::Value>::new()).into_response()
-        }
-    }
+    let cache_key = format!("pulls:{owner}/{repo}:inst:{installation_id}");
+    let app = state.github_app.clone();
+    let o = owner.clone();
+    let r = repo.clone();
+    swr_respond(&state.cache, cache_key, "pulls", move || async move {
+        app.list_pull_requests(installation_id, &o, &r).await
+    })
+    .await
 }
 
 // ---------------------------------------------------------------------------
@@ -872,17 +926,14 @@ async fn api_list_releases(
         Err(_) => return Json(Vec::<serde_json::Value>::new()).into_response(),
     };
 
-    match state
-        .github_app
-        .list_releases(installation_id, &owner, &repo)
-        .await
-    {
-        Ok(releases) => Json(releases).into_response(),
-        Err(e) => {
-            tracing::warn!("Failed to list releases for {owner}/{repo}: {e:#}");
-            Json(Vec::<serde_json::Value>::new()).into_response()
-        }
-    }
+    let cache_key = format!("releases:{owner}/{repo}:inst:{installation_id}");
+    let app = state.github_app.clone();
+    let o = owner.clone();
+    let r = repo.clone();
+    swr_respond(&state.cache, cache_key, "releases", move || async move {
+        app.list_releases(installation_id, &o, &r).await
+    })
+    .await
 }
 
 // ---------------------------------------------------------------------------

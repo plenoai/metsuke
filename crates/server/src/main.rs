@@ -5,6 +5,7 @@ mod db;
 mod github_app;
 mod oauth;
 mod server;
+mod swr_cache;
 mod validation;
 mod web;
 

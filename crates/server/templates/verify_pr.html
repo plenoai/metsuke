@@ -271,31 +271,34 @@ document.getElementById('pr-number').addEventListener('keydown', e => {
 });
 
 // Load open PRs
-async function loadPRs() {
-  try {
-    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/pulls`);
-    const prs = resp.ok ? await resp.json() : [];
-    const container = document.getElementById('pr-list');
-    if (prs.length === 0) {
-      container.innerHTML = '<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">オープンなPRはありません</div>';
-      return;
-    }
-    container.innerHTML = '<div class="pr-list">' + prs.map(pr => `
-      <div class="pr-item">
-        <div class="pr-item-info">
-          <div class="pr-item-title">#${pr.number} ${esc(pr.title)}</div>
-          <div class="pr-item-meta">
-            <span>${esc(pr.user.login)}</span>
-            <span>${new Date(pr.updated_at).toLocaleDateString('ja-JP')}</span>
-            ${pr.draft ? '<span class="pr-draft">draft</span>' : ''}
-          </div>
-        </div>
-        <div style="display:flex;gap:0.4rem;align-items:center">
-          <div id="pr-result-${pr.number}" class="result-summary" style="display:flex;gap:0.25rem"></div>
-          <button class="verify-btn" onclick="verifyPRById(${pr.number}, this)">検証</button>
+function renderPRList(prs) {
+  const container = document.getElementById('pr-list');
+  if (prs.length === 0) {
+    container.innerHTML = '<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">オープンなPRはありません</div>';
+    return;
+  }
+  container.innerHTML = '<div class="pr-list">' + prs.map(pr => `
+    <div class="pr-item">
+      <div class="pr-item-info">
+        <div class="pr-item-title">#${pr.number} ${esc(pr.title)}</div>
+        <div class="pr-item-meta">
+          <span>${esc(pr.user.login)}</span>
+          <span>${new Date(pr.updated_at).toLocaleDateString('ja-JP')}</span>
+          ${pr.draft ? '<span class="pr-draft">draft</span>' : ''}
         </div>
       </div>
-    `).join('') + '</div>';
+      <div style="display:flex;gap:0.4rem;align-items:center">
+        <div id="pr-result-${pr.number}" class="result-summary" style="display:flex;gap:0.25rem"></div>
+        <button class="verify-btn" onclick="verifyPRById(${pr.number}, this)">検証</button>
+      </div>
+    </div>
+  `).join('') + '</div>';
+}
+
+async function loadPRs() {
+  try {
+    const prs = await swrFetch(`/api/repos/${OWNER}/${REPO}/pulls`);
+    renderPRList(prs);
   } catch (e) {
     document.getElementById('pr-list').innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem">PRの取得に失敗しました</div>';
   }

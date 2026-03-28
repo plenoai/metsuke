@@ -34,6 +34,29 @@
     {% block content %}{% endblock %}
   </main>
 </div>
+<script>
+// SWR (Stale-While-Revalidate) fetch helper.
+// Returns cached data immediately if fresh; otherwise fetches and caches.
+// On fetch error, falls back to stale cache if available.
+const _swrCache = {};
+async function swrFetch(url, { maxAge = 60000 } = {}) {
+  const entry = _swrCache[url];
+  const now = Date.now();
+
+  if (entry && now - entry.ts < maxAge) return entry.data;
+
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(resp.statusText);
+    const data = await resp.json();
+    _swrCache[url] = { data, ts: now };
+    return data;
+  } catch (e) {
+    if (entry) return entry.data;
+    throw e;
+  }
+}
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
