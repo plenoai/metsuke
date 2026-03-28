@@ -454,12 +454,12 @@ async fn handle_authorization_code_grant(state: OAuthState, req: TokenRequest) -
     }
 
     // Validate client_secret if client uses client_secret_post
-    if let Ok(Some(client)) = state.db.get_oauth_client(&client_id) {
-        if client.token_endpoint_auth_method == "client_secret_post" {
-            match (&client.client_secret, &req.client_secret) {
-                (Some(expected), Some(provided)) if expected == provided => {}
-                _ => return token_error("invalid_client", "Invalid client_secret"),
-            }
+    if let Ok(Some(client)) = state.db.get_oauth_client(&client_id)
+        && client.token_endpoint_auth_method == "client_secret_post"
+    {
+        match (&client.client_secret, &req.client_secret) {
+            (Some(expected), Some(provided)) if expected == provided => {}
+            _ => return token_error("invalid_client", "Invalid client_secret"),
         }
     }
 

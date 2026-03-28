@@ -121,8 +121,6 @@ body {{
 </div>
 </body>
 </html>"#,
-        title = title,
-        message = message,
     ))
     .into_response()
 }
@@ -141,16 +139,15 @@ fn session_cookie(session_id: &str, max_age: i64) -> String {
 }
 
 async fn index(headers: HeaderMap, State(state): State<WebState>) -> Response {
-    if let Some(session_id) = get_session_from_cookie(&headers) {
-        if state
+    if let Some(session_id) = get_session_from_cookie(&headers)
+        && state
             .db
             .get_user_by_session(&session_id)
             .ok()
             .flatten()
             .is_some()
-        {
-            return Redirect::to("/dashboard").into_response();
-        }
+    {
+        return Redirect::to("/dashboard").into_response();
     }
 
     Html(
