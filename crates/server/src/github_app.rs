@@ -65,6 +65,22 @@ pub struct Repository {
     pub updated_at: Option<String>,
 }
 
+#[derive(Deserialize, Serialize, Clone)]
+pub struct PullRequest {
+    pub number: u32,
+    pub title: String,
+    pub state: String,
+    pub user: PullRequestUser,
+    pub created_at: String,
+    pub updated_at: String,
+    pub draft: Option<bool>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct PullRequestUser {
+    pub login: String,
+}
+
 impl GitHubApp {
     pub fn new(
         app_id: u64,
@@ -180,6 +196,29 @@ impl GitHubApp {
             page += 1;
         }
         Ok(repos)
+    }
+
+    pub async fn list_pull_requests(
+        &self,
+        installation_id: i64,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<PullRequest>> {
+        let token = self.create_installation_token(installation_id).await?;
+        let client = reqwest::Client::new();
+        client
+            .get(format!("https://api.github.com/repos/{owner}/{repo}/pulls"))
+            .query(&[("state", "open"), ("per_page", "30"), ("sort", "updated")])
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "metsuke")
+            .send()
+            .await?
+            .error_for_status()
+            .context("Failed to list pull requests")?
+            .json()
+            .await
+            .context("Failed to parse pull requests")
     }
 
     pub async fn get_user(access_token: &str) -> Result<GitHubUser> {

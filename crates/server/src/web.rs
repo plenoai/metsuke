@@ -65,6 +65,10 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             axum::routing::post(api_verify_repo),
         )
         .route(
+            "/api/repos/{owner}/{repo}/pulls",
+            axum::routing::get(api_list_pulls),
+        )
+        .route(
             "/api/repos/{owner}/{repo}/verify-pr/{pr_number}",
             axum::routing::post(api_verify_pr),
         )
@@ -731,6 +735,44 @@ async fn api_verification_cache(headers: HeaderMap, State(state): State<WebState
         .collect();
 
     Json(json).into_response()
+}
+
+// ---------------------------------------------------------------------------
+// PR list API
+// ---------------------------------------------------------------------------
+
+async fn api_list_pulls(
+    headers: HeaderMap,
+    Path((owner, repo)): Path<(String, String)>,
+    State(state): State<WebState>,
+) -> Response {
+    let session_id = match get_session_from_cookie(&headers) {
+        Some(s) => s,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
+        Ok(Some(u)) => u,
+        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let installation_id = match state.db.get_installation_for_owner(user_id, &owner) {
+        Ok(Some(id)) => id,
+        Ok(None) => return Json(Vec::<serde_json::Value>::new()).into_response(),
+        Err(_) => return Json(Vec::<serde_json::Value>::new()).into_response(),
+    };
+
+    match state
+        .github_app
+        .list_pull_requests(installation_id, &owner, &repo)
+        .await
+    {
+        Ok(prs) => Json(prs).into_response(),
+        Err(e) => {
+            tracing::warn!("Failed to list PRs for {owner}/{repo}: {e:#}");
+            Json(Vec::<serde_json::Value>::new()).into_response()
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
