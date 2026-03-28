@@ -125,7 +125,9 @@ where
             tokio::spawn(async move {
                 match f().await {
                     Ok(fresh) => cache.set(ck, fresh).await,
-                    Err(e) => tracing::warn!("SWR background revalidation failed for {label}: {e:#}"),
+                    Err(e) => {
+                        tracing::warn!("SWR background revalidation failed for {label}: {e:#}")
+                    }
                 }
             });
             Json(v).into_response()
