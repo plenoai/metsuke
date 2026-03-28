@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% endblock %} — Metsuke</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="shell">
+  <a class="skip-link" href="#main">コンテンツへスキップ</a>
+  <header class="header" role="banner">
+    <div class="header-left">
+      <div>
+        <a class="brand" href="/dashboard" aria-label="Metsuke ホーム">目付</a>
+        <div class="brand-sub">Metsuke</div>
+      </div>
+      <nav class="nav-links" aria-label="メインナビゲーション">
+        <a class="nav-link{% if active_page == "dashboard" %} active{% endif %}" href="/dashboard">Dashboard</a>
+        <a class="nav-link{% if active_page == "repos" %} active{% endif %}" href="/repos">Repos</a>
+      </nav>
+    </div>
+    <div class="user-badge">
+      <strong>{{ login }}</strong>
+      <a class="logout-link" href="/auth/logout">logout</a>
+    </div>
+  </header>
+  <main id="main" role="main">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

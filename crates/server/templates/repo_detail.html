@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}{{ owner }}/{{ repo }}{% endblock %}
+
+{% block head %}
+<style>
+.findings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+.findings-table th {
+  text-align: left;
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-deep);
+}
+.findings-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+  color: var(--text-primary);
+}
+.findings-table tr:hover td {
+  background: var(--bg-elevated);
+}
+.findings-table .rationale {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  max-width: 420px;
+  line-height: 1.5;
+}
+.summary-bar {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.summary-stat {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="section">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem">
+      <div>
+        <div style="font-size:1.3rem;font-weight:800;letter-spacing:0.02em">{{ owner }}<span style="color:var(--text-secondary);font-weight:400"> / </span>{{ repo }}</div>
+        <a class="gh-link" href="https://github.com/{{ owner }}/{{ repo }}" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:0.75rem;margin-left:0">
+          <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
+          GitHub で開く
+        </a>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem">
+        <select class="policy-select" id="policy-select">
+          {% for p in policy_options %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+        <button class="btn" id="verify-btn" onclick="runVerify()">検証を実行</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="result-area"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const OWNER = '{{ owner }}';
+const REPO = '{{ repo }}';
+
+async function runVerify() {
+  const btn = document.getElementById('verify-btn');
+  const area = document.getElementById('result-area');
+  const policyEl = document.getElementById('policy-select');
+  const policy = policyEl.value;
+
+  btn.disabled = true;
+  btn.textContent = '検証中…';
+  btn.style.borderColor = 'var(--accent-gold)';
+  btn.style.color = 'var(--accent-gold)';
+  area.innerHTML = '<div class="loading">検証を実行中</div>';
+
+  try {
+    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+
+    const findings = (data.report && data.report.findings) || [];
+    const profileName = (data.report && data.report.profile_name) || policy;
+
+    let pass = 0, fail = 0, review = 0, na = 0;
+    for (const f of findings) {
+      if (f.status === 'Satisfied') pass++;
+      else if (f.status === 'Violated') fail++;
+      else if (f.status === 'Indeterminate') review++;
+      else if (f.status === 'NotApplicable') na++;
+    }
+
+    function statusBadge(status) {
+      if (status === 'Satisfied') return '<span class="badge badge-pass">PASS</span>';
+      if (status === 'Violated') return '<span class="badge badge-fail">FAIL</span>';
+      if (status === 'Indeterminate') return '<span class="badge badge-review">REVIEW</span>';
+      if (status === 'NotApplicable') return '<span class="badge badge-na">N/A</span>';
+      return '<span class="badge">' + status + '</span>';
+    }
+
+    let html = `<div class="section-title">Results — ${profileName}</div>`;
+    html += '<div class="summary-bar">';
+    html += `<div class="summary-stat"><span class="badge badge-pass">PASS</span> ${pass}</div>`;
+    html += `<div class="summary-stat"><span class="badge badge-fail">FAIL</span> ${fail}</div>`;
+    html += `<div class="summary-stat"><span class="badge badge-review">REVIEW</span> ${review}</div>`;
+    html += `<div class="summary-stat"><span class="badge badge-na">N/A</span> ${na}</div>`;
+    html += '</div>';
+
+    html += '<div class="card" style="padding:0;overflow:hidden">';
+    html += '<table class="findings-table"><thead><tr><th>Control</th><th>Status</th><th>Rationale</th></tr></thead><tbody>';
+    for (const f of findings) {
+      const rationale = f.rationale || '';
+      const escaped = rationale.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += `<tr><td style="white-space:nowrap">${f.control_id}</td><td>${statusBadge(f.status)}</td><td class="rationale">${escaped}</td></tr>`;
+    }
+    html += '</tbody></table></div>';
+
+    area.innerHTML = html;
+  } catch (e) {
+    area.innerHTML = `<div class="card" style="color:var(--accent-vermillion)"><strong>検証エラー:</strong> ${e.message}</div>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '検証を実行';
+  btn.style.borderColor = '';
+  btn.style.color = '';
+}
+</script>
+{% endblock %}
