@@ -37,6 +37,10 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             axum::routing::get(install_callback),
         )
         .route("/repos", axum::routing::get(repos_page))
+        .route(
+            "/repos/{owner}/{repo}",
+            axum::routing::get(repo_detail_page),
+        )
         .route("/api/repos", axum::routing::get(api_repos))
         .route(
             "/api/repos/{owner}/{repo}/verify",
@@ -44,6 +48,396 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         )
         .with_state(state)
 }
+
+// ---------------------------------------------------------------------------
+// Shared HTML helpers
+// ---------------------------------------------------------------------------
+
+/// Returns the full `<head>` section including fonts, CSS variables, and shared styles.
+/// `title` is the page title shown in the browser tab.
+fn common_head(title: &str) -> String {
+    format!(
+        r#"<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title} — Metsuke</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {{
+  --bg-deep: #0c0e1a;
+  --bg-surface: #141627;
+  --bg-elevated: #1c1f36;
+  --border: #2a2d47;
+  --border-subtle: #1f2139;
+  --text-primary: #e8e6e3;
+  --text-secondary: #8a8da0;
+  --accent-vermillion: #c73e3a;
+  --accent-vermillion-glow: rgba(199, 62, 58, 0.12);
+  --accent-gold: #c9a84c;
+  --accent-gold-dim: rgba(201, 168, 76, 0.1);
+  --accent-indigo: #4a5fd7;
+  --accent-green: #3a9a5c;
+  --accent-green-dim: rgba(58, 154, 92, 0.1);
+  --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+}}
+*, *::before, *::after {{ margin: 0; padding: 0; box-sizing: border-box; }}
+body {{
+  font-family: var(--font-display);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  position: relative;
+}}
+body::before {{
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='%232a2d47' stroke-width='0.5' opacity='0.3'/%3E%3C/svg%3E");
+  background-size: 60px 60px;
+  z-index: 0;
+  pointer-events: none;
+}}
+.shell {{
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}}
+
+/* header */
+.header {{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+}}
+.header-left {{
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}}
+.brand {{
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  color: var(--text-primary);
+}}
+.brand-sub {{
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}}
+.nav-links {{
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}}
+.nav-link {{
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}}
+.nav-link:hover, .nav-link.active {{
+  color: var(--text-primary);
+  border-color: var(--border);
+}}
+.nav-link.active {{
+  border-color: var(--accent-vermillion);
+}}
+.user-badge {{
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}}
+.user-badge strong {{
+  color: var(--text-primary);
+}}
+.logout-link {{
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}}
+.logout-link:hover {{
+  color: var(--accent-vermillion);
+  border-color: var(--accent-vermillion);
+}}
+
+/* section */
+.section {{
+  margin-bottom: 2rem;
+  animation: fadeIn 0.5s ease-out both;
+}}
+.section:nth-child(2) {{ animation-delay: 0.1s; }}
+.section:nth-child(3) {{ animation-delay: 0.2s; }}
+.section-title {{
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}}
+.section-title::before {{
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  background: var(--accent-vermillion);
+}}
+
+/* card */
+.card {{
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 0.75rem;
+  transition: border-color 0.2s ease;
+}}
+.card:hover {{
+  border-color: #3a3d57;
+}}
+
+/* badges */
+.badge {{
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}}
+.badge-pass {{
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
+  border: 1px solid rgba(58, 154, 92, 0.25);
+}}
+.badge-fail {{
+  background: var(--accent-vermillion-glow);
+  color: var(--accent-vermillion);
+  border: 1px solid rgba(199, 62, 58, 0.25);
+}}
+.badge-review {{
+  background: var(--accent-gold-dim);
+  color: var(--accent-gold);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+}}
+.badge-na {{
+  background: rgba(138, 141, 160, 0.1);
+  color: var(--text-secondary);
+  border: 1px solid rgba(138, 141, 160, 0.2);
+}}
+.badge-private {{
+  background: rgba(74, 95, 215, 0.1);
+  color: var(--accent-indigo);
+  border: 1px solid rgba(74, 95, 215, 0.2);
+}}
+
+/* buttons */
+.btn {{
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}}
+.btn:hover {{
+  border-color: var(--accent-vermillion);
+  box-shadow: 0 0 16px var(--accent-vermillion-glow);
+}}
+.btn svg {{
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}}
+.btn-row {{
+  margin-top: 1rem;
+}}
+.verify-btn {{
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}}
+.verify-btn:hover {{
+  border-color: var(--accent-vermillion);
+  box-shadow: 0 0 12px var(--accent-vermillion-glow);
+}}
+.verify-btn:disabled {{
+  opacity: 0.5;
+  cursor: not-allowed;
+}}
+.verify-btn.running {{
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}}
+
+/* policy selector */
+.policy-select {{
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}}
+.policy-select:hover {{
+  border-color: var(--accent-gold);
+}}
+
+/* loading */
+.loading {{
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}}
+.loading::after {{
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent-vermillion);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}}
+
+/* external link icon */
+.gh-link {{
+  color: var(--text-secondary);
+  text-decoration: none;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  transition: color 0.2s ease;
+}}
+.gh-link:hover {{
+  color: var(--text-primary);
+}}
+.gh-link svg {{
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  vertical-align: -1px;
+}}
+
+@keyframes spin {{
+  to {{ transform: rotate(360deg); }}
+}}
+@keyframes fadeIn {{
+  from {{ opacity: 0; transform: translateY(8px); }}
+  to {{ opacity: 1; transform: translateY(0); }}
+}}
+@media (max-width: 600px) {{
+  .shell {{ padding: 1.5rem 1rem 3rem; }}
+  .header {{ flex-direction: column; align-items: flex-start; gap: 1rem; }}
+  .brand {{ font-size: 1.3rem; }}
+}}
+</style>
+</head>"#,
+    )
+}
+
+/// Returns the `<header>` element with brand, nav links, user badge, and logout.
+/// `login` is the GitHub username.
+/// `active_page` is `"dashboard"` or `"repos"`.
+fn nav_header(login: &str, active_page: &str) -> String {
+    let dash_class = if active_page == "dashboard" {
+        "nav-link active"
+    } else {
+        "nav-link"
+    };
+    let repos_class = if active_page == "repos" {
+        "nav-link active"
+    } else {
+        "nav-link"
+    };
+    format!(
+        r#"<header class="header">
+    <div class="header-left">
+      <div>
+        <a class="brand" href="/dashboard">目付</a>
+        <div class="brand-sub">Metsuke</div>
+      </div>
+      <nav class="nav-links">
+        <a class="{dash_class}" href="/dashboard">Dashboard</a>
+        <a class="{repos_class}" href="/repos">Repos</a>
+      </nav>
+    </div>
+    <div class="user-badge">
+      <strong>{login}</strong>
+      <a class="logout-link" href="/auth/logout">logout</a>
+    </div>
+  </header>"#,
+    )
+}
+
+/// Policy `<option>` tags for the policy selector dropdown.
+fn policy_options() -> &'static str {
+    r#"<option value="default">default</option>
+<option value="oss">oss</option>
+<option value="aiops">aiops</option>
+<option value="soc1">soc1</option>
+<option value="soc2">soc2</option>
+<option value="slsa-l1">slsa-l1</option>
+<option value="slsa-l2">slsa-l2</option>
+<option value="slsa-l3">slsa-l3</option>
+<option value="slsa-l4">slsa-l4</option>"#
+}
+
+// ---------------------------------------------------------------------------
+// Error page (unique layout, no shared helpers)
+// ---------------------------------------------------------------------------
 
 fn error_page(title: &str, message: &str) -> Response {
     Html(format!(
@@ -132,6 +526,10 @@ body {{
     .into_response()
 }
 
+// ---------------------------------------------------------------------------
+// Session helpers
+// ---------------------------------------------------------------------------
+
 fn get_session_from_cookie(headers: &HeaderMap) -> Option<String> {
     headers
         .get(axum::http::header::COOKIE)?
@@ -144,6 +542,10 @@ fn get_session_from_cookie(headers: &HeaderMap) -> Option<String> {
 fn session_cookie(session_id: &str, max_age: i64) -> String {
     format!("session={session_id}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age={max_age}")
 }
+
+// ---------------------------------------------------------------------------
+// Landing page (unique layout, no shared helpers)
+// ---------------------------------------------------------------------------
 
 async fn index(headers: HeaderMap, State(state): State<WebState>) -> Response {
     if let Some(session_id) = get_session_from_cookie(&headers)
@@ -337,6 +739,10 @@ body::after {
     .into_response()
 }
 
+// ---------------------------------------------------------------------------
+// Auth handlers
+// ---------------------------------------------------------------------------
+
 #[derive(Deserialize)]
 struct AuthCallback {
     code: String,
@@ -474,6 +880,10 @@ async fn install_callback(
     Redirect::to("/dashboard").into_response()
 }
 
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
 async fn dashboard(headers: HeaderMap, State(state): State<WebState>) -> Response {
     let session_id = match get_session_from_cookie(&headers) {
         Some(s) => s,
@@ -505,152 +915,61 @@ async fn dashboard(headers: HeaderMap, State(state): State<WebState>) -> Respons
         items.join("")
     };
 
+    let head = common_head("Dashboard");
+    let header = nav_header(&login, "dashboard");
+
     Html(format!(
         r#"<!DOCTYPE html>
 <html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dashboard — Metsuke</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+{head}
+<body>
+<div class="shell">
+  {header}
+
+  <div class="section">
+    <div class="section-title">Installations</div>
+    <div class="card">
+      {install_list}
+    </div>
+    <div class="btn-row">
+      <a class="btn" href="https://github.com/apps/pleno-metsuke/installations/new?redirect_url={base_url}/auth/install/callback">
+        <svg viewBox="0 0 16 16"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0z"/><path d="M8 4a.75.75 0 01.75.75v2.5h2.5a.75.75 0 010 1.5h-2.5v2.5a.75.75 0 01-1.5 0v-2.5h-2.5a.75.75 0 010-1.5h2.5v-2.5A.75.75 0 018 4z"/></svg>
+        Install GitHub App
+      </a>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">MCP Connection</div>
+    <div class="card">
+      <p class="mcp-desc">MCPクライアントは <code>OAuth 2.1</code> で自動認証されます。以下の設定をMCPクライアントに追加してください。</p>
+
+      <div style="margin-top:1.25rem">
+        <div class="code-label">Claude Code Settings</div>
+        <div class="code-wrap">
+          <pre class="code-block" id="config">{{
+  "mcpServers": {{
+    "metsuke": {{
+      "url": "{base_url}/mcp"
+    }}
+  }}
+}}</pre>
+          <button class="copy-btn" onclick="copyText('config', this)">COPY</button>
+        </div>
+      </div>
+
+      <div style="margin-top:1rem">
+        <div class="code-label">Discovery Endpoints</div>
+        <div class="code-wrap">
+          <pre class="code-block" id="endpoints">Protected Resource: {base_url}/.well-known/oauth-protected-resource
+Auth Server:        {base_url}/.well-known/oauth-authorization-server</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <style>
-:root {{
-  --bg-deep: #0c0e1a;
-  --bg-surface: #141627;
-  --bg-elevated: #1c1f36;
-  --border: #2a2d47;
-  --border-subtle: #1f2139;
-  --text-primary: #e8e6e3;
-  --text-secondary: #8a8da0;
-  --accent-vermillion: #c73e3a;
-  --accent-vermillion-glow: rgba(199, 62, 58, 0.12);
-  --accent-gold: #c9a84c;
-  --accent-gold-dim: rgba(201, 168, 76, 0.1);
-  --accent-indigo: #4a5fd7;
-  --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
-}}
-*, *::before, *::after {{ margin: 0; padding: 0; box-sizing: border-box; }}
-body {{
-  font-family: var(--font-display);
-  background: var(--bg-deep);
-  color: var(--text-primary);
-  min-height: 100vh;
-  position: relative;
-}}
-body::before {{
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='%232a2d47' stroke-width='0.5' opacity='0.3'/%3E%3C/svg%3E");
-  background-size: 60px 60px;
-  z-index: 0;
-  pointer-events: none;
-}}
-.shell {{
-  position: relative;
-  z-index: 1;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
-}}
-
-/* header */
-.header {{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border-subtle);
-}}
-.header-left {{
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}}
-.brand {{
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-}}
-.brand-sub {{
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}}
-.user-badge {{
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}}
-.user-badge strong {{
-  color: var(--text-primary);
-}}
-.logout-link {{
-  color: var(--text-secondary);
-  text-decoration: none;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}}
-.logout-link:hover {{
-  color: var(--accent-vermillion);
-  border-color: var(--accent-vermillion);
-}}
-
-/* section */
-.section {{
-  margin-bottom: 2rem;
-  animation: fadeIn 0.5s ease-out both;
-}}
-.section:nth-child(2) {{ animation-delay: 0.1s; }}
-.section:nth-child(3) {{ animation-delay: 0.2s; }}
-.section-title {{
-  font-size: 0.7rem;
-  font-family: var(--font-mono);
-  font-weight: 500;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--accent-gold);
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}}
-.section-title::before {{
-  content: '';
-  display: inline-block;
-  width: 12px;
-  height: 2px;
-  background: var(--accent-vermillion);
-}}
-
-/* card */
-.card {{
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1.25rem 1.5rem;
-  margin-bottom: 0.75rem;
-  transition: border-color 0.2s ease;
-}}
-.card:hover {{
-  border-color: #3a3d57;
-}}
-
-/* installations */
+/* dashboard-specific styles */
 .install-item {{
   display: flex;
   align-items: center;
@@ -694,39 +1013,6 @@ body::before {{
   font-size: 0.9rem;
   padding: 0.5rem 0;
 }}
-
-/* buttons */
-.btn {{
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.65rem 1.3rem;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  font-weight: 500;
-  text-decoration: none;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  transition: all 0.2s ease;
-  cursor: pointer;
-  letter-spacing: 0.02em;
-}}
-.btn:hover {{
-  border-color: var(--accent-vermillion);
-  box-shadow: 0 0 16px var(--accent-vermillion-glow);
-}}
-.btn svg {{
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
-}}
-.btn-row {{
-  margin-top: 1rem;
-}}
-
-/* code blocks */
 .code-wrap {{
   position: relative;
   margin-top: 0.75rem;
@@ -773,7 +1059,6 @@ body::before {{
   color: var(--accent-gold);
   border-color: var(--accent-gold);
 }}
-
 .mcp-desc {{
   font-size: 0.85rem;
   color: var(--text-secondary);
@@ -788,79 +1073,7 @@ body::before {{
   border-radius: 3px;
   color: var(--accent-gold);
 }}
-
-@keyframes fadeIn {{
-  from {{ opacity: 0; transform: translateY(8px); }}
-  to {{ opacity: 1; transform: translateY(0); }}
-}}
-@media (max-width: 600px) {{
-  .shell {{ padding: 1.5rem 1rem 3rem; }}
-  .header {{ flex-direction: column; align-items: flex-start; gap: 1rem; }}
-  .brand {{ font-size: 1.3rem; }}
-}}
 </style>
-</head>
-<body>
-<div class="shell">
-  <header class="header">
-    <div class="header-left">
-      <div>
-        <div class="brand">目付</div>
-        <div class="brand-sub">Metsuke</div>
-      </div>
-      <nav style="display:flex;gap:0.75rem;margin-left:1rem">
-        <a href="/dashboard" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-primary);text-decoration:none;padding:0.35rem 0.7rem;border:1px solid var(--accent-vermillion);border-radius:4px">Dashboard</a>
-        <a href="/repos" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);text-decoration:none;padding:0.35rem 0.7rem;border:1px solid transparent;border-radius:4px">Repos</a>
-      </nav>
-    </div>
-    <div class="user-badge">
-      <strong>{login}</strong>
-      <a class="logout-link" href="/auth/logout">logout</a>
-    </div>
-  </header>
-
-  <div class="section">
-    <div class="section-title">Installations</div>
-    <div class="card">
-      {install_list}
-    </div>
-    <div class="btn-row">
-      <a class="btn" href="https://github.com/apps/pleno-metsuke/installations/new?redirect_url={base_url}/auth/install/callback">
-        <svg viewBox="0 0 16 16"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0z"/><path d="M8 4a.75.75 0 01.75.75v2.5h2.5a.75.75 0 010 1.5h-2.5v2.5a.75.75 0 01-1.5 0v-2.5h-2.5a.75.75 0 010-1.5h2.5v-2.5A.75.75 0 018 4z"/></svg>
-        Install GitHub App
-      </a>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">MCP Connection</div>
-    <div class="card">
-      <p class="mcp-desc">MCPクライアントは <code>OAuth 2.1</code> で自動認証されます。以下の設定をMCPクライアントに追加してください。</p>
-
-      <div style="margin-top:1.25rem">
-        <div class="code-label">Claude Code Settings</div>
-        <div class="code-wrap">
-          <pre class="code-block" id="config">{{
-  "mcpServers": {{
-    "metsuke": {{
-      "url": "{base_url}/mcp"
-    }}
-  }}
-}}</pre>
-          <button class="copy-btn" onclick="copyText('config', this)">COPY</button>
-        </div>
-      </div>
-
-      <div style="margin-top:1rem">
-        <div class="code-label">Discovery Endpoints</div>
-        <div class="code-wrap">
-          <pre class="code-block" id="endpoints">Protected Resource: {base_url}/.well-known/oauth-protected-resource
-Auth Server:        {base_url}/.well-known/oauth-authorization-server</pre>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 <script>
 function copyText(id, btn) {{
   const t = document.getElementById(id).textContent;
@@ -873,14 +1086,17 @@ function copyText(id, btn) {{
 </script>
 </body>
 </html>"#,
-        login = login,
+        head = head,
+        header = header,
         install_list = install_list,
         base_url = state.base_url,
     ))
     .into_response()
 }
 
-// --- API Endpoints ---
+// ---------------------------------------------------------------------------
+// API Endpoints
+// ---------------------------------------------------------------------------
 
 #[derive(Serialize)]
 struct RepoWithOwner {
@@ -997,6 +1213,7 @@ async fn api_verify_repo(
     let policy = query.policy;
     let owner_c = owner.clone();
     let repo_c = repo.clone();
+
     let result = run_blocking(move || {
         let config = libverify_github::GitHubConfig {
             token,
@@ -1018,7 +1235,9 @@ async fn api_verify_repo(
     }
 }
 
-// --- Repos Page ---
+// ---------------------------------------------------------------------------
+// Repos list page
+// ---------------------------------------------------------------------------
 
 async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Response {
     let session_id = match get_session_from_cookie(&headers) {
@@ -1031,160 +1250,24 @@ async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Respon
         _ => return Redirect::to("/").into_response(),
     };
 
+    let head = common_head("Repositories");
+    let header = nav_header(&login, "repos");
+    let options = policy_options();
+
     Html(format!(
         r#"<!DOCTYPE html>
 <html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Repositories — Metsuke</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+{head}
+<body>
+<div class="shell">
+  {header}
+
+  <div class="section-title" id="repos-title">Repositories</div>
+  <div id="repo-list">
+    <div class="loading">リポジトリを取得中</div>
+  </div>
+</div>
 <style>
-:root {{
-  --bg-deep: #0c0e1a;
-  --bg-surface: #141627;
-  --bg-elevated: #1c1f36;
-  --border: #2a2d47;
-  --border-subtle: #1f2139;
-  --text-primary: #e8e6e3;
-  --text-secondary: #8a8da0;
-  --accent-vermillion: #c73e3a;
-  --accent-vermillion-glow: rgba(199, 62, 58, 0.12);
-  --accent-gold: #c9a84c;
-  --accent-gold-dim: rgba(201, 168, 76, 0.1);
-  --accent-indigo: #4a5fd7;
-  --accent-green: #3a9a5c;
-  --accent-green-dim: rgba(58, 154, 92, 0.1);
-  --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
-}}
-*, *::before, *::after {{ margin: 0; padding: 0; box-sizing: border-box; }}
-body {{
-  font-family: var(--font-display);
-  background: var(--bg-deep);
-  color: var(--text-primary);
-  min-height: 100vh;
-  position: relative;
-}}
-body::before {{
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='%232a2d47' stroke-width='0.5' opacity='0.3'/%3E%3C/svg%3E");
-  background-size: 60px 60px;
-  z-index: 0;
-  pointer-events: none;
-}}
-.shell {{
-  position: relative;
-  z-index: 1;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
-}}
-.header {{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border-subtle);
-}}
-.header-left {{
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}}
-.brand {{
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-decoration: none;
-  color: var(--text-primary);
-}}
-.brand-sub {{
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}}
-.nav-links {{
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}}
-.nav-link {{
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  text-decoration: none;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}}
-.nav-link:hover, .nav-link.active {{
-  color: var(--text-primary);
-  border-color: var(--border);
-}}
-.nav-link.active {{
-  border-color: var(--accent-vermillion);
-}}
-.user-badge {{
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}}
-.user-badge strong {{
-  color: var(--text-primary);
-}}
-.section-title {{
-  font-size: 0.7rem;
-  font-family: var(--font-mono);
-  font-weight: 500;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--accent-gold);
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}}
-.section-title::before {{
-  content: '';
-  display: inline-block;
-  width: 12px;
-  height: 2px;
-  background: var(--accent-vermillion);
-}}
-.loading {{
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-}}
-.loading::after {{
-  content: '';
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent-vermillion);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-left: 0.5rem;
-  vertical-align: middle;
-}}
-@keyframes spin {{
-  to {{ transform: rotate(360deg); }}
-}}
 .repo-grid {{
   display: flex;
   flex-direction: column;
@@ -1235,59 +1318,6 @@ body::before {{
   flex-shrink: 0;
   margin-left: 1rem;
 }}
-.verify-btn {{
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  padding: 0.4rem 0.8rem;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-}}
-.verify-btn:hover {{
-  border-color: var(--accent-vermillion);
-  box-shadow: 0 0 12px var(--accent-vermillion-glow);
-}}
-.verify-btn:disabled {{
-  opacity: 0.5;
-  cursor: not-allowed;
-}}
-.verify-btn.running {{
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
-}}
-.badge {{
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.05em;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  white-space: nowrap;
-}}
-.badge-pass {{
-  background: var(--accent-green-dim);
-  color: var(--accent-green);
-  border: 1px solid rgba(58, 154, 92, 0.25);
-}}
-.badge-fail {{
-  background: var(--accent-vermillion-glow);
-  color: var(--accent-vermillion);
-  border: 1px solid rgba(199, 62, 58, 0.25);
-}}
-.badge-review {{
-  background: var(--accent-gold-dim);
-  color: var(--accent-gold);
-  border: 1px solid rgba(201, 168, 76, 0.25);
-}}
-.badge-private {{
-  background: rgba(74, 95, 215, 0.1);
-  color: var(--accent-indigo);
-  border: 1px solid rgba(74, 95, 215, 0.2);
-}}
 .result-summary {{
   display: flex;
   align-items: center;
@@ -1299,49 +1329,23 @@ body::before {{
   color: var(--text-secondary);
   font-size: 0.9rem;
 }}
-@keyframes fadeIn {{
-  from {{ opacity: 0; transform: translateY(8px); }}
-  to {{ opacity: 1; transform: translateY(0); }}
-}}
 @media (max-width: 600px) {{
-  .shell {{ padding: 1.5rem 1rem 3rem; }}
-  .header {{ flex-direction: column; align-items: flex-start; gap: 1rem; }}
   .repo-card {{ flex-direction: column; align-items: flex-start; gap: 0.75rem; }}
   .repo-actions {{ margin-left: 0; }}
 }}
 </style>
-</head>
-<body>
-<div class="shell">
-  <header class="header">
-    <div class="header-left">
-      <div>
-        <a class="brand" href="/dashboard">目付</a>
-        <div class="brand-sub">Metsuke</div>
-      </div>
-      <nav class="nav-links">
-        <a class="nav-link" href="/dashboard">Dashboard</a>
-        <a class="nav-link active" href="/repos">Repos</a>
-      </nav>
-    </div>
-    <div class="user-badge">
-      <strong>{login}</strong>
-    </div>
-  </header>
-
-  <div class="section-title">Repositories</div>
-  <div id="repo-list">
-    <div class="loading">リポジトリを取得中</div>
-  </div>
-</div>
 
 <script>
+const POLICY_OPTIONS = `{options}`;
+
 async function loadRepos() {{
   try {{
     const resp = await fetch('/api/repos');
     if (!resp.ok) throw new Error('Failed to fetch');
     const repos = await resp.json();
     const container = document.getElementById('repo-list');
+
+    document.getElementById('repos-title').textContent = `Repositories (${{repos.length}})`;
 
     if (repos.length === 0) {{
       container.innerHTML = '<div class="empty-state">リポジトリが見つかりません。GitHub Appをインストールしてください。</div>';
@@ -1352,7 +1356,10 @@ async function loadRepos() {{
       <div class="repo-card" id="repo-${{r.full_name.replace('/', '-')}}">
         <div class="repo-info">
           <div class="repo-name">
-            <a href="https://github.com/${{r.full_name}}" target="_blank" rel="noopener">${{r.full_name}}</a>
+            <a href="/repos/${{r.owner}}/${{r.name}}">${{r.full_name}}</a>
+            <a class="gh-link" href="https://github.com/${{r.full_name}}" target="_blank" rel="noopener" title="GitHub で開く">
+              <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
+            </a>
           </div>
           <div class="repo-meta">
             ${{r.private ? '<span class="badge badge-private">private</span>' : ''}}
@@ -1362,6 +1369,7 @@ async function loadRepos() {{
         </div>
         <div class="repo-actions">
           <div class="result-summary" id="result-${{r.full_name.replace('/', '-')}}"></div>
+          <select class="policy-select" id="policy-${{r.full_name.replace('/', '-')}}">${{POLICY_OPTIONS}}</select>
           <button class="verify-btn" onclick="verifyRepo('${{r.owner}}', '${{r.name}}', this)">検証</button>
         </div>
       </div>
@@ -1381,14 +1389,22 @@ async function verifyRepo(owner, repo, btn) {{
   const resultEl = document.getElementById(`result-${{owner}}-${{repo}}`);
   resultEl.innerHTML = '';
 
+  const policyEl = document.getElementById(`policy-${{owner}}-${{repo}}`);
+  const policy = policyEl ? policyEl.value : 'default';
+
   try {{
-    const resp = await fetch(`/api/repos/${{owner}}/${{repo}}/verify`, {{ method: 'POST' }});
+    const resp = await fetch(`/api/repos/${{owner}}/${{repo}}/verify?policy=${{encodeURIComponent(policy)}}`, {{ method: 'POST' }});
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
 
-    const pass = data.pass || 0;
-    const fail = data.fail || 0;
-    const review = data.review || 0;
+    let pass = 0, fail = 0, review = 0;
+    if (data.report && data.report.findings) {{
+      for (const f of data.report.findings) {{
+        if (f.status === 'Satisfied') pass++;
+        else if (f.status === 'Violated') fail++;
+        else if (f.status === 'Indeterminate') review++;
+      }}
+    }}
 
     let badges = '';
     if (pass > 0) badges += `<span class="badge badge-pass">PASS ${{pass}}</span>`;
@@ -1409,7 +1425,179 @@ loadRepos();
 </script>
 </body>
 </html>"#,
-        login = login,
+    ))
+    .into_response()
+}
+
+// ---------------------------------------------------------------------------
+// Repo detail page
+// ---------------------------------------------------------------------------
+
+async fn repo_detail_page(
+    headers: HeaderMap,
+    Path((owner, repo)): Path<(String, String)>,
+    State(state): State<WebState>,
+) -> Response {
+    let session_id = match get_session_from_cookie(&headers) {
+        Some(s) => s,
+        None => return Redirect::to("/").into_response(),
+    };
+
+    let (_user_id, login) = match state.db.get_user_by_session(&session_id) {
+        Ok(Some(u)) => u,
+        _ => return Redirect::to("/").into_response(),
+    };
+
+    let _ = &state; // keep state alive for future use
+
+    let head = common_head(&format!("{owner}/{repo}"));
+    let header = nav_header(&login, "repos");
+    let options = policy_options();
+
+    Html(format!(
+        r#"<!DOCTYPE html>
+<html lang="ja">
+{head}
+<body>
+<div class="shell">
+  {header}
+
+  <div class="section">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem">
+      <div>
+        <div style="font-size:1.3rem;font-weight:800;letter-spacing:0.02em">{owner}<span style="color:var(--text-secondary);font-weight:400"> / </span>{repo}</div>
+        <a class="gh-link" href="https://github.com/{owner}/{repo}" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:0.75rem;margin-left:0">
+          <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
+          GitHub で開く
+        </a>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem">
+        <select class="policy-select" id="policy-select">{options}</select>
+        <button class="btn" id="verify-btn" onclick="runVerify()">検証を実行</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="result-area"></div>
+</div>
+
+<style>
+.findings-table {{
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}}
+.findings-table th {{
+  text-align: left;
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-deep);
+}}
+.findings-table td {{
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+  color: var(--text-primary);
+}}
+.findings-table tr:hover td {{
+  background: var(--bg-elevated);
+}}
+.findings-table .rationale {{
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  max-width: 420px;
+  line-height: 1.5;
+}}
+.summary-bar {{
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}}
+.summary-stat {{
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}}
+</style>
+
+<script>
+const OWNER = '{owner}';
+const REPO = '{repo}';
+
+async function runVerify() {{
+  const btn = document.getElementById('verify-btn');
+  const area = document.getElementById('result-area');
+  const policyEl = document.getElementById('policy-select');
+  const policy = policyEl.value;
+
+  btn.disabled = true;
+  btn.textContent = '検証中…';
+  btn.style.borderColor = 'var(--accent-gold)';
+  btn.style.color = 'var(--accent-gold)';
+  area.innerHTML = '<div class="loading">検証を実行中</div>';
+
+  try {{
+    const resp = await fetch(`/api/repos/${{OWNER}}/${{REPO}}/verify?policy=${{encodeURIComponent(policy)}}`, {{ method: 'POST' }});
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+
+    const findings = (data.report && data.report.findings) || [];
+    const profileName = (data.report && data.report.profile_name) || policy;
+
+    let pass = 0, fail = 0, review = 0, na = 0;
+    for (const f of findings) {{
+      if (f.status === 'Satisfied') pass++;
+      else if (f.status === 'Violated') fail++;
+      else if (f.status === 'Indeterminate') review++;
+      else if (f.status === 'NotApplicable') na++;
+    }}
+
+    function statusBadge(status) {{
+      if (status === 'Satisfied') return '<span class="badge badge-pass">PASS</span>';
+      if (status === 'Violated') return '<span class="badge badge-fail">FAIL</span>';
+      if (status === 'Indeterminate') return '<span class="badge badge-review">REVIEW</span>';
+      if (status === 'NotApplicable') return '<span class="badge badge-na">N/A</span>';
+      return '<span class="badge">' + status + '</span>';
+    }}
+
+    let html = `<div class="section-title">Results — ${{profileName}}</div>`;
+    html += '<div class="summary-bar">';
+    html += `<div class="summary-stat"><span class="badge badge-pass">PASS</span> ${{pass}}</div>`;
+    html += `<div class="summary-stat"><span class="badge badge-fail">FAIL</span> ${{fail}}</div>`;
+    html += `<div class="summary-stat"><span class="badge badge-review">REVIEW</span> ${{review}}</div>`;
+    html += `<div class="summary-stat"><span class="badge badge-na">N/A</span> ${{na}}</div>`;
+    html += '</div>';
+
+    html += '<div class="card" style="padding:0;overflow:hidden">';
+    html += '<table class="findings-table"><thead><tr><th>Control</th><th>Status</th><th>Rationale</th></tr></thead><tbody>';
+    for (const f of findings) {{
+      const rationale = f.rationale || '';
+      const escaped = rationale.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += `<tr><td style="white-space:nowrap">${{f.control_id}}</td><td>${{statusBadge(f.status)}}</td><td class="rationale">${{escaped}}</td></tr>`;
+    }}
+    html += '</tbody></table></div>';
+
+    area.innerHTML = html;
+  }} catch (e) {{
+    area.innerHTML = `<div class="card" style="color:var(--accent-vermillion)"><strong>検証エラー:</strong> ${{e.message}}</div>`;
+  }}
+
+  btn.disabled = false;
+  btn.textContent = '検証を実行';
+  btn.style.borderColor = '';
+  btn.style.color = '';
+}}
+</script>
+</body>
+</html>"#,
     ))
     .into_response()
 }
