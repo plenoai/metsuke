@@ -319,3 +319,92 @@ impl ServerHandler for MetsukeServer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_error_sets_is_error_flag() {
+        let result = tool_error("something went wrong");
+        assert_eq!(result.is_error, Some(true));
+        assert!(!result.content.is_empty());
+    }
+
+    #[test]
+    fn verify_pr_args_deserializes_minimal() {
+        let json = serde_json::json!({
+            "owner": "octocat",
+            "repo": "hello-world",
+            "pr_number": 42
+        });
+        let args: VerifyPrArgs = serde_json::from_value(json).unwrap();
+        assert_eq!(args.owner, "octocat");
+        assert_eq!(args.repo, "hello-world");
+        assert_eq!(args.pr_number, 42);
+        assert_eq!(args.policy, None);
+        assert!(!args.with_evidence);
+    }
+
+    #[test]
+    fn verify_pr_args_deserializes_full() {
+        let json = serde_json::json!({
+            "owner": "org",
+            "repo": "repo",
+            "pr_number": 1,
+            "policy": "soc2",
+            "with_evidence": true
+        });
+        let args: VerifyPrArgs = serde_json::from_value(json).unwrap();
+        assert_eq!(args.policy, Some("soc2".into()));
+        assert!(args.with_evidence);
+    }
+
+    #[test]
+    fn verify_release_args_deserializes_minimal() {
+        let json = serde_json::json!({
+            "owner": "org",
+            "repo": "repo",
+            "base_tag": "v1.0.0",
+            "head_tag": "v1.1.0"
+        });
+        let args: VerifyReleaseArgs = serde_json::from_value(json).unwrap();
+        assert_eq!(args.base_tag, "v1.0.0");
+        assert_eq!(args.head_tag, "v1.1.0");
+        assert_eq!(args.policy, None);
+        assert!(!args.with_evidence);
+    }
+
+    #[test]
+    fn verify_repo_args_defaults_reference_to_head() {
+        let json = serde_json::json!({
+            "owner": "org",
+            "repo": "repo"
+        });
+        let args: VerifyRepoArgs = serde_json::from_value(json).unwrap();
+        assert_eq!(args.reference, "HEAD");
+        assert_eq!(args.policy, None);
+        assert!(!args.with_evidence);
+    }
+
+    #[test]
+    fn verify_repo_args_custom_reference() {
+        let json = serde_json::json!({
+            "owner": "org",
+            "repo": "repo",
+            "reference": "refs/heads/main",
+            "policy": "slsa-l2",
+            "with_evidence": true
+        });
+        let args: VerifyRepoArgs = serde_json::from_value(json).unwrap();
+        assert_eq!(args.reference, "refs/heads/main");
+        assert_eq!(args.policy, Some("slsa-l2".into()));
+        assert!(args.with_evidence);
+    }
+
+    #[test]
+    fn verify_pr_args_rejects_missing_required() {
+        let json = serde_json::json!({"owner": "org"});
+        assert!(serde_json::from_value::<VerifyPrArgs>(json).is_err());
+    }
+}
