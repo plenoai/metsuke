@@ -452,9 +452,48 @@ select:focus-visible {
   .header { flex-direction: column; align-items: flex-start; gap: 1rem; }
   .brand { font-size: 1.3rem; }
   .nav-links { gap: 0.5rem; }
-  .nav-link { font-size: 0.72rem; padding: 0.4rem 0.6rem; min-height: 44px; display: inline-flex; align-items: center; }
+  .nav-link { font-size: 0.72rem; padding: 0.5rem 0.75rem; min-height: 48px; display: inline-flex; align-items: center; }
   .user-badge { font-size: 0.75rem; }
-  .verify-btn { padding: 0.5rem 0.9rem; min-height: 44px; }
-  .policy-select { padding: 0.5rem; min-height: 44px; }
-  .btn { padding: 0.6rem 1rem; min-height: 44px; }
+  .verify-btn { padding: 0.55rem 1rem; min-height: 48px; }
+  .policy-select { padding: 0.55rem 0.6rem; min-height: 48px; font-size: 0.8rem; }
+  .btn { padding: 0.65rem 1rem; min-height: 48px; }
+  .logout-link { min-height: 48px; display: inline-flex; align-items: center; }
+
+  /* Form inputs: prevent iOS zoom */
+  .form-group input,
+  .form-group select,
+  input[type="search"],
+  input[type="number"],
+  input[type="date"] {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  /* Audit: hide low-value columns on mobile */
+  .audit-table th:nth-child(4),
+  .audit-table td:nth-child(4) { display: none; }
+  .audit-table th:nth-child(5),
+  .audit-table td:nth-child(5) { display: none; }
+
+  /* Pagination touch targets */
+  .pagination button { min-height: 48px; min-width: 48px; padding: 0.5rem 1rem; }
+
+  /* Findings table rationale on mobile */
+  .findings-table .rationale,
+  .rationale-cell {
+    max-width: 55vw;
+    word-break: break-word;
+  }
+
+  /* Dashboard summary cards stack */
+  .dashboard-summary {
+    gap: 0.35rem;
+  }
+  .summary-card {
+    min-width: 70px;
+    padding: 0.5rem 0.6rem;
+  }
+  .summary-card-count {
+    font-size: 1.1rem;
+  }
 }

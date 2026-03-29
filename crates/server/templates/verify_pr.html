@@ -34,8 +34,11 @@
   transition: border-color 0.2s ease;
 }
 .form-group input:focus {
-  outline: none;
   border-color: var(--accent-gold);
+}
+.form-group input:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
 }
 .findings-table {
   width: 100%;
@@ -242,7 +245,7 @@ function renderResult(data, prNum) {
     return `<tr class="status-${f.status}">
       <td>${esc(f.control_id)}</td>
       <td>${badge}</td>
-      <td class="rationale-cell${longText ? ' collapsed' : ''}" ${longText ? 'onclick="this.classList.toggle(\'collapsed\')"' : ''}>${esc(f.rationale)}</td>
+      <td class="rationale-cell${longText ? ' collapsed' : ''}" ${longText ? 'role="button" tabindex="0" aria-expanded="false" onclick="this.classList.toggle(\'collapsed\');this.setAttribute(\'aria-expanded\',!this.classList.contains(\'collapsed\'))" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click()}"' : ''}>${esc(f.rationale)}</td>
     </tr>`;
   }).join('');
 
@@ -258,7 +261,7 @@ function renderResult(data, prNum) {
       <div class="card" style="padding:0;overflow-x:auto">
         <table class="findings-table">
           <thead>
-            <tr><th>Control</th><th>Status</th><th>Rationale</th></tr>
+            <tr><th scope="col">Control</th><th scope="col">Status</th><th scope="col">Rationale</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>

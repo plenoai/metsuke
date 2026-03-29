@@ -104,11 +104,20 @@
   <div class="section-title">Audit Log</div>
 
   <div class="audit-toolbar">
-    <select class="policy-select" id="filter-type" onchange="loadAudit()">
+    <select class="policy-select" id="filter-type" onchange="resetAndLoad()" aria-label="タイプフィルタ">
       <option value="">全タイプ</option>
       <option value="release">Release</option>
       <option value="pr">PR</option>
       <option value="repo">Repo</option>
+    </select>
+    <input type="date" class="policy-select" id="filter-from" onchange="resetAndLoad()" aria-label="開始日">
+    <input type="date" class="policy-select" id="filter-to" onchange="resetAndLoad()" aria-label="終了日">
+    <select class="policy-select" id="filter-preset" onchange="applyPreset(this.value)" aria-label="期間プリセット">
+      <option value="">期間指定…</option>
+      <option value="this-quarter">今四半期</option>
+      <option value="last-quarter">前四半期</option>
+      <option value="ytd">年初来</option>
+      <option value="last-12m">過去12ヶ月</option>
     </select>
     <button class="verify-btn" id="export-csv-btn" onclick="exportAuditCSV()">CSV出力</button>
   </div>
@@ -149,6 +158,10 @@ async function loadAudit() {
   try {
     let url = `/api/audit-history?limit=${PAGE_SIZE}&offset=${currentOffset}`;
     if (type) url += `&type=${encodeURIComponent(type)}`;
+    const fromDate = document.getElementById('filter-from').value;
+    const toDate = document.getElementById('filter-to').value;
+    if (fromDate) url += `&from_date=${encodeURIComponent(fromDate)}`;
+    if (toDate) url += `&to_date=${encodeURIComponent(toDate)}`;
     const resp = await fetch(url);
     const entries = resp.ok ? await resp.json() : [];
     allEntries = entries;
@@ -171,7 +184,7 @@ async function loadAudit() {
     container.innerHTML = `<div class="card" style="padding:0;overflow-x:auto">
       <table class="audit-table">
         <thead>
-          <tr><th>Date</th><th>Type</th><th>Repository</th><th>Target</th><th>Policy</th><th>Result</th></tr>
+          <tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Repository</th><th scope="col">Target</th><th scope="col">Policy</th><th scope="col">Result</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -201,26 +214,53 @@ function nextPage() {
 
 function exportAuditCSV() {
   const btn = document.getElementById('export-csv-btn');
-  const origText = btn.textContent;
   btn.textContent = '出力中…';
   btn.disabled = true;
-  const rows = [['Date','Type','Owner','Repo','Target','Policy','Pass','Fail','Review','N/A']];
-  allEntries.forEach(e => {
-    rows.push([
-      e.verified_at, e.type, e.owner, e.repo, e.target_ref, e.policy,
-      e.pass, e.fail, e.review, e.na || 0,
-    ]);
-  });
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `metsuke-audit-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  btn.textContent = origText;
-  btn.disabled = false;
+  let url = '/api/audit-history/export?';
+  const type = document.getElementById('filter-type').value;
+  if (type) url += `type=${encodeURIComponent(type)}&`;
+  const fromDate = document.getElementById('filter-from').value;
+  const toDate = document.getElementById('filter-to').value;
+  if (fromDate) url += `from_date=${encodeURIComponent(fromDate)}&`;
+  if (toDate) url += `to_date=${encodeURIComponent(toDate)}&`;
+  window.location = url;
+  setTimeout(() => { btn.textContent = 'CSV出力'; btn.disabled = false; }, 1500);
+}
+
+function resetAndLoad() {
+  currentOffset = 0;
+  loadAudit();
+}
+
+function applyPreset(val) {
+  const from = document.getElementById('filter-from');
+  const to = document.getElementById('filter-to');
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const q = Math.floor(m / 3);
+
+  if (val === 'this-quarter') {
+    from.value = `${y}-${String(q * 3 + 1).padStart(2, '0')}-01`;
+    to.value = '';
+  } else if (val === 'last-quarter') {
+    const lq = q === 0 ? 3 : q - 1;
+    const ly = q === 0 ? y - 1 : y;
+    from.value = `${ly}-${String(lq * 3 + 1).padStart(2, '0')}-01`;
+    to.value = `${q === 0 ? y - 1 : y}-${String(q * 3 + 1).padStart(2, '0')}-01`;
+  } else if (val === 'ytd') {
+    from.value = `${y}-01-01`;
+    to.value = '';
+  } else if (val === 'last-12m') {
+    const past = new Date(now);
+    past.setFullYear(past.getFullYear() - 1);
+    from.value = past.toISOString().slice(0, 10);
+    to.value = '';
+  } else {
+    from.value = '';
+    to.value = '';
+  }
+  resetAndLoad();
 }
 
 loadAudit();

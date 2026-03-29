@@ -180,7 +180,7 @@ function renderRepoList(repos, cacheArr) {
       </div>
       <div class="repo-actions">
         <div class="result-summary" id="result-${r.full_name.replace('/', '-')}">${cachedBadges}</div>
-        <select class="policy-select" id="policy-${r.full_name.replace('/', '-')}">${POLICY_OPTIONS}</select>
+        <select class="policy-select" id="policy-${r.full_name.replace('/', '-')}" aria-label="${esc(r.full_name)} のポリシー選択">${POLICY_OPTIONS}</select>
         <button class="verify-btn" onclick="verifyRepo('${esc(r.owner)}', '${esc(r.name)}', this)">${cached ? '再検証' : '検証'}</button>
       </div>
     </div>`;
@@ -205,19 +205,19 @@ function renderRepoList(repos, cacheArr) {
   const summaryEl = document.getElementById('dashboard-summary');
   summaryEl.style.display = '';
   summaryEl.innerHTML = `
-    <div class="summary-card summary-card-fail" onclick="filterByStatus('fail')" title="FAILのあるリポジトリのみ表示">
+    <div class="summary-card summary-card-fail" role="button" tabindex="0" aria-pressed="false" onclick="filterByStatus('fail')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('fail')}" title="FAILのあるリポジトリのみ表示">
       <div class="summary-card-count">${failRepos}</div>
       <div class="summary-card-label">FAIL</div>
     </div>
-    <div class="summary-card summary-card-review" onclick="filterByStatus('review')" title="REVIEWのあるリポジトリのみ表示">
+    <div class="summary-card summary-card-review" role="button" tabindex="0" aria-pressed="false" onclick="filterByStatus('review')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('review')}" title="REVIEWのあるリポジトリのみ表示">
       <div class="summary-card-count">${reviewRepos}</div>
       <div class="summary-card-label">REVIEW</div>
     </div>
-    <div class="summary-card summary-card-pass" onclick="filterByStatus('pass')" title="PASSのリポジトリのみ表示">
+    <div class="summary-card summary-card-pass" role="button" tabindex="0" aria-pressed="false" onclick="filterByStatus('pass')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('pass')}" title="PASSのリポジトリのみ表示">
       <div class="summary-card-count">${passRepos}</div>
       <div class="summary-card-label">PASS</div>
     </div>
-    <div class="summary-card summary-card-unverified" onclick="filterByStatus('unverified')" title="未検証のリポジトリのみ表示">
+    <div class="summary-card summary-card-unverified" role="button" tabindex="0" aria-pressed="false" onclick="filterByStatus('unverified')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('unverified')}" title="未検証のリポジトリのみ表示">
       <div class="summary-card-count">${unverifiedRepos}</div>
       <div class="summary-card-label">未検証</div>
     </div>
@@ -311,13 +311,16 @@ function filterByStatus(status) {
     activeFilter = null;
     cards.forEach(c => c.style.display = '');
     summaryCards.forEach(c => c.classList.remove('active'));
+    summaryCards.forEach(c => c.setAttribute('aria-pressed', 'false'));
     document.getElementById('repos-title').textContent = `Repositories (${cards.length})`;
     return;
   }
 
   activeFilter = status;
   summaryCards.forEach(c => c.classList.remove('active'));
+  summaryCards.forEach(c => c.setAttribute('aria-pressed', 'false'));
   document.querySelector(`.summary-card-${status}`).classList.add('active');
+  document.querySelector(`.summary-card-${status}`).setAttribute('aria-pressed', 'true');
 
   let visible = 0;
   cards.forEach(c => {

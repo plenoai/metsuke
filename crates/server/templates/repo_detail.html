@@ -131,13 +131,13 @@ async function runVerify() {
     html += `<div class="summary-stat"><span class="badge badge-na">N/A</span> ${na}</div>`;
     html += '</div>';
 
-    html += '<div class="card" style="padding:0;overflow:hidden">';
-    html += '<table class="findings-table"><thead><tr><th>Control</th><th>Status</th><th>Rationale</th></tr></thead><tbody>';
+    html += '<div class="card" style="padding:0;overflow-x:auto">';
+    html += '<table class="findings-table" aria-label="検証結果"><thead><tr><th scope="col">Control</th><th scope="col">Status</th><th scope="col">Rationale</th></tr></thead><tbody>';
     for (const f of findings) {
       const rationale = f.rationale || '';
       const escaped = rationale.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const longText = rationale.length > 120;
-      html += `<tr class="status-${f.status}"><td style="white-space:nowrap">${f.control_id}</td><td>${statusBadge(f.status)}</td><td class="rationale${longText ? ' collapsed' : ''}" ${longText ? `onclick="this.classList.toggle('collapsed')"` : ''}>${escaped}</td></tr>`;
+      html += `<tr class="status-${f.status}"><td style="white-space:nowrap">${f.control_id}</td><td>${statusBadge(f.status)}</td><td class="rationale${longText ? ' collapsed' : ''}" ${longText ? `role="button" tabindex="0" aria-expanded="false" onclick="this.classList.toggle('collapsed');this.setAttribute('aria-expanded',!this.classList.contains('collapsed'))" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"` : ''}>${escaped}</td></tr>`;
     }
     html += '</tbody></table></div>';
 

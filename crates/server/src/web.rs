@@ -98,6 +98,10 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             axum::routing::get(api_verification_cache),
         )
         .route("/api/audit-history", axum::routing::get(api_audit_history))
+        .route(
+            "/api/audit-history/export",
+            axum::routing::get(api_audit_export_csv),
+        )
         .with_state(state)
 }
 
@@ -1112,6 +1116,8 @@ struct AuditHistoryQuery {
     verification_type: Option<String>,
     owner: Option<String>,
     repo: Option<String>,
+    from_date: Option<String>,
+    to_date: Option<String>,
     limit: Option<i64>,
     offset: Option<i64>,
 }
@@ -1138,6 +1144,8 @@ async fn api_audit_history(
             query.verification_type.as_deref(),
             query.owner.as_deref(),
             query.repo.as_deref(),
+            query.from_date.as_deref(),
+            query.to_date.as_deref(),
             query.limit.unwrap_or(50),
             query.offset.unwrap_or(0),
         )
@@ -1163,6 +1171,65 @@ async fn api_audit_history(
         .collect();
 
     Json(json).into_response()
+}
+
+async fn api_audit_export_csv(
+    headers: HeaderMap,
+    Query(query): Query<AuditHistoryQuery>,
+    State(state): State<WebState>,
+) -> Response {
+    let session_id = match get_session_from_cookie(&headers) {
+        Some(s) => s,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
+        Ok(Some(u)) => u,
+        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let entries = state
+        .db
+        .get_audit_history(
+            user_id,
+            query.verification_type.as_deref(),
+            query.owner.as_deref(),
+            query.repo.as_deref(),
+            query.from_date.as_deref(),
+            query.to_date.as_deref(),
+            10000,
+            0,
+        )
+        .unwrap_or_default();
+
+    let mut csv = String::from("Date,Type,Owner,Repo,Target,Policy,Pass,Fail,Review,N/A\n");
+    for e in &entries {
+        csv.push_str(&format!(
+            "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{},{},{},{}\n",
+            e.verified_at,
+            e.verification_type,
+            e.owner,
+            e.repo,
+            e.target_ref,
+            e.policy,
+            e.pass_count,
+            e.fail_count,
+            e.review_count,
+            e.na_count,
+        ));
+    }
+
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                "attachment; filename=\"metsuke-audit.csv\"",
+            ),
+        ],
+        csv,
+    )
+        .into_response()
 }
 
 // ---------------------------------------------------------------------------

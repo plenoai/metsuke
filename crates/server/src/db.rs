@@ -90,7 +90,8 @@ impl Database {
             );
             CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
             CREATE INDEX IF NOT EXISTS idx_audit_log_repo ON audit_log(owner, repo);
-            CREATE INDEX IF NOT EXISTS idx_audit_log_type ON audit_log(verification_type);",
+            CREATE INDEX IF NOT EXISTS idx_audit_log_type ON audit_log(verification_type);
+            CREATE INDEX IF NOT EXISTS idx_audit_log_verified_at ON audit_log(verified_at);",
         )?;
         // Add github_token column to users (idempotent migration)
         let _ = conn.execute_batch("ALTER TABLE users ADD COLUMN github_token TEXT;");
@@ -475,12 +476,15 @@ impl Database {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn get_audit_history(
         &self,
         user_id: i64,
         verification_type: Option<&str>,
         owner: Option<&str>,
         repo: Option<&str>,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<AuditEntry>> {
@@ -505,6 +509,16 @@ impl Database {
         if let Some(r) = repo {
             sql.push_str(&format!(" AND repo = ?{idx}"));
             params.push(Box::new(r.to_string()));
+            idx += 1;
+        }
+        if let Some(fd) = from_date {
+            sql.push_str(&format!(" AND verified_at >= ?{idx}"));
+            params.push(Box::new(fd.to_string()));
+            idx += 1;
+        }
+        if let Some(td) = to_date {
+            sql.push_str(&format!(" AND verified_at < ?{idx}"));
+            params.push(Box::new(td.to_string()));
             idx += 1;
         }
         sql.push_str(&format!(
