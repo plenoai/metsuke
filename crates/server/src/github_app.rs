@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use anyhow::{Context, Result};
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
@@ -9,6 +12,8 @@ pub struct GitHubApp {
     client_id: String,
     client_secret: String,
     http: reqwest::Client,
+    jwt_cache: Arc<std::sync::RwLock<Option<(String, std::time::Instant)>>>,
+    token_cache: Arc<std::sync::RwLock<HashMap<i64, (String, std::time::Instant)>>>,
 }
 
 #[derive(Serialize)]
@@ -135,6 +140,8 @@ impl GitHubApp {
             client_id,
             client_secret,
             http,
+            jwt_cache: Arc::new(std::sync::RwLock::new(None)),
+            token_cache: Arc::new(std::sync::RwLock::new(HashMap::new())),
         })
     }
 
@@ -143,6 +150,19 @@ impl GitHubApp {
     }
 
     fn generate_jwt(&self) -> Result<String> {
+        const JWT_TTL: std::time::Duration = std::time::Duration::from_secs(9 * 60);
+
+        // Check cache (read lock)
+        {
+            let cache = self.jwt_cache.read().unwrap();
+            if let Some((ref token, created_at)) = *cache {
+                if created_at.elapsed() < JWT_TTL {
+                    return Ok(token.clone());
+                }
+            }
+        }
+
+        // Cache miss — generate a new JWT
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as i64;
@@ -151,11 +171,32 @@ impl GitHubApp {
             exp: now + (10 * 60),
             iss: self.app_id.to_string(),
         };
-        encode(&Header::new(Algorithm::RS256), &claims, &self.private_key)
-            .context("Failed to encode JWT")
+        let token = encode(&Header::new(Algorithm::RS256), &claims, &self.private_key)
+            .context("Failed to encode JWT")?;
+
+        // Store in cache (write lock)
+        {
+            let mut cache = self.jwt_cache.write().unwrap();
+            *cache = Some((token.clone(), std::time::Instant::now()));
+        }
+
+        Ok(token)
     }
 
     pub async fn create_installation_token(&self, installation_id: i64) -> Result<String> {
+        const TOKEN_TTL: std::time::Duration = std::time::Duration::from_secs(50 * 60);
+
+        // Check cache (read lock)
+        {
+            let cache = self.token_cache.read().unwrap();
+            if let Some((token, created_at)) = cache.get(&installation_id) {
+                if created_at.elapsed() < TOKEN_TTL {
+                    return Ok(token.clone());
+                }
+            }
+        }
+
+        // Cache miss — fetch from GitHub API
         let jwt = self.generate_jwt()?;
         let resp: InstallationTokenResponse = self
             .http
@@ -170,6 +211,16 @@ impl GitHubApp {
             .context("Failed to create installation token")?
             .json()
             .await?;
+
+        // Store in cache (write lock)
+        {
+            let mut cache = self.token_cache.write().unwrap();
+            cache.insert(
+                installation_id,
+                (resp.token.clone(), std::time::Instant::now()),
+            );
+        }
+
         Ok(resp.token)
     }
 

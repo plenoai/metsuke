@@ -85,7 +85,15 @@ async fn main() -> anyhow::Result<()> {
     let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "crates/server/static".into());
     let app = axum::Router::new()
         .nest_service("/mcp", authed_mcp)
-        .nest_service("/static", tower_http::services::ServeDir::new(&static_dir))
+        .nest(
+            "/static",
+            axum::Router::new()
+                .nest_service("/", tower_http::services::ServeDir::new(&static_dir))
+                .layer(SetResponseHeaderLayer::if_not_present(
+                    axum::http::header::CACHE_CONTROL,
+                    axum::http::HeaderValue::from_static("public, max-age=86400"),
+                )),
+        )
         .route("/health", axum::routing::get(|| async { "ok" }))
         .route("/healthz", axum::routing::get(healthz))
         .with_state(db.clone())

@@ -705,18 +705,13 @@ async fn sync_installations(state: &WebState, user_id: i64) {
             return;
         }
     };
-    for inst in user_installations {
-        let db = state.db.clone();
-        let account_login = inst.account.login.clone();
-        let account_type = inst.account.account_type.clone();
-        let inst_id = inst.id;
-        if let Err(e) = run_blocking(move || {
-            db.save_installation(inst_id, user_id, &account_login, &account_type)
-        })
-        .await
-        {
-            tracing::warn!("Failed to sync installation {}: {e:#}", inst.account.login);
-        }
+    let installs: Vec<_> = user_installations
+        .into_iter()
+        .map(|i| (i.id, i.account.login, i.account.account_type))
+        .collect();
+    let db = state.db.clone();
+    if let Err(e) = run_blocking(move || db.batch_save_installations(user_id, &installs)).await {
+        tracing::warn!("Failed to sync installations: {e:#}");
     }
 }
 

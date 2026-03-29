@@ -92,7 +92,8 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
             CREATE INDEX IF NOT EXISTS idx_audit_log_repo ON audit_log(owner, repo);
             CREATE INDEX IF NOT EXISTS idx_audit_log_type ON audit_log(verification_type);
-            CREATE INDEX IF NOT EXISTS idx_audit_log_verified_at ON audit_log(verified_at);",
+            CREATE INDEX IF NOT EXISTS idx_audit_log_verified_at ON audit_log(verified_at);
+            CREATE INDEX IF NOT EXISTS idx_audit_log_user_type_repo ON audit_log(user_id, verification_type, owner, repo);",
         )?;
         // Add github_token column to users (idempotent migration)
         let _ = conn.execute_batch("ALTER TABLE users ADD COLUMN github_token TEXT;");
@@ -237,6 +238,22 @@ impl Database {
              VALUES (?1, ?2, ?3, ?4)",
             rusqlite::params![installation_id, user_id, account_login, account_type],
         )?;
+        Ok(())
+    }
+
+    pub fn batch_save_installations(
+        &self,
+        user_id: i64,
+        installations: &[(i64, String, String)],
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "INSERT OR REPLACE INTO installations (installation_id, user_id, account_login, account_type)
+             VALUES (?1, ?2, ?3, ?4)",
+        )?;
+        for (inst_id, login, account_type) in installations {
+            stmt.execute(rusqlite::params![inst_id, user_id, login, account_type])?;
+        }
         Ok(())
     }
 
@@ -644,33 +661,37 @@ impl Database {
     // --- Repository Cache ---
 
     pub fn upsert_repositories(&self, user_id: i64, repos: &[RepoRow]) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "INSERT INTO repositories (user_id, owner, name, full_name, private, description, language, default_branch, pushed_at, synced_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))
-             ON CONFLICT(user_id, full_name) DO UPDATE SET
-                owner = excluded.owner,
-                name = excluded.name,
-                private = excluded.private,
-                description = excluded.description,
-                language = excluded.language,
-                default_branch = excluded.default_branch,
-                pushed_at = excluded.pushed_at,
-                synced_at = datetime('now')",
-        )?;
-        for r in repos {
-            stmt.execute(rusqlite::params![
-                user_id,
-                r.owner,
-                r.name,
-                r.full_name,
-                r.private as i32,
-                r.description,
-                r.language,
-                r.default_branch,
-                r.pushed_at,
-            ])?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO repositories (user_id, owner, name, full_name, private, description, language, default_branch, pushed_at, synced_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))
+                 ON CONFLICT(user_id, full_name) DO UPDATE SET
+                    owner = excluded.owner,
+                    name = excluded.name,
+                    private = excluded.private,
+                    description = excluded.description,
+                    language = excluded.language,
+                    default_branch = excluded.default_branch,
+                    pushed_at = excluded.pushed_at,
+                    synced_at = datetime('now')",
+            )?;
+            for r in repos {
+                stmt.execute(rusqlite::params![
+                    user_id,
+                    r.owner,
+                    r.name,
+                    r.full_name,
+                    r.private as i32,
+                    r.description,
+                    r.language,
+                    r.default_branch,
+                    r.pushed_at,
+                ])?;
+            }
         }
+        tx.commit()?;
         Ok(())
     }
 
@@ -725,59 +746,41 @@ impl Database {
 
     pub fn is_repos_stale(&self, user_id: i64) -> Result<bool> {
         let conn = self.conn.lock().unwrap();
-        let result: Result<String, _> = conn.query_row(
-            "SELECT MIN(synced_at) FROM repositories WHERE user_id = ?1",
+        let stale: bool = conn.query_row(
+            "SELECT CASE WHEN COUNT(*) = 0 THEN 1
+                    ELSE MIN(synced_at) < datetime('now', '-5 minutes')
+                    END
+             FROM repositories WHERE user_id = ?1",
             [user_id],
             |row| row.get(0),
-        );
-        match result {
-            Ok(ts) => {
-                let stale: bool =
-                    conn.query_row("SELECT ?1 < datetime('now', '-5 minutes')", [&ts], |row| {
-                        row.get(0)
-                    })?;
-                Ok(stale)
-            }
-            Err(_) => Ok(true),
-        }
+        )?;
+        Ok(stale)
     }
 
     pub fn is_pulls_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
         let conn = self.conn.lock().unwrap();
-        let result: Result<String, _> = conn.query_row(
-            "SELECT MIN(synced_at) FROM cached_pulls WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+        let stale: bool = conn.query_row(
+            "SELECT CASE WHEN COUNT(*) = 0 THEN 1
+                    ELSE MIN(synced_at) < datetime('now', '-5 minutes')
+                    END
+             FROM cached_pulls WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
             rusqlite::params![user_id, owner, repo],
             |row| row.get(0),
-        );
-        match result {
-            Ok(ts) => {
-                let stale: bool =
-                    conn.query_row("SELECT ?1 < datetime('now', '-5 minutes')", [&ts], |row| {
-                        row.get(0)
-                    })?;
-                Ok(stale)
-            }
-            Err(_) => Ok(true),
-        }
+        )?;
+        Ok(stale)
     }
 
     pub fn is_releases_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
         let conn = self.conn.lock().unwrap();
-        let result: Result<String, _> = conn.query_row(
-            "SELECT MIN(synced_at) FROM cached_releases WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+        let stale: bool = conn.query_row(
+            "SELECT CASE WHEN COUNT(*) = 0 THEN 1
+                    ELSE MIN(synced_at) < datetime('now', '-5 minutes')
+                    END
+             FROM cached_releases WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
             rusqlite::params![user_id, owner, repo],
             |row| row.get(0),
-        );
-        match result {
-            Ok(ts) => {
-                let stale: bool =
-                    conn.query_row("SELECT ?1 < datetime('now', '-5 minutes')", [&ts], |row| {
-                        row.get(0)
-                    })?;
-                Ok(stale)
-            }
-            Err(_) => Ok(true),
-        }
+        )?;
+        Ok(stale)
     }
 
     // --- Cached Pulls ---
@@ -789,30 +792,34 @@ impl Database {
         repo: &str,
         pulls: &[CachedPullRow],
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "DELETE FROM cached_pulls WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
-            rusqlite::params![user_id, owner, repo],
-        )?;
-        let mut stmt = conn.prepare(
-            "INSERT INTO cached_pulls (user_id, owner, repo, pr_number, title, state, author, created_at, updated_at, merged_at, draft, synced_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))",
-        )?;
-        for p in pulls {
-            stmt.execute(rusqlite::params![
-                user_id,
-                owner,
-                repo,
-                p.pr_number,
-                p.title,
-                p.state,
-                p.author,
-                p.created_at,
-                p.updated_at,
-                p.merged_at,
-                p.draft as i32,
-            ])?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        {
+            tx.execute(
+                "DELETE FROM cached_pulls WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+                rusqlite::params![user_id, owner, repo],
+            )?;
+            let mut stmt = tx.prepare(
+                "INSERT INTO cached_pulls (user_id, owner, repo, pr_number, title, state, author, created_at, updated_at, merged_at, draft, synced_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))",
+            )?;
+            for p in pulls {
+                stmt.execute(rusqlite::params![
+                    user_id,
+                    owner,
+                    repo,
+                    p.pr_number,
+                    p.title,
+                    p.state,
+                    p.author,
+                    p.created_at,
+                    p.updated_at,
+                    p.merged_at,
+                    p.draft as i32,
+                ])?;
+            }
         }
+        tx.commit()?;
         Ok(())
     }
 
@@ -853,32 +860,36 @@ impl Database {
         repo: &str,
         releases: &[CachedReleaseRow],
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "DELETE FROM cached_releases WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
-            rusqlite::params![user_id, owner, repo],
-        )?;
-        let mut stmt = conn.prepare(
-            "INSERT INTO cached_releases (user_id, owner, repo, release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body, synced_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now'))",
-        )?;
-        for r in releases {
-            stmt.execute(rusqlite::params![
-                user_id,
-                owner,
-                repo,
-                r.release_id,
-                r.tag_name,
-                r.name,
-                r.draft as i32,
-                r.prerelease as i32,
-                r.created_at,
-                r.published_at,
-                r.author,
-                r.html_url,
-                r.body,
-            ])?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        {
+            tx.execute(
+                "DELETE FROM cached_releases WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+                rusqlite::params![user_id, owner, repo],
+            )?;
+            let mut stmt = tx.prepare(
+                "INSERT INTO cached_releases (user_id, owner, repo, release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body, synced_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now'))",
+            )?;
+            for r in releases {
+                stmt.execute(rusqlite::params![
+                    user_id,
+                    owner,
+                    repo,
+                    r.release_id,
+                    r.tag_name,
+                    r.name,
+                    r.draft as i32,
+                    r.prerelease as i32,
+                    r.created_at,
+                    r.published_at,
+                    r.author,
+                    r.html_url,
+                    r.body,
+                ])?;
+            }
         }
+        tx.commit()?;
         Ok(())
     }
 
