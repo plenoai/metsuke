@@ -97,6 +97,7 @@
     <p style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">
       PRのコミット署名、CIステータス、レビュー承認、依存関係変更などをSDLCコントロールに照合します。
     </p>
+    <div id="policy-help" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);min-height:1.2em;margin-top:0.25rem"></div>
   </div>
 
   <div id="pr-list-section" style="margin-top:1.5rem">
@@ -210,5 +211,6 @@ async function verifyPRById(num, btn) {
 }
 
 loadPRs();
+enhancePolicySelect(document.getElementById('pr-policy'), 'policy-help');
 </script>
 {% endblock %}

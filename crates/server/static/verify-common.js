@@ -1,5 +1,37 @@
 /* Metsuke — Shared verification utilities */
 
+const POLICY_DESCRIPTIONS = {
+  'default': '汎用SDLCチェック — CI、コードレビュー、署名などの基本コントロールを検証',
+  'oss': 'OSSプロジェクト向け — ライセンス、SECURITY.md、依存関係管理を重視',
+  'aiops': 'AI/MLパイプライン向け — モデル管理、データリネージ、実験追跡を検証',
+  'soc1': 'SOC 1 準拠 — 財務報告に関連するITコントロールを検証',
+  'soc2': 'SOC 2 準拠 — セキュリティ・可用性・機密性のコントロールを検証',
+  'slsa-l1': 'SLSA Level 1 — ビルドプロセスの文書化を検証',
+  'slsa-l2': 'SLSA Level 2 — ホスト型ビルドサービスの使用を検証',
+  'slsa-l3': 'SLSA Level 3 — ビルド環境の分離・改ざん防止を検証',
+  'slsa-l4': 'SLSA Level 4 — 二者レビューとビルドの完全再現性を検証',
+};
+
+/**
+ * Enhance a policy <select> element with descriptive title on change
+ * and a companion help-text element.
+ * @param {HTMLSelectElement} selectEl - The policy select element
+ * @param {string} [helpElId] - Optional id of a <div> to show the description
+ */
+function enhancePolicySelect(selectEl, helpElId) {
+  if (!selectEl) return;
+  function update() {
+    const desc = POLICY_DESCRIPTIONS[selectEl.value] || '';
+    selectEl.title = desc;
+    if (helpElId) {
+      const el = document.getElementById(helpElId);
+      if (el) el.textContent = desc;
+    }
+  }
+  selectEl.addEventListener('change', update);
+  update();
+}
+
 function esc(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

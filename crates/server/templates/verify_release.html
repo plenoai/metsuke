@@ -98,6 +98,7 @@
     <p style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">
       2つのリリースタグ間の変更をSDLCコントロールに照合し、コンプライアンスを検証します。
     </p>
+    <div id="policy-help" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);min-height:1.2em;margin-top:0.25rem"></div>
   </div>
 
   <div id="release-list-section" style="margin-top:1.5rem">
@@ -227,5 +228,6 @@ function renderResult(data, baseTag, headTag) {
 }
 
 loadReleases();
+enhancePolicySelect(document.getElementById('release-policy'), 'policy-help');
 </script>
 {% endblock %}

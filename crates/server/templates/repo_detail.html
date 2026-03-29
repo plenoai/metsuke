@@ -26,6 +26,7 @@
         <button class="verify-btn" id="verify-btn" onclick="runVerify()">リポジトリ検証</button>
       </div>
     </div>
+    <div id="policy-help" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);min-height:1.2em"></div>
   </div>
 
   <div id="result-area" aria-live="polite">
@@ -66,5 +67,7 @@ async function runVerify() {
   btn.textContent = '再検証';
   btn.classList.remove('running');
 }
+
+enhancePolicySelect(document.getElementById('policy-select'), 'policy-help');
 </script>
 {% endblock %}

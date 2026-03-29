@@ -132,7 +132,14 @@ function renderRepoList(repos, cacheArr) {
   document.title = `Repos (${repos.length}) — Metsuke`;
 
   if (repos.length === 0) {
-    container.innerHTML = '<div class="empty-state">リポジトリが見つかりません。GitHub Appをインストールしてください。</div>';
+    container.innerHTML = `<div class="empty-state">
+      <div style="margin-bottom:0.75rem">リポジトリが見つかりません</div>
+      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary);margin-bottom:1rem">
+        Metsukeがリポジトリにアクセスするには、GitHub Appのインストールが必要です。<br>
+        インストール後、このページにリポジトリが自動的に表示されます。
+      </div>
+      <a class="btn" href="/settings" style="text-decoration:none">設定画面でGitHub Appをインストール</a>
+    </div>`;
     return;
   }
 

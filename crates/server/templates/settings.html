@@ -110,7 +110,13 @@
     <div class="section-title">インストール済みアカウント</div>
     <div class="card">
       {% if installations.is_empty() %}
-        <p class="hint">インストールされたアカウントはありません。GitHub Appをインストールしてください。</p>
+        <div class="hint" style="text-align:center;padding:1.5rem">
+          <div style="margin-bottom:0.5rem">インストールされたアカウントはありません</div>
+          <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">
+            下の「GitHub App をインストール」ボタンから、個人アカウントまたは組織にMetsukeをインストールしてください。<br>
+            インストールすると、対象リポジトリのSDLC検証が可能になります。
+          </div>
+        </div>
       {% else %}
         {% for inst in installations %}
         <div class="install-item">
@@ -134,9 +140,16 @@
   <div class="section">
     <div class="section-title">MCP 接続設定</div>
     <div class="card">
-      <p class="mcp-desc">MCPクライアントは <code>OAuth 2.1</code> で自動認証されます。以下の設定をMCPクライアントに追加してください。</p>
+      <p class="mcp-desc">
+        MCP (Model Context Protocol) を使うと、Claude CodeなどのAIツールからMetsukeの検証機能を直接呼び出せます。<br>
+        認証は <code>OAuth 2.1</code> で自動的に行われます。
+      </p>
+
       <div style="margin-top:1.25rem">
-        <div class="code-label">Claude Code Settings</div>
+        <div class="code-label">手順 1 — 設定ファイルに追加</div>
+        <p style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);margin:0.25rem 0 0.5rem">
+          Claude Codeの場合: <code>~/.claude.json</code> の <code>mcpServers</code> に以下を追加してください。
+        </p>
         <div class="code-wrap">
           <pre class="code-block" id="config">{
   "mcpServers": {
@@ -148,8 +161,22 @@
           <button class="copy-btn" onclick="copyText('config', this)" aria-label="設定をコピー">COPY</button>
         </div>
       </div>
+
+      <div style="margin-top:1.25rem">
+        <div class="code-label">手順 2 — 接続を確認</div>
+        <p style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);margin:0.25rem 0 0.5rem">
+          Claude Codeを起動し、初回接続時にブラウザでOAuth認証を行ってください。<br>
+          接続後、以下のようなツールが利用可能になります:
+        </p>
+        <ul style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);margin:0 0 0.5rem 1.5rem;line-height:1.8">
+          <li><code>verify_repo</code> — リポジトリのSDLC検証を実行</li>
+          <li><code>verify_pr</code> — PRのコンプライアンスチェック</li>
+          <li><code>verify_release</code> — リリース間の変更を検証</li>
+        </ul>
+      </div>
+
       <div style="margin-top:1rem">
-        <div class="code-label">Discovery Endpoints</div>
+        <div class="code-label">参考 — Discovery Endpoints</div>
         <div class="code-wrap">
           <pre class="code-block" id="endpoints">Protected Resource: {{ base_url }}/.well-known/oauth-protected-resource
 Auth Server:        {{ base_url }}/.well-known/oauth-authorization-server</pre>
