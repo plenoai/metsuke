@@ -200,6 +200,10 @@ function nextPage() {
 }
 
 function exportAuditCSV() {
+  const btn = document.getElementById('export-csv-btn');
+  const origText = btn.textContent;
+  btn.textContent = '出力中…';
+  btn.disabled = true;
   const rows = [['Date','Type','Owner','Repo','Target','Policy','Pass','Fail','Review','N/A']];
   allEntries.forEach(e => {
     rows.push([
@@ -215,6 +219,8 @@ function exportAuditCSV() {
   a.download = `metsuke-audit-${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+  btn.textContent = origText;
+  btn.disabled = false;
 }
 
 loadAudit();

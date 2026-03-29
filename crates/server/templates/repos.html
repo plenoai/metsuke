@@ -271,6 +271,10 @@ function sortRepos(mode) {
 }
 
 function exportCSV() {
+  const btn = document.getElementById('export-csv-btn');
+  const origText = btn.textContent;
+  btn.textContent = '出力中…';
+  btn.disabled = true;
   const rows = [['Repository','Language','Private','Policy','Pass','Fail','Review','N/A','Verified At']];
   allRepos.forEach(r => {
     const c = allCache[r.full_name] || {};
@@ -294,6 +298,8 @@ function exportCSV() {
   a.download = `metsuke-verification-${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+  btn.textContent = origText;
+  btn.disabled = false;
 }
 
 async function verifyAll() {
