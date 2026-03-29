@@ -58,6 +58,96 @@ async function swrFetch(url, { maxAge = 60000 } = {}) {
 }
 </script>
 <script src="/static/verify-common.js"></script>
+<script>
+// Global keyboard shortcuts (when not focused on input/select/textarea)
+document.addEventListener('keydown', function(e) {
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  switch (e.key) {
+    // Navigation: g then r/a/s (vim-style two-key nav via single-key for simplicity)
+    case 'g':
+      // Set up pending nav key
+      document._metsukeNavPending = true;
+      setTimeout(() => { document._metsukeNavPending = false; }, 800);
+      return;
+    case 'r':
+      if (document._metsukeNavPending) { document._metsukeNavPending = false; window.location = '/repos'; e.preventDefault(); }
+      return;
+    case 'a':
+      if (document._metsukeNavPending) { document._metsukeNavPending = false; window.location = '/audit'; e.preventDefault(); }
+      return;
+    case 's':
+      if (document._metsukeNavPending) { document._metsukeNavPending = false; window.location = '/settings'; e.preventDefault(); }
+      return;
+    // Focus search: /
+    case '/':
+      e.preventDefault();
+      const searchEl = document.getElementById('search-input') || document.getElementById('filter-repo');
+      if (searchEl) { searchEl.focus(); searchEl.select(); }
+      return;
+    // Primary action: Enter (trigger verify on current page)
+    // j/k: navigate repo cards or table rows
+    case 'j':
+    case 'k': {
+      const cards = Array.from(document.querySelectorAll('.repo-card:not([style*="display: none"]):not([style*="display:none"]), .pr-item, .audit-table tbody tr'));
+      if (cards.length === 0) return;
+      e.preventDefault();
+      const current = document.querySelector('.repo-card.kbd-focus, .pr-item.kbd-focus, .audit-table tbody tr.kbd-focus');
+      let idx = current ? cards.indexOf(current) : -1;
+      if (current) current.classList.remove('kbd-focus');
+      idx = e.key === 'j' ? Math.min(idx + 1, cards.length - 1) : Math.max(idx - 1, 0);
+      cards[idx].classList.add('kbd-focus');
+      cards[idx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      return;
+    }
+    // Open focused item
+    case 'o':
+    case 'Enter': {
+      const focused = document.querySelector('.kbd-focus');
+      if (!focused) return;
+      const link = focused.querySelector('a[href]');
+      if (link) { e.preventDefault(); window.location = link.href; }
+      return;
+    }
+    // Help overlay
+    case '?':
+      e.preventDefault();
+      toggleShortcutHelp();
+      return;
+  }
+});
+
+function toggleShortcutHelp() {
+  let overlay = document.getElementById('kbd-help-overlay');
+  if (overlay) { overlay.remove(); return; }
+  overlay = document.createElement('div');
+  overlay.id = 'kbd-help-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-label', 'キーボードショートカット');
+  overlay.innerHTML = `
+    <div class="kbd-help-backdrop" onclick="this.parentElement.remove()"></div>
+    <div class="kbd-help-panel">
+      <div style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;margin-bottom:0.75rem;color:var(--accent-gold)">キーボードショートカット</div>
+      <table style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-primary);border-collapse:collapse;width:100%">
+        <tr><td class="kbd-key">g r</td><td>リポジトリ一覧</td></tr>
+        <tr><td class="kbd-key">g a</td><td>監査ログ</td></tr>
+        <tr><td class="kbd-key">g s</td><td>設定</td></tr>
+        <tr><td class="kbd-key">/</td><td>検索にフォーカス</td></tr>
+        <tr><td class="kbd-key">j / k</td><td>リスト上下移動</td></tr>
+        <tr><td class="kbd-key">o</td><td>選択項目を開く</td></tr>
+        <tr><td class="kbd-key">?</td><td>このヘルプを表示</td></tr>
+      </table>
+      <div style="margin-top:0.75rem;font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)">Esc または ? で閉じる</div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') overlay.remove();
+  });
+  overlay.querySelector('.kbd-help-panel').focus();
+}
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -477,32 +477,68 @@ struct AuthCallback {
     state: Option<String>,
 }
 
-async fn login(State(state): State<WebState>) -> Redirect {
+async fn login(State(state): State<WebState>) -> Response {
     let redirect_uri = format!("{}/auth/callback", state.base_url);
+    let csrf_state = uuid::Uuid::new_v4().to_string();
     let url = format!(
-        "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=read:user",
+        "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=read:user&state=web:{}",
         state.github_app.client_id(),
-        redirect_uri
+        redirect_uri,
+        csrf_state,
     );
-    Redirect::temporary(&url)
+    let mut resp = Redirect::temporary(&url).into_response();
+    resp.headers_mut().insert(
+        SET_COOKIE,
+        format!("csrf_state={csrf_state}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600")
+            .parse()
+            .unwrap(),
+    );
+    resp
 }
 
 async fn auth_callback(
+    headers: HeaderMap,
     Query(params): Query<AuthCallback>,
     State(state): State<WebState>,
 ) -> Response {
-    // If state parameter is present, this is an MCP OAuth 2.1 callback
+    // Dispatch based on state parameter format:
+    //   - "web:<csrf>" => web login flow with CSRF verification
+    //   - other non-empty state => MCP OAuth 2.1 callback
+    //   - None => legacy web login (should not happen after CSRF addition)
     if let Some(ref oauth_state) = params.state {
-        return crate::oauth::handle_oauth_callback(
-            &params.code,
-            oauth_state,
-            &state.db,
-            &state.github_app,
-        )
-        .await;
+        if let Some(csrf_token) = oauth_state.strip_prefix("web:") {
+            // Web login flow — verify CSRF cookie matches
+            let cookie_csrf = headers
+                .get(axum::http::header::COOKIE)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|cookies| {
+                    cookies
+                        .split(';')
+                        .find_map(|c| c.trim().strip_prefix("csrf_state=").map(|s| s.to_string()))
+                });
+            match cookie_csrf {
+                Some(ref expected) if expected == csrf_token => { /* CSRF valid */ }
+                _ => {
+                    return error_page(
+                        "認証エラー",
+                        "CSRF検証に失敗しました。もう一度ログインしてください。",
+                    );
+                }
+            }
+            // Fall through to web login flow below; clear csrf_state cookie
+        } else {
+            // MCP OAuth 2.1 callback
+            return crate::oauth::handle_oauth_callback(
+                &params.code,
+                oauth_state,
+                &state.db,
+                &state.github_app,
+            )
+            .await;
+        }
     }
 
-    // Otherwise, this is the standard web login flow
+    // Standard web login flow
     let token_resp = match state.github_app.exchange_code(&params.code).await {
         Ok(t) => t,
         Err(e) => {
@@ -552,9 +588,16 @@ async fn auth_callback(
     };
 
     let mut resp = Redirect::to("/repos").into_response();
-    resp.headers_mut().insert(
+    resp.headers_mut().append(
         SET_COOKIE,
         session_cookie(&session_id, 30 * 24 * 3600).parse().unwrap(),
+    );
+    // Clear the CSRF cookie now that login is complete
+    resp.headers_mut().append(
+        SET_COOKIE,
+        "csrf_state=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"
+            .parse()
+            .unwrap(),
     );
     resp
 }

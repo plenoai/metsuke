@@ -556,6 +556,29 @@ impl Database {
         Ok(())
     }
 
+    /// Delete expired sessions, authorization codes, tokens, and OAuth states.
+    pub fn cleanup_expired(&self) -> Result<u64> {
+        let conn = self.conn.lock().unwrap();
+        let mut total = 0u64;
+        total += conn.execute(
+            "DELETE FROM sessions WHERE expires_at <= datetime('now')",
+            [],
+        )? as u64;
+        total += conn.execute(
+            "DELETE FROM authorization_codes WHERE expires_at <= datetime('now')",
+            [],
+        )? as u64;
+        total += conn.execute(
+            "DELETE FROM oauth_tokens WHERE expires_at <= datetime('now') AND refresh_expires_at <= datetime('now')",
+            [],
+        )? as u64;
+        total += conn.execute(
+            "DELETE FROM oauth_states WHERE expires_at <= datetime('now')",
+            [],
+        )? as u64;
+        Ok(total)
+    }
+
     /// Latest verification per (owner, repo, type) for cache display on repos list
     pub fn get_latest_verifications_for_user(&self, user_id: i64) -> Result<Vec<AuditEntry>> {
         let conn = self.conn.lock().unwrap();

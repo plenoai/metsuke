@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Audit{% endblock %}
+{% block title %}監査ログ{% endblock %}
 
 {% block head %}
 <style>
@@ -133,9 +133,6 @@ let currentOffset = 0;
 const PAGE_SIZE = 50;
 let allEntries = [];
 
-function esc(s) {
-  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 
 function typeBadge(type) {
   if (type === 'release') return '<span class="type-badge type-release">release</span>';
@@ -199,6 +196,15 @@ async function loadAudit() {
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+
+    // Update page title with context
+    const filterParts = [];
+    if (type) filterParts.push(type);
+    const repoFilter = document.getElementById('filter-repo').value.trim();
+    if (repoFilter) filterParts.push(repoFilter);
+    document.title = filterParts.length > 0
+      ? `監査ログ: ${filterParts.join(' ')} (${entries.length}件) — Metsuke`
+      : `監査ログ (${currentOffset + 1}-${currentOffset + entries.length}) — Metsuke`;
 
     // Pagination
     const pag = document.getElementById('audit-pagination');

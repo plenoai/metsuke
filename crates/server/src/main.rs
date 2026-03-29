@@ -60,6 +60,27 @@ async fn main() -> anyhow::Result<()> {
         .layer(OAuthAuthLayer::new(db.clone(), &config.base_url))
         .service(service);
 
+    // Periodic expired session cleanup (hourly)
+    {
+        let db = db.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+            interval.tick().await; // skip first immediate tick
+            loop {
+                interval.tick().await;
+                let db = db.clone();
+                match crate::blocking::run_blocking(move || db.cleanup_expired()).await {
+                    Ok(count) => {
+                        if count > 0 {
+                            tracing::info!("Cleaned up {count} expired records");
+                        }
+                    }
+                    Err(e) => tracing::warn!("Cleanup failed: {e:#}"),
+                }
+            }
+        });
+    }
+
     let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "crates/server/static".into());
     let app = axum::Router::new()
         .nest_service("/mcp", authed_mcp)

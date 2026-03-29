@@ -531,6 +531,47 @@ select:focus-visible {
   background: linear-gradient(to right, transparent, var(--bg-surface) 50%);
 }
 
+/* Keyboard navigation focus */
+.kbd-focus {
+  outline: 2px solid var(--accent-gold) !important;
+  outline-offset: -2px;
+  border-color: var(--accent-gold) !important;
+}
+
+/* Keyboard shortcut help overlay */
+#kbd-help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kbd-help-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+.kbd-help-panel {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  min-width: 280px;
+  max-width: 360px;
+  outline: none;
+}
+.kbd-help-panel td {
+  padding: 0.3rem 0.5rem;
+}
+.kbd-key {
+  color: var(--text-secondary);
+  text-align: right;
+  padding-right: 1rem !important;
+  white-space: nowrap;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .shell { padding: 1.5rem 1rem 3rem; }

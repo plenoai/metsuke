@@ -116,10 +116,6 @@ function renderBadges(pass, fail, review) {
   return b;
 }
 
-function esc(s) {
-  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
 
 function filterRepos() {
   applyFilters();
@@ -133,6 +129,7 @@ function renderRepoList(repos, cacheArr) {
 
   const container = document.getElementById('repo-list');
   document.getElementById('repos-title').textContent = `リポジトリ (${repos.length})`;
+  document.title = `Repos (${repos.length}) — Metsuke`;
 
   if (repos.length === 0) {
     container.innerHTML = '<div class="empty-state">リポジトリが見つかりません。GitHub Appをインストールしてください。</div>';
@@ -167,6 +164,8 @@ function renderRepoList(repos, cacheArr) {
       </div>
       <div class="repo-actions">
         <div class="result-summary" id="result-${r.full_name.replace('/', '-')}">${cachedBadges}</div>
+        <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/pulls" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="PR検証">PR</a>
+        <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/releases" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="リリース検証">Rel</a>
         <select class="policy-select" id="policy-${r.full_name.replace('/', '-')}" aria-label="${esc(r.full_name)} のポリシー選択">${POLICY_OPTIONS}</select>
         <button class="verify-btn" onclick="verifyRepo('${esc(r.owner)}', '${esc(r.name)}', this)">${cached ? '再検証' : '検証'}</button>
       </div>
@@ -339,6 +338,7 @@ function applyFilters() {
   });
 
   document.getElementById('repos-title').textContent = `リポジトリ (${visible} / ${cards.length})`;
+  document.title = `Repos (${visible}/${cards.length}) — Metsuke`;
 
   // Update dashboard summary for filtered subset
   updateDashboardSummary();
