@@ -132,7 +132,7 @@ async function runVerify() {
     html += '</div>';
 
     html += '<div class="card" style="padding:0;overflow-x:auto">';
-    html += '<table class="findings-table" aria-label="検証結果"><thead><tr><th scope="col">Control</th><th scope="col">Status</th><th scope="col">Rationale</th></tr></thead><tbody>';
+    html += '<table class="findings-table" aria-label="検証結果"><thead><tr><th scope="col">コントロール</th><th scope="col">ステータス</th><th scope="col">根拠</th></tr></thead><tbody>';
     for (const f of findings) {
       const rationale = f.rationale || '';
       const escaped = rationale.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

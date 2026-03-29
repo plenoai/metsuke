@@ -30,46 +30,75 @@ fn tool_error(msg: impl std::fmt::Display) -> CallToolResult {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct VerifyPrArgs {
-    #[schemars(description = "GitHub repository owner")]
+    #[schemars(description = "GitHub repository owner (e.g. 'octocat')")]
     pub owner: String,
-    #[schemars(description = "GitHub repository name")]
+    #[schemars(description = "GitHub repository name (e.g. 'hello-world')")]
     pub repo: String,
-    #[schemars(description = "Pull request number")]
+    #[schemars(description = "Pull request number to verify")]
     pub pr_number: u32,
-    #[schemars(description = "Policy preset (default, oss, aiops, soc1, soc2, slsa-l1..l4)")]
+    #[schemars(description = "Policy preset that selects which controls to enforce. \
+        default=basic SDLC hygiene, oss=open-source best practices, \
+        soc2=SOC 2 compliance controls, slsa-l1..l4=SLSA supply-chain levels 1-4, \
+        aiops=AI/ML operations controls, soc1=SOC 1 controls. \
+        Omit to use 'default'.")]
     pub policy: Option<String>,
-    #[schemars(description = "Include raw evidence bundle in output")]
+    #[schemars(
+        description = "When true, includes raw GitHub API responses in the output \
+        as an evidence bundle. Significantly increases response size. \
+        Useful for audit trails and debugging false positives."
+    )]
     #[serde(default)]
     pub with_evidence: bool,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct VerifyReleaseArgs {
-    #[schemars(description = "GitHub repository owner")]
+    #[schemars(description = "GitHub repository owner (e.g. 'octocat')")]
     pub owner: String,
-    #[schemars(description = "GitHub repository name")]
+    #[schemars(description = "GitHub repository name (e.g. 'hello-world')")]
     pub repo: String,
-    #[schemars(description = "Base tag (e.g. v1.0.0)")]
+    #[schemars(description = "Base tag — the older release to compare from (e.g. 'v1.0.0')")]
     pub base_tag: String,
-    #[schemars(description = "Head tag (e.g. v1.1.0)")]
+    #[schemars(description = "Head tag — the newer release to compare to (e.g. 'v1.1.0')")]
     pub head_tag: String,
-    #[schemars(description = "Policy preset")]
+    #[schemars(description = "Policy preset that selects which controls to enforce. \
+        default=basic SDLC hygiene, oss=open-source best practices, \
+        soc2=SOC 2 compliance controls, slsa-l1..l4=SLSA supply-chain levels 1-4, \
+        aiops=AI/ML operations controls, soc1=SOC 1 controls. \
+        Omit to use 'default'.")]
     pub policy: Option<String>,
+    #[schemars(
+        description = "When true, includes raw GitHub API responses in the output \
+        as an evidence bundle. Significantly increases response size. \
+        Useful for audit trails and debugging false positives."
+    )]
     #[serde(default)]
     pub with_evidence: bool,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct VerifyRepoArgs {
-    #[schemars(description = "GitHub repository owner")]
+    #[schemars(description = "GitHub repository owner (e.g. 'octocat')")]
     pub owner: String,
-    #[schemars(description = "GitHub repository name")]
+    #[schemars(description = "GitHub repository name (e.g. 'hello-world')")]
     pub repo: String,
-    #[schemars(description = "Git reference (branch, tag, or SHA)")]
+    #[schemars(
+        description = "Git reference to verify at — branch name, tag, or commit SHA. \
+        Defaults to HEAD."
+    )]
     #[serde(default = "default_ref")]
     pub reference: String,
-    #[schemars(description = "Policy preset")]
+    #[schemars(description = "Policy preset that selects which controls to enforce. \
+        default=basic SDLC hygiene, oss=open-source best practices, \
+        soc2=SOC 2 compliance controls, slsa-l1..l4=SLSA supply-chain levels 1-4, \
+        aiops=AI/ML operations controls, soc1=SOC 1 controls. \
+        Omit to use 'default'.")]
     pub policy: Option<String>,
+    #[schemars(
+        description = "When true, includes raw GitHub API responses in the output \
+        as an evidence bundle. Significantly increases response size. \
+        Useful for audit trails and debugging false positives."
+    )]
     #[serde(default)]
     pub with_evidence: bool,
 }
@@ -108,7 +137,13 @@ impl MetsukeServer {
             .await
     }
 
-    #[tool(description = "Verify a pull request against SDLC controls and a policy preset")]
+    #[tool(
+        description = "Verify a pull request against SDLC controls including code review approval, \
+        CI status checks, commit signing, and branch protection. Returns JSON with a top-level \
+        verdict and a findings array where each entry has control_id, status \
+        (satisfied/violated/indeterminate/not_applicable), and rationale fields. \
+        Use the policy parameter to select which controls are enforced."
+    )]
     pub async fn verify_pr(
         &self,
         Parameters(args): Parameters<VerifyPrArgs>,
@@ -155,7 +190,14 @@ impl MetsukeServer {
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 
-    #[tool(description = "Verify a release tag range against SDLC controls")]
+    #[tool(
+        description = "Verify changes between two release tags against SDLC controls. \
+        Evaluates all commits and PRs in the base_tag..head_tag range for code review, \
+        CI status, commit signing, and release integrity. Returns JSON with a top-level \
+        verdict and a findings array where each entry has control_id, status \
+        (satisfied/violated/indeterminate/not_applicable), and rationale fields. \
+        Use the policy parameter to select which controls are enforced."
+    )]
     pub async fn verify_release(
         &self,
         Parameters(args): Parameters<VerifyReleaseArgs>,
@@ -204,7 +246,14 @@ impl MetsukeServer {
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 
-    #[tool(description = "Verify repository dependency signatures at a git reference")]
+    #[tool(
+        description = "Verify repository-level SDLC controls at a specific git reference, \
+        including branch protection rules, dependency signature verification, and \
+        security policy presence. Returns JSON with a top-level verdict and a findings \
+        array where each entry has control_id, status \
+        (satisfied/violated/indeterminate/not_applicable), and rationale fields. \
+        Use the policy parameter to select which controls are enforced."
+    )]
     pub async fn verify_repo(
         &self,
         Parameters(args): Parameters<VerifyRepoArgs>,

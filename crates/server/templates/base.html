@@ -20,14 +20,14 @@
         <div class="brand-sub">Metsuke</div>
       </div>
       <nav class="nav-links" aria-label="メインナビゲーション">
-        <a class="nav-link{% if active_page == "repos" %} active{% endif %}" href="/repos">Repos</a>
-        <a class="nav-link{% if active_page == "audit" %} active{% endif %}" href="/audit">Audit</a>
-        <a class="nav-link{% if active_page == "settings" %} active{% endif %}" href="/settings">Settings</a>
+        <a class="nav-link{% if active_page == "repos" %} active{% endif %}" href="/repos">リポジトリ</a>
+        <a class="nav-link{% if active_page == "audit" %} active{% endif %}" href="/audit">監査ログ</a>
+        <a class="nav-link{% if active_page == "settings" %} active{% endif %}" href="/settings">設定</a>
       </nav>
     </div>
     <div class="user-badge">
       <strong>{{ login }}</strong>
-      <a class="logout-link" href="/auth/logout">logout</a>
+      <a class="logout-link" href="/auth/logout">ログアウト</a>
     </div>
   </header>
   <main id="main" role="main">

@@ -101,7 +101,7 @@
 {% endblock %}
 
 {% block content %}
-  <div class="section-title">Audit Log</div>
+  <div class="section-title">監査ログ</div>
 
   <div class="audit-toolbar">
     <select class="policy-select" id="filter-type" onchange="resetAndLoad()" aria-label="タイプフィルタ">
@@ -184,7 +184,7 @@ async function loadAudit() {
     container.innerHTML = `<div class="card" style="padding:0;overflow-x:auto">
       <table class="audit-table">
         <thead>
-          <tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Repository</th><th scope="col">Target</th><th scope="col">Policy</th><th scope="col">Result</th></tr>
+          <tr><th scope="col">日時</th><th scope="col">タイプ</th><th scope="col">リポジトリ</th><th scope="col">対象</th><th scope="col">ポリシー</th><th scope="col">結果</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>

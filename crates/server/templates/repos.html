@@ -74,7 +74,7 @@
 
 {% block content %}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
-    <div class="section-title" id="repos-title" style="margin-bottom:0">Repositories</div>
+    <div class="section-title" id="repos-title" style="margin-bottom:0">リポジトリ</div>
     <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap" id="toolbar" class="toolbar-hidden">
       <select class="policy-select" id="sort-select" onchange="sortRepos(this.value)" aria-label="ソート順">
         <option value="activity" selected>アクティビティ順</option>
@@ -132,9 +132,9 @@ function filterRepos() {
   });
   const title = document.getElementById('repos-title');
   if (q) {
-    title.textContent = `Repositories (${visible} / ${cards.length})`;
+    title.textContent = `リポジトリ (${visible} / ${cards.length})`;
   } else {
-    title.textContent = `Repositories (${cards.length})`;
+    title.textContent = `リポジトリ (${cards.length})`;
   }
 }
 
@@ -145,7 +145,7 @@ function renderRepoList(repos, cacheArr) {
   }
 
   const container = document.getElementById('repo-list');
-  document.getElementById('repos-title').textContent = `Repositories (${repos.length})`;
+  document.getElementById('repos-title').textContent = `リポジトリ (${repos.length})`;
 
   if (repos.length === 0) {
     container.innerHTML = '<div class="empty-state">リポジトリが見つかりません。GitHub Appをインストールしてください。</div>';
@@ -312,7 +312,7 @@ function filterByStatus(status) {
     cards.forEach(c => c.style.display = '');
     summaryCards.forEach(c => c.classList.remove('active'));
     summaryCards.forEach(c => c.setAttribute('aria-pressed', 'false'));
-    document.getElementById('repos-title').textContent = `Repositories (${cards.length})`;
+    document.getElementById('repos-title').textContent = `リポジトリ (${cards.length})`;
     return;
   }
 
@@ -331,7 +331,7 @@ function filterByStatus(status) {
       c.style.display = 'none';
     }
   });
-  document.getElementById('repos-title').textContent = `Repositories (${visible} / ${cards.length})`;
+  document.getElementById('repos-title').textContent = `リポジトリ (${visible} / ${cards.length})`;
 }
 
 function exportCSV() {
@@ -339,22 +339,22 @@ function exportCSV() {
   const origText = btn.textContent;
   btn.textContent = '出力中…';
   btn.disabled = true;
-  const rows = [['Repository','Language','Private','Policy','Pass','Fail','Review','N/A','Verified At']];
+  const rows = [['リポジトリ','言語','公開範囲','ポリシー','PASS','FAIL','REVIEW','N/A','検証日時']];
   allRepos.forEach(r => {
     const c = allCache[r.full_name] || {};
     rows.push([
       r.full_name,
       r.language || '',
-      r.private ? 'yes' : 'no',
+      r.private ? '非公開' : '公開',
       c.policy || '',
       c.pass || 0,
       c.fail || 0,
       c.review || 0,
       c.na || 0,
-      c.verified_at || 'not verified',
+      c.verified_at || '未検証',
     ]);
   });
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = '\uFEFF' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

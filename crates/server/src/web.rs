@@ -267,19 +267,22 @@ fn session_cookie(session_id: &str, max_age: i64) -> String {
     format!("session={session_id}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age={max_age}")
 }
 
+/// Consolidates session-cookie extraction + DB user lookup behind `run_blocking`.
+async fn require_user(db: &Arc<Database>, headers: &HeaderMap) -> Option<(i64, String)> {
+    let session_id = get_session_from_cookie(headers)?;
+    let db = db.clone();
+    run_blocking(move || db.get_user_by_session(&session_id))
+        .await
+        .ok()
+        .flatten()
+}
+
 // ---------------------------------------------------------------------------
 // Landing page (unique layout, inline HTML)
 // ---------------------------------------------------------------------------
 
 async fn index(headers: HeaderMap, State(state): State<WebState>) -> Response {
-    if let Some(session_id) = get_session_from_cookie(&headers)
-        && state
-            .db
-            .get_user_by_session(&session_id)
-            .ok()
-            .flatten()
-            .is_some()
-    {
+    if require_user(&state.db, &headers).await.is_some() {
         return Redirect::to("/repos").into_response();
     }
 
@@ -516,12 +519,16 @@ async fn auth_callback(
         }
     };
 
-    let user_id = match state.db.upsert_user(
-        user.id,
-        &user.login,
-        user.avatar_url.as_deref(),
-        Some(&token_resp.access_token),
-    ) {
+    let db = state.db.clone();
+    let login = user.login.clone();
+    let avatar = user.avatar_url.clone();
+    let access_token = token_resp.access_token.clone();
+    let uid = user.id;
+    let user_id = match run_blocking(move || {
+        db.upsert_user(uid, &login, avatar.as_deref(), Some(&access_token))
+    })
+    .await
+    {
         Ok(id) => id,
         Err(e) => {
             tracing::error!("DB error: {e:#}");
@@ -532,7 +539,8 @@ async fn auth_callback(
         }
     };
 
-    let session_id = match state.db.create_session(user_id) {
+    let db = state.db.clone();
+    let session_id = match run_blocking(move || db.create_session(user_id)).await {
         Ok(s) => s,
         Err(e) => {
             tracing::error!("Session creation failed: {e:#}");
@@ -553,7 +561,8 @@ async fn auth_callback(
 
 async fn logout(headers: HeaderMap, State(state): State<WebState>) -> Response {
     if let Some(session_id) = get_session_from_cookie(&headers) {
-        let _ = state.db.delete_session(&session_id);
+        let db = state.db.clone();
+        let _ = run_blocking(move || db.delete_session(&session_id)).await;
     }
     let mut resp = Redirect::to("/").into_response();
     resp.headers_mut()
@@ -571,14 +580,9 @@ async fn install_callback(
     Query(params): Query<InstallCallback>,
     State(state): State<WebState>,
 ) -> Response {
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return Redirect::to("/auth/login").into_response(),
-    };
-
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return Redirect::to("/auth/login").into_response(),
     };
 
     let installation = match state
@@ -593,12 +597,14 @@ async fn install_callback(
         }
     };
 
-    if let Err(e) = state.db.save_installation(
-        installation.id,
-        user_id,
-        &installation.account.login,
-        &installation.account.account_type,
-    ) {
+    let db = state.db.clone();
+    let account_login = installation.account.login.clone();
+    let account_type = installation.account.account_type.clone();
+    let inst_id = installation.id;
+    if let Err(e) =
+        run_blocking(move || db.save_installation(inst_id, user_id, &account_login, &account_type))
+            .await
+    {
         tracing::error!("Failed to save installation: {e:#}");
         return Html("Internal error".to_string()).into_response();
     }
@@ -611,19 +617,14 @@ async fn install_callback(
 // ---------------------------------------------------------------------------
 
 async fn settings(headers: HeaderMap, State(state): State<WebState>) -> Response {
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return Redirect::to("/").into_response(),
     };
 
-    let (user_id, login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return Redirect::to("/").into_response(),
-    };
-
-    let installations = state
-        .db
-        .get_installations_for_user(user_id)
+    let db = state.db.clone();
+    let installations = run_blocking(move || db.get_installations_for_user(user_id))
+        .await
         .unwrap_or_default();
 
     SettingsTemplate {
@@ -654,14 +655,9 @@ struct RepoWithOwner {
 }
 
 async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Response {
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
     let cache_key = format!("repos:user:{user_id}");
@@ -673,7 +669,8 @@ async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Respons
 }
 
 async fn sync_installations(state: &WebState, user_id: i64) {
-    let token = match state.db.get_github_token(user_id) {
+    let db = state.db.clone();
+    let token = match run_blocking(move || db.get_github_token(user_id)).await {
         Ok(Some(t)) => t,
         _ => return,
     };
@@ -685,12 +682,15 @@ async fn sync_installations(state: &WebState, user_id: i64) {
         }
     };
     for inst in user_installations {
-        if let Err(e) = state.db.save_installation(
-            inst.id,
-            user_id,
-            &inst.account.login,
-            &inst.account.account_type,
-        ) {
+        let db = state.db.clone();
+        let account_login = inst.account.login.clone();
+        let account_type = inst.account.account_type.clone();
+        let inst_id = inst.id;
+        if let Err(e) = run_blocking(move || {
+            db.save_installation(inst_id, user_id, &account_login, &account_type)
+        })
+        .await
+        {
             tracing::warn!("Failed to sync installation {}: {e:#}", inst.account.login);
         }
     }
@@ -699,9 +699,9 @@ async fn sync_installations(state: &WebState, user_id: i64) {
 async fn fetch_repos(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
     sync_installations(state, user_id).await;
 
-    let installations = state
-        .db
-        .get_installations_for_user(user_id)
+    let db = state.db.clone();
+    let installations = run_blocking(move || db.get_installations_for_user(user_id))
+        .await
         .unwrap_or_default();
 
     let mut repos: Vec<RepoWithOwner> = Vec::new();
@@ -757,33 +757,31 @@ async fn api_verify_repo(
         return r;
     }
 
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let installation_id = match state.db.get_installation_for_owner(user_id, &owner) {
-        Ok(Some(id)) => id,
-        Ok(None) => {
-            return (
-                axum::http::StatusCode::NOT_FOUND,
-                "No installation found for this owner",
-            )
-                .into_response();
-        }
-        Err(e) => {
-            return (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("{e}"),
-            )
-                .into_response();
-        }
-    };
+    let db = state.db.clone();
+    let owner_q = owner.clone();
+    let installation_id =
+        match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
+            Ok(Some(id)) => id,
+            Ok(None) => {
+                return (
+                    axum::http::StatusCode::NOT_FOUND,
+                    "No installation found for this owner",
+                )
+                    .into_response();
+            }
+            Err(e) => {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("{e}"),
+                )
+                    .into_response();
+            }
+        };
 
     let token = match state
         .github_app
@@ -820,11 +818,26 @@ async fn api_verify_repo(
         Ok(r) => {
             if let Ok(json) = serde_json::to_string(&r) {
                 let (pass, fail, review, na) = count_findings(&json);
-                let policy_str = policy_used.as_deref().unwrap_or("default");
-                let _ = state.db.append_audit_entry(
-                    user_id, "repo", &owner, &repo, "HEAD", policy_str, pass, fail, review, na,
-                    &json,
-                );
+                let policy_str = policy_used.unwrap_or_else(|| "default".to_string());
+                let db = state.db.clone();
+                let owner_a = owner.clone();
+                let repo_a = repo.clone();
+                let _ = run_blocking(move || {
+                    db.append_audit_entry(
+                        user_id,
+                        "repo",
+                        &owner_a,
+                        &repo_a,
+                        "HEAD",
+                        &policy_str,
+                        pass,
+                        fail,
+                        review,
+                        na,
+                        &json,
+                    )
+                })
+                .await;
             }
             Json(r).into_response()
         }
@@ -863,19 +876,14 @@ fn count_findings(json: &str) -> (i64, i64, i64, i64) {
 // ---------------------------------------------------------------------------
 
 async fn api_verification_cache(headers: HeaderMap, State(state): State<WebState>) -> Response {
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let entries = state
-        .db
-        .get_latest_verifications_for_user(user_id)
+    let db = state.db.clone();
+    let entries = run_blocking(move || db.get_latest_verifications_for_user(user_id))
+        .await
         .unwrap_or_default();
 
     let json: Vec<serde_json::Value> = entries
@@ -912,21 +920,18 @@ async fn api_list_pulls(
         return r;
     }
 
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let installation_id = match state.db.get_installation_for_owner(user_id, &owner) {
-        Ok(Some(id)) => id,
-        Ok(None) => return Json(Vec::<serde_json::Value>::new()).into_response(),
-        Err(_) => return Json(Vec::<serde_json::Value>::new()).into_response(),
-    };
+    let db = state.db.clone();
+    let owner_q = owner.clone();
+    let installation_id =
+        match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
+            Ok(Some(id)) => id,
+            _ => return Json(Vec::<serde_json::Value>::new()).into_response(),
+        };
 
     let cache_key = format!("pulls:{owner}/{repo}:inst:{installation_id}");
     let app = state.github_app.clone();
@@ -951,21 +956,18 @@ async fn api_list_releases(
         return r;
     }
 
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let installation_id = match state.db.get_installation_for_owner(user_id, &owner) {
-        Ok(Some(id)) => id,
-        Ok(None) => return Json(Vec::<serde_json::Value>::new()).into_response(),
-        Err(_) => return Json(Vec::<serde_json::Value>::new()).into_response(),
-    };
+    let db = state.db.clone();
+    let owner_q = owner.clone();
+    let installation_id =
+        match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
+            Ok(Some(id)) => id,
+            _ => return Json(Vec::<serde_json::Value>::new()).into_response(),
+        };
 
     let cache_key = format!("releases:{owner}/{repo}:inst:{installation_id}");
     let app = state.github_app.clone();
@@ -1007,33 +1009,31 @@ async fn api_verify_release(
         return (axum::http::StatusCode::BAD_REQUEST, e.message).into_response();
     }
 
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let installation_id = match state.db.get_installation_for_owner(user_id, &owner) {
-        Ok(Some(id)) => id,
-        Ok(None) => {
-            return (
-                axum::http::StatusCode::NOT_FOUND,
-                "No installation found for this owner",
-            )
-                .into_response();
-        }
-        Err(e) => {
-            return (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("{e}"),
-            )
-                .into_response();
-        }
-    };
+    let db = state.db.clone();
+    let owner_q = owner.clone();
+    let installation_id =
+        match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
+            Ok(Some(id)) => id,
+            Ok(None) => {
+                return (
+                    axum::http::StatusCode::NOT_FOUND,
+                    "No installation found for this owner",
+                )
+                    .into_response();
+            }
+            Err(e) => {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("{e}"),
+                )
+                    .into_response();
+            }
+        };
 
     let token = match state
         .github_app
@@ -1080,21 +1080,27 @@ async fn api_verify_release(
         Ok(r) => {
             if let Ok(json) = serde_json::to_string(&r) {
                 let (pass, fail, review, na) = count_findings(&json);
-                let policy_str = policy_used.as_deref().unwrap_or("default");
+                let policy_str = policy_used.unwrap_or_else(|| "default".to_string());
                 let target_ref = format!("{}..{}", query.base_tag, query.head_tag);
-                let _ = state.db.append_audit_entry(
-                    user_id,
-                    "release",
-                    &owner,
-                    &repo,
-                    &target_ref,
-                    policy_str,
-                    pass,
-                    fail,
-                    review,
-                    na,
-                    &json,
-                );
+                let db = state.db.clone();
+                let owner_a = owner.clone();
+                let repo_a = repo.clone();
+                let _ = run_blocking(move || {
+                    db.append_audit_entry(
+                        user_id,
+                        "release",
+                        &owner_a,
+                        &repo_a,
+                        &target_ref,
+                        &policy_str,
+                        pass,
+                        fail,
+                        review,
+                        na,
+                        &json,
+                    )
+                })
+                .await;
             }
             Json(r).into_response()
         }
@@ -1127,29 +1133,33 @@ async fn api_audit_history(
     Query(query): Query<AuditHistoryQuery>,
     State(state): State<WebState>,
 ) -> Response {
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let entries = state
-        .db
-        .get_audit_history(
+    let db = state.db.clone();
+    let vtype = query.verification_type.clone();
+    let qowner = query.owner.clone();
+    let qrepo = query.repo.clone();
+    let from = query.from_date.clone();
+    let to = query.to_date.clone();
+    let limit = query.limit.unwrap_or(50);
+    let offset = query.offset.unwrap_or(0);
+    let entries = run_blocking(move || {
+        db.get_audit_history(
             user_id,
-            query.verification_type.as_deref(),
-            query.owner.as_deref(),
-            query.repo.as_deref(),
-            query.from_date.as_deref(),
-            query.to_date.as_deref(),
-            query.limit.unwrap_or(50),
-            query.offset.unwrap_or(0),
+            vtype.as_deref(),
+            qowner.as_deref(),
+            qrepo.as_deref(),
+            from.as_deref(),
+            to.as_deref(),
+            limit,
+            offset,
         )
-        .unwrap_or_default();
+    })
+    .await
+    .unwrap_or_default();
 
     let json: Vec<serde_json::Value> = entries
         .iter()
@@ -1178,29 +1188,31 @@ async fn api_audit_export_csv(
     Query(query): Query<AuditHistoryQuery>,
     State(state): State<WebState>,
 ) -> Response {
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let entries = state
-        .db
-        .get_audit_history(
+    let db = state.db.clone();
+    let vtype = query.verification_type.clone();
+    let qowner = query.owner.clone();
+    let qrepo = query.repo.clone();
+    let from = query.from_date.clone();
+    let to = query.to_date.clone();
+    let entries = run_blocking(move || {
+        db.get_audit_history(
             user_id,
-            query.verification_type.as_deref(),
-            query.owner.as_deref(),
-            query.repo.as_deref(),
-            query.from_date.as_deref(),
-            query.to_date.as_deref(),
+            vtype.as_deref(),
+            qowner.as_deref(),
+            qrepo.as_deref(),
+            from.as_deref(),
+            to.as_deref(),
             10000,
             0,
         )
-        .unwrap_or_default();
+    })
+    .await
+    .unwrap_or_default();
 
     let mut csv = String::from("Date,Type,Owner,Repo,Target,Policy,Pass,Fail,Review,N/A\n");
     for e in &entries {
@@ -1249,33 +1261,31 @@ async fn api_verify_pr(
         return r;
     }
 
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
-    let (user_id, _login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let installation_id = match state.db.get_installation_for_owner(user_id, &owner) {
-        Ok(Some(id)) => id,
-        Ok(None) => {
-            return (
-                axum::http::StatusCode::NOT_FOUND,
-                "No installation found for this owner",
-            )
-                .into_response();
-        }
-        Err(e) => {
-            return (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("{e}"),
-            )
-                .into_response();
-        }
-    };
+    let db = state.db.clone();
+    let owner_q = owner.clone();
+    let installation_id =
+        match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
+            Ok(Some(id)) => id,
+            Ok(None) => {
+                return (
+                    axum::http::StatusCode::NOT_FOUND,
+                    "No installation found for this owner",
+                )
+                    .into_response();
+            }
+            Err(e) => {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("{e}"),
+                )
+                    .into_response();
+            }
+        };
 
     let token = match state
         .github_app
@@ -1319,21 +1329,27 @@ async fn api_verify_pr(
         Ok(r) => {
             if let Ok(json) = serde_json::to_string(&r) {
                 let (pass, fail, review, na) = count_findings(&json);
-                let policy_str = policy_used.as_deref().unwrap_or("default");
+                let policy_str = policy_used.unwrap_or_else(|| "default".to_string());
                 let target_ref = format!("#{pr_number}");
-                let _ = state.db.append_audit_entry(
-                    user_id,
-                    "pr",
-                    &owner,
-                    &repo,
-                    &target_ref,
-                    policy_str,
-                    pass,
-                    fail,
-                    review,
-                    na,
-                    &json,
-                );
+                let db = state.db.clone();
+                let owner_a = owner.clone();
+                let repo_a = repo.clone();
+                let _ = run_blocking(move || {
+                    db.append_audit_entry(
+                        user_id,
+                        "pr",
+                        &owner_a,
+                        &repo_a,
+                        &target_ref,
+                        &policy_str,
+                        pass,
+                        fail,
+                        review,
+                        na,
+                        &json,
+                    )
+                })
+                .await;
             }
             Json(r).into_response()
         }
@@ -1358,14 +1374,9 @@ async fn verify_pr_page(
         return r;
     }
 
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (_user_id, login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return Redirect::to("/").into_response(),
-    };
-
-    let (_user_id, login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return Redirect::to("/").into_response(),
     };
 
     VerifyPrTemplate {
@@ -1392,14 +1403,9 @@ async fn verify_release_page(
         return r;
     }
 
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (_user_id, login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return Redirect::to("/").into_response(),
-    };
-
-    let (_user_id, login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return Redirect::to("/").into_response(),
     };
 
     VerifyReleaseTemplate {
@@ -1418,14 +1424,9 @@ async fn verify_release_page(
 // ---------------------------------------------------------------------------
 
 async fn audit_page(headers: HeaderMap, State(state): State<WebState>) -> Response {
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (_user_id, login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return Redirect::to("/").into_response(),
-    };
-
-    let (_user_id, login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return Redirect::to("/").into_response(),
     };
 
     AuditTemplate {
@@ -1441,14 +1442,9 @@ async fn audit_page(headers: HeaderMap, State(state): State<WebState>) -> Respon
 // ---------------------------------------------------------------------------
 
 async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Response {
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (_user_id, login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return Redirect::to("/").into_response(),
-    };
-
-    let (_user_id, login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return Redirect::to("/").into_response(),
     };
 
     ReposTemplate {
@@ -1473,14 +1469,9 @@ async fn repo_detail_page(
         return r;
     }
 
-    let session_id = match get_session_from_cookie(&headers) {
-        Some(s) => s,
+    let (_user_id, login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
         None => return Redirect::to("/").into_response(),
-    };
-
-    let (_user_id, login) = match state.db.get_user_by_session(&session_id) {
-        Ok(Some(u)) => u,
-        _ => return Redirect::to("/").into_response(),
     };
 
     let _ = &state; // keep state alive for future use
@@ -1568,7 +1559,7 @@ mod tests {
         let html = t.render().unwrap();
         assert!(html.contains("PR検証"));
         assert!(html.contains("pr-number"));
-        assert!(html.contains("Open Pull Requests"));
+        assert!(html.contains("オープン Pull Request"));
     }
 
     #[test]
@@ -1584,7 +1575,7 @@ mod tests {
         assert!(html.contains("Release 検証"));
         assert!(html.contains("base-tag"));
         assert!(html.contains("head-tag"));
-        assert!(html.contains("Releases"));
+        assert!(html.contains("リリース一覧"));
     }
 
     #[test]
@@ -1594,7 +1585,7 @@ mod tests {
             active_page: "audit",
         };
         let html = t.render().unwrap();
-        assert!(html.contains("Audit Log"));
+        assert!(html.contains("監査ログ"));
         assert!(html.contains("filter-type"));
         assert!(html.contains(r#"nav-link active" href="/audit"#));
     }
