@@ -589,7 +589,11 @@ mod tests {
     fn generate_random_token_is_base64url() {
         let token = generate_random_token();
         // base64url characters: A-Z, a-z, 0-9, -, _
-        assert!(token.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            token
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        );
         // 32 bytes → 43 base64url chars (no padding)
         assert_eq!(token.len(), 43);
     }
@@ -603,21 +607,14 @@ mod tests {
 
     #[test]
     fn oauth_error_redirect_with_state() {
-        let resp = oauth_error_redirect(
-            "https://example.com/cb",
-            "invalid_client",
-            Some("my-state"),
-        );
+        let resp =
+            oauth_error_redirect("https://example.com/cb", "invalid_client", Some("my-state"));
         assert!(resp.status().is_redirection());
     }
 
     #[test]
     fn oauth_error_redirect_with_existing_query_params() {
-        let resp = oauth_error_redirect(
-            "https://example.com/cb?foo=bar",
-            "invalid_client",
-            None,
-        );
+        let resp = oauth_error_redirect("https://example.com/cb?foo=bar", "invalid_client", None);
         assert!(resp.status().is_redirection());
     }
 

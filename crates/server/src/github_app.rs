@@ -411,7 +411,10 @@ J9/Y+qX1+dFvHem00HtuVTs2mItUXlLIOAlgtrWHl0pIzYSARxM=
         let app = GitHubApp::new(1, "not-a-pem-key", "cid".into(), "cs".into());
         assert!(app.is_err());
         let err = format!("{:#}", app.err().unwrap());
-        assert!(err.contains("private key"), "error should mention private key: {err}");
+        assert!(
+            err.contains("private key"),
+            "error should mention private key: {err}"
+        );
     }
 
     #[test]
@@ -447,7 +450,10 @@ J9/Y+qX1+dFvHem00HtuVTs2mItUXlLIOAlgtrWHl0pIzYSARxM=
         let exp = claims["exp"].as_i64().unwrap();
         // exp should be ~10 minutes after iat (iat is now-60, exp is now+600)
         assert!(exp - iat > 0, "exp must be after iat");
-        assert!(exp - iat <= 660 + 1, "token should expire within ~11 minutes of iat");
+        assert!(
+            exp - iat <= 660 + 1,
+            "token should expire within ~11 minutes of iat"
+        );
     }
 
     #[test]
@@ -460,7 +466,10 @@ J9/Y+qX1+dFvHem00HtuVTs2mItUXlLIOAlgtrWHl0pIzYSARxM=
         let user: GitHubUser = serde_json::from_value(json).unwrap();
         assert_eq!(user.id, 12345);
         assert_eq!(user.login, "octocat");
-        assert_eq!(user.avatar_url, Some("https://avatars.githubusercontent.com/u/12345".into()));
+        assert_eq!(
+            user.avatar_url,
+            Some("https://avatars.githubusercontent.com/u/12345".into())
+        );
     }
 
     #[test]

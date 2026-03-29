@@ -127,12 +127,23 @@ mod tests {
 
     #[test]
     fn unauthorized_response_has_correct_status_and_headers() {
-        let resp = unauthorized_response("https://example.com/.well-known/oauth-protected-resource");
+        let resp =
+            unauthorized_response("https://example.com/.well-known/oauth-protected-resource");
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
-        let www_auth = resp.headers().get("WWW-Authenticate").unwrap().to_str().unwrap();
+        let www_auth = resp
+            .headers()
+            .get("WWW-Authenticate")
+            .unwrap()
+            .to_str()
+            .unwrap();
         assert!(www_auth.contains("Bearer"));
         assert!(www_auth.contains("resource_metadata="));
-        let ct = resp.headers().get("Content-Type").unwrap().to_str().unwrap();
+        let ct = resp
+            .headers()
+            .get("Content-Type")
+            .unwrap()
+            .to_str()
+            .unwrap();
         assert_eq!(ct, "application/json");
     }
 
@@ -147,14 +158,31 @@ mod tests {
         Request<Body>,
         Response = Response<BoxBody<Bytes, Infallible>>,
         Error = Infallible,
-        Future = Pin<Box<dyn Future<Output = Result<Response<BoxBody<Bytes, Infallible>>, Infallible>> + Send>>,
+        Future = Pin<
+            Box<
+                dyn Future<Output = Result<Response<BoxBody<Bytes, Infallible>>, Infallible>>
+                    + Send,
+            >,
+        >,
     > + Clone {
         tower::service_fn(|_req: Request<Body>| {
             Box::pin(async move {
                 let uid = REQUEST_USER_ID.try_with(|id| *id).unwrap_or(-1);
                 let body = echo_body(&uid.to_string());
-                Ok::<_, Infallible>(Response::builder().status(StatusCode::OK).body(body).unwrap())
-            }) as Pin<Box<dyn Future<Output = Result<Response<BoxBody<Bytes, Infallible>>, Infallible>> + Send>>
+                Ok::<_, Infallible>(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .body(body)
+                        .unwrap(),
+                )
+            })
+                as Pin<
+                    Box<
+                        dyn Future<
+                                Output = Result<Response<BoxBody<Bytes, Infallible>>, Infallible>,
+                            > + Send,
+                    >,
+                >
         })
     }
 
@@ -207,8 +235,10 @@ mod tests {
         let db = test_db();
         // Create user and token
         let uid = db.upsert_user(1, "testuser", None, None).unwrap();
-        db.register_oauth_client("cid", None, None, &["https://cb".into()], "none").unwrap();
-        db.create_oauth_token("valid-access-token", "rt", "cid", uid, "mcp", 3600, 86400).unwrap();
+        db.register_oauth_client("cid", None, None, &["https://cb".into()], "none")
+            .unwrap();
+        db.create_oauth_token("valid-access-token", "rt", "cid", uid, "mcp", 3600, 86400)
+            .unwrap();
 
         let svc = ServiceBuilder::new()
             .layer(OAuthAuthLayer::new(db, "https://example.com"))

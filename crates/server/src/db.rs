@@ -719,9 +719,13 @@ mod tests {
     #[test]
     fn upsert_user_creates_and_updates() {
         let db = memory_db();
-        let id1 = db.upsert_user(42, "alice", Some("https://img/a"), None).unwrap();
+        let id1 = db
+            .upsert_user(42, "alice", Some("https://img/a"), None)
+            .unwrap();
         // Same github_id → same internal id, updated login
-        let id2 = db.upsert_user(42, "alice-renamed", Some("https://img/b"), None).unwrap();
+        let id2 = db
+            .upsert_user(42, "alice-renamed", Some("https://img/b"), None)
+            .unwrap();
         assert_eq!(id1, id2);
 
         // Login was updated
@@ -782,9 +786,13 @@ mod tests {
     fn save_and_get_installation() {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
-        db.save_installation(100, uid, "my-org", "Organization").unwrap();
+        db.save_installation(100, uid, "my-org", "Organization")
+            .unwrap();
 
-        assert_eq!(db.get_installation_for_owner(uid, "my-org").unwrap(), Some(100));
+        assert_eq!(
+            db.get_installation_for_owner(uid, "my-org").unwrap(),
+            Some(100)
+        );
         assert_eq!(db.get_installation_for_owner(uid, "other").unwrap(), None);
 
         let all = db.get_installations_for_user(uid).unwrap();
@@ -796,10 +804,15 @@ mod tests {
     fn save_installation_upserts_on_conflict() {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
-        db.save_installation(100, uid, "org-old", "Organization").unwrap();
+        db.save_installation(100, uid, "org-old", "Organization")
+            .unwrap();
         // Same installation_id, different account
-        db.save_installation(100, uid, "org-new", "Organization").unwrap();
-        assert_eq!(db.get_installation_for_owner(uid, "org-new").unwrap(), Some(100));
+        db.save_installation(100, uid, "org-new", "Organization")
+            .unwrap();
+        assert_eq!(
+            db.get_installation_for_owner(uid, "org-new").unwrap(),
+            Some(100)
+        );
         assert_eq!(db.get_installations_for_user(uid).unwrap().len(), 1);
     }
 
@@ -809,7 +822,14 @@ mod tests {
     fn register_and_get_oauth_client() {
         let db = memory_db();
         let uris = vec!["https://example.com/cb".to_string()];
-        db.register_oauth_client("cid", Some("secret"), Some("My App"), &uris, "client_secret_post").unwrap();
+        db.register_oauth_client(
+            "cid",
+            Some("secret"),
+            Some("My App"),
+            &uris,
+            "client_secret_post",
+        )
+        .unwrap();
 
         let client = db.get_oauth_client("cid").unwrap().unwrap();
         assert_eq!(client.client_secret, Some("secret".into()));
@@ -830,9 +850,11 @@ mod tests {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
         let uris = vec!["https://cb".to_string()];
-        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+        db.register_oauth_client("cid", None, None, &uris, "none")
+            .unwrap();
 
-        db.create_authorization_code("code1", "cid", uid, "https://cb", "challenge", "mcp").unwrap();
+        db.create_authorization_code("code1", "cid", uid, "https://cb", "challenge", "mcp")
+            .unwrap();
 
         let ac = db.consume_authorization_code("code1").unwrap().unwrap();
         assert_eq!(ac.client_id, "cid");
@@ -847,8 +869,10 @@ mod tests {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
         let uris = vec!["https://cb".to_string()];
-        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
-        db.create_authorization_code("code1", "cid", uid, "https://cb", "ch", "mcp").unwrap();
+        db.register_oauth_client("cid", None, None, &uris, "none")
+            .unwrap();
+        db.create_authorization_code("code1", "cid", uid, "https://cb", "ch", "mcp")
+            .unwrap();
 
         assert!(db.consume_authorization_code("code1").unwrap().is_some());
         // Second consume → None (already used)
@@ -858,7 +882,11 @@ mod tests {
     #[test]
     fn consume_authorization_code_returns_none_for_unknown() {
         let db = memory_db();
-        assert!(db.consume_authorization_code("nonexistent").unwrap().is_none());
+        assert!(
+            db.consume_authorization_code("nonexistent")
+                .unwrap()
+                .is_none()
+        );
     }
 
     // --- OAuth Token tests ---
@@ -868,9 +896,11 @@ mod tests {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
         let uris = vec!["https://cb".to_string()];
-        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+        db.register_oauth_client("cid", None, None, &uris, "none")
+            .unwrap();
 
-        db.create_oauth_token("at", "rt", "cid", uid, "mcp", 3600, 86400).unwrap();
+        db.create_oauth_token("at", "rt", "cid", uid, "mcp", 3600, 86400)
+            .unwrap();
 
         assert_eq!(db.validate_access_token("at").unwrap(), Some(uid));
         assert_eq!(db.validate_access_token("unknown").unwrap(), None);
@@ -881,10 +911,15 @@ mod tests {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
         let uris = vec!["https://cb".to_string()];
-        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
-        db.create_oauth_token("at1", "rt1", "cid", uid, "mcp", 3600, 86400).unwrap();
+        db.register_oauth_client("cid", None, None, &uris, "none")
+            .unwrap();
+        db.create_oauth_token("at1", "rt1", "cid", uid, "mcp", 3600, 86400)
+            .unwrap();
 
-        let refreshed = db.refresh_oauth_token("rt1", "at2", "rt2", 3600, 86400).unwrap().unwrap();
+        let refreshed = db
+            .refresh_oauth_token("rt1", "at2", "rt2", 3600, 86400)
+            .unwrap()
+            .unwrap();
         assert_eq!(refreshed.scope, "mcp");
 
         // Old token invalid, new token valid
@@ -895,7 +930,11 @@ mod tests {
     #[test]
     fn refresh_oauth_token_returns_none_for_unknown() {
         let db = memory_db();
-        assert!(db.refresh_oauth_token("nope", "a", "b", 3600, 86400).unwrap().is_none());
+        assert!(
+            db.refresh_oauth_token("nope", "a", "b", 3600, 86400)
+                .unwrap()
+                .is_none()
+        );
     }
 
     // --- OAuth State tests ---
@@ -903,7 +942,8 @@ mod tests {
     #[test]
     fn create_and_consume_oauth_state() {
         let db = memory_db();
-        db.create_oauth_state("state1", "cid", "https://cb", "ch", "mcp").unwrap();
+        db.create_oauth_state("state1", "cid", "https://cb", "ch", "mcp")
+            .unwrap();
 
         let s = db.consume_oauth_state("state1").unwrap().unwrap();
         assert_eq!(s.client_id, "cid");
@@ -915,7 +955,8 @@ mod tests {
     #[test]
     fn consume_oauth_state_is_single_use() {
         let db = memory_db();
-        db.create_oauth_state("s1", "cid", "https://cb", "ch", "mcp").unwrap();
+        db.create_oauth_state("s1", "cid", "https://cb", "ch", "mcp")
+            .unwrap();
         assert!(db.consume_oauth_state("s1").unwrap().is_some());
         assert!(db.consume_oauth_state("s1").unwrap().is_none());
     }
@@ -927,22 +968,46 @@ mod tests {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
 
-        db.append_audit_entry(uid, "pr", "owner", "repo", "refs/pull/1", "default", 5, 1, 0, 2, "{}").unwrap();
-        db.append_audit_entry(uid, "release", "owner", "repo", "v1.0", "oss", 3, 0, 0, 0, "{}").unwrap();
+        db.append_audit_entry(
+            uid,
+            "pr",
+            "owner",
+            "repo",
+            "refs/pull/1",
+            "default",
+            5,
+            1,
+            0,
+            2,
+            "{}",
+        )
+        .unwrap();
+        db.append_audit_entry(
+            uid, "release", "owner", "repo", "v1.0", "oss", 3, 0, 0, 0, "{}",
+        )
+        .unwrap();
 
         // No filters
-        let all = db.get_audit_history(uid, None, None, None, None, None, 100, 0).unwrap();
+        let all = db
+            .get_audit_history(uid, None, None, None, None, None, 100, 0)
+            .unwrap();
         assert_eq!(all.len(), 2);
 
         // Filter by type
-        let prs = db.get_audit_history(uid, Some("pr"), None, None, None, None, 100, 0).unwrap();
+        let prs = db
+            .get_audit_history(uid, Some("pr"), None, None, None, None, 100, 0)
+            .unwrap();
         assert_eq!(prs.len(), 1);
         assert_eq!(prs[0].verification_type, "pr");
 
         // Filter by owner
-        let by_owner = db.get_audit_history(uid, None, Some("owner"), None, None, None, 100, 0).unwrap();
+        let by_owner = db
+            .get_audit_history(uid, None, Some("owner"), None, None, None, 100, 0)
+            .unwrap();
         assert_eq!(by_owner.len(), 2);
-        let by_nobody = db.get_audit_history(uid, None, Some("nobody"), None, None, None, 100, 0).unwrap();
+        let by_nobody = db
+            .get_audit_history(uid, None, Some("nobody"), None, None, None, 100, 0)
+            .unwrap();
         assert_eq!(by_nobody.len(), 0);
     }
 
@@ -951,16 +1016,35 @@ mod tests {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
         for i in 0..5 {
-            db.append_audit_entry(uid, "pr", "o", "r", &format!("ref{i}"), "default", 1, 0, 0, 0, "{}").unwrap();
+            db.append_audit_entry(
+                uid,
+                "pr",
+                "o",
+                "r",
+                &format!("ref{i}"),
+                "default",
+                1,
+                0,
+                0,
+                0,
+                "{}",
+            )
+            .unwrap();
         }
 
-        let page1 = db.get_audit_history(uid, None, None, None, None, None, 2, 0).unwrap();
+        let page1 = db
+            .get_audit_history(uid, None, None, None, None, None, 2, 0)
+            .unwrap();
         assert_eq!(page1.len(), 2);
 
-        let page2 = db.get_audit_history(uid, None, None, None, None, None, 2, 2).unwrap();
+        let page2 = db
+            .get_audit_history(uid, None, None, None, None, None, 2, 2)
+            .unwrap();
         assert_eq!(page2.len(), 2);
 
-        let page3 = db.get_audit_history(uid, None, None, None, None, None, 2, 4).unwrap();
+        let page3 = db
+            .get_audit_history(uid, None, None, None, None, None, 2, 4)
+            .unwrap();
         assert_eq!(page3.len(), 1);
     }
 
@@ -970,10 +1054,13 @@ mod tests {
         let uid = db.upsert_user(1, "user", None, None).unwrap();
 
         // Two PRs for same repo → only latest returned
-        db.append_audit_entry(uid, "pr", "o", "r", "ref1", "default", 1, 0, 0, 0, "{}").unwrap();
-        db.append_audit_entry(uid, "pr", "o", "r", "ref2", "default", 2, 0, 0, 0, "{}").unwrap();
+        db.append_audit_entry(uid, "pr", "o", "r", "ref1", "default", 1, 0, 0, 0, "{}")
+            .unwrap();
+        db.append_audit_entry(uid, "pr", "o", "r", "ref2", "default", 2, 0, 0, 0, "{}")
+            .unwrap();
         // Different type for same repo → separate entry
-        db.append_audit_entry(uid, "release", "o", "r", "v1", "default", 3, 0, 0, 0, "{}").unwrap();
+        db.append_audit_entry(uid, "release", "o", "r", "v1", "default", 3, 0, 0, 0, "{}")
+            .unwrap();
 
         let latest = db.get_latest_verifications_for_user(uid).unwrap();
         assert_eq!(latest.len(), 2);
@@ -988,7 +1075,8 @@ mod tests {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
         let uris = vec!["https://cb".to_string()];
-        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+        db.register_oauth_client("cid", None, None, &uris, "none")
+            .unwrap();
 
         // Insert an already-expired authorization code
         {
@@ -1000,16 +1088,25 @@ mod tests {
             ).unwrap();
         }
         // Also create a valid code
-        db.create_authorization_code("valid-code", "cid", uid, "https://cb", "ch", "mcp").unwrap();
+        db.create_authorization_code("valid-code", "cid", uid, "https://cb", "ch", "mcp")
+            .unwrap();
 
         let deleted = db.cleanup_expired().unwrap();
         assert!(deleted >= 1);
 
         // Expired code was already expired so consume should return None regardless,
         // but the row should be gone from the table
-        assert!(db.consume_authorization_code("expired-code").unwrap().is_none());
+        assert!(
+            db.consume_authorization_code("expired-code")
+                .unwrap()
+                .is_none()
+        );
         // Valid code still consumable
-        assert!(db.consume_authorization_code("valid-code").unwrap().is_some());
+        assert!(
+            db.consume_authorization_code("valid-code")
+                .unwrap()
+                .is_some()
+        );
     }
 
     #[test]
@@ -1017,7 +1114,8 @@ mod tests {
         let db = memory_db();
         let uid = db.upsert_user(1, "user", None, None).unwrap();
         let uris = vec!["https://cb".to_string()];
-        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+        db.register_oauth_client("cid", None, None, &uris, "none")
+            .unwrap();
 
         // Insert a token where both access and refresh are expired
         {
@@ -1045,14 +1143,20 @@ mod tests {
         // Fully expired token gone
         assert_eq!(db.validate_access_token("at-expired").unwrap(), None);
         // Token with valid refresh still exists (refresh_oauth_token should find it)
-        let refreshed = db.refresh_oauth_token("rt-valid", "new-at", "new-rt", 3600, 86400).unwrap();
-        assert!(refreshed.is_some(), "token with valid refresh should survive cleanup");
+        let refreshed = db
+            .refresh_oauth_token("rt-valid", "new-at", "new-rt", 3600, 86400)
+            .unwrap();
+        assert!(
+            refreshed.is_some(),
+            "token with valid refresh should survive cleanup"
+        );
     }
 
     #[test]
     fn cleanup_expired_deletes_expired_oauth_states() {
         let db = memory_db();
-        db.create_oauth_state("valid-state", "cid", "https://cb", "ch", "mcp").unwrap();
+        db.create_oauth_state("valid-state", "cid", "https://cb", "ch", "mcp")
+            .unwrap();
 
         // Insert an expired state
         {
@@ -1076,8 +1180,12 @@ mod tests {
     #[test]
     fn oauth_client_redirect_uris_parses_json() {
         let db = memory_db();
-        let uris = vec!["https://a.com/cb".to_string(), "https://b.com/cb".to_string()];
-        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+        let uris = vec![
+            "https://a.com/cb".to_string(),
+            "https://b.com/cb".to_string(),
+        ];
+        db.register_oauth_client("cid", None, None, &uris, "none")
+            .unwrap();
 
         let client = db.get_oauth_client("cid").unwrap().unwrap();
         assert_eq!(client.redirect_uris(), uris);

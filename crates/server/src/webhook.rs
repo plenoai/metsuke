@@ -516,7 +516,10 @@ mod tests {
         let result = mac.finalize().into_bytes();
         let sig = format!(
             "sha256={}",
-            result.iter().map(|b| format!("{b:02x}")).collect::<String>()
+            result
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
         );
         assert!(verify_signature(secret, body, &sig));
     }

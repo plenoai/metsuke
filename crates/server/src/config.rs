@@ -38,8 +38,7 @@ impl AppConfig {
         let github_app_private_key =
             get("GITHUB_APP_PRIVATE_KEY").context("GITHUB_APP_PRIVATE_KEY required")?;
         let database_url = get("DATABASE_URL").unwrap_or_else(|| "/data/metsuke.db".into());
-        let base_url =
-            get("BASE_URL").unwrap_or_else(|| "https://metsuke.fly.dev".into());
+        let base_url = get("BASE_URL").unwrap_or_else(|| "https://metsuke.fly.dev".into());
         let github_webhook_secret = get("GITHUB_WEBHOOK_SECRET");
 
         Ok(Self {
@@ -117,7 +116,10 @@ mod tests {
         let cfg = AppConfig::from_getter(|_| None);
         assert!(cfg.is_err());
         let msg = cfg.unwrap_err().to_string();
-        assert!(msg.contains("GITHUB_APP_ID"), "error should name the missing var: {msg}");
+        assert!(
+            msg.contains("GITHUB_APP_ID"),
+            "error should name the missing var: {msg}"
+        );
     }
 
     #[test]
