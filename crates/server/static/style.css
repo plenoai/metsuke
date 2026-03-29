@@ -379,6 +379,73 @@ select:focus-visible {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Dashboard summary strip */
+.dashboard-summary {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.summary-card {
+  flex: 1;
+  min-width: 120px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.summary-card:hover {
+  border-color: var(--accent-gold);
+}
+.summary-card.active {
+  border-color: var(--accent-vermillion);
+  box-shadow: 0 0 12px var(--accent-vermillion-glow);
+}
+.summary-card-count {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+.summary-card-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.summary-card-fail .summary-card-count { color: var(--accent-vermillion); }
+.summary-card-review .summary-card-count { color: var(--accent-gold); }
+.summary-card-pass .summary-card-count { color: var(--accent-green); }
+.summary-card-unverified .summary-card-count { color: var(--text-secondary); }
+
+/* Findings table: status row coloring */
+.findings-table tr.status-violated td { border-left: 3px solid var(--accent-vermillion); }
+.findings-table tr.status-violated td:first-child { border-left: 3px solid var(--accent-vermillion); }
+.findings-table tr.status-indeterminate td:first-child { border-left: 3px solid var(--accent-gold); }
+.findings-table tr.status-satisfied td:first-child { border-left: 3px solid var(--accent-green); }
+
+/* Expandable rationale */
+.rationale-cell.collapsed,
+.findings-table .rationale.collapsed {
+  max-height: 3em;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+.rationale-cell.collapsed::after,
+.findings-table .rationale.collapsed::after {
+  content: '…';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  padding-left: 1em;
+  background: linear-gradient(to right, transparent, var(--bg-surface) 50%);
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .shell { padding: 1.5rem 1rem 3rem; }

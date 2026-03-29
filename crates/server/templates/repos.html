@@ -87,6 +87,7 @@
       <button class="btn" id="verify-all-btn" onclick="verifyAll()" style="font-size:0.72rem;display:none">全リポジトリを検証</button>
     </div>
   </div>
+  <div id="dashboard-summary" class="dashboard-summary" style="display:none" aria-label="検証サマリー"></div>
   <div id="verify-all-progress" style="display:none;margin-bottom:1rem">
     <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">
       <span id="progress-text">0 / 0</span>
@@ -161,7 +162,7 @@ function renderRepoList(repos, cacheArr) {
     const cachedTime = cached ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${cached.verified_at}</span>` : '';
     const desc = r.description ? `<div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">${esc(r.description)}</div>` : '';
 
-    return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}" data-name="${esc(r.full_name.toLowerCase())}" data-desc="${esc((r.description || '').toLowerCase())}" data-lang="${esc((r.language || '').toLowerCase())}" data-pushed="${esc(r.pushed_at || '')}">
+    return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}" data-name="${esc(r.full_name.toLowerCase())}" data-desc="${esc((r.description || '').toLowerCase())}" data-lang="${esc((r.language || '').toLowerCase())}" data-pushed="${esc(r.pushed_at || '')}" data-status="${cached ? (cached.fail > 0 ? 'fail' : (cached.review > 0 ? 'review' : 'pass')) : 'unverified'}">
       <div class="repo-info">
         <div class="repo-name">
           <a href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}">${esc(r.full_name)}</a>
@@ -192,6 +193,35 @@ function renderRepoList(repos, cacheArr) {
     document.getElementById('verify-all-btn').style.display = '';
     document.getElementById('export-csv-btn').style.display = '';
   }
+  // Dashboard summary
+  let failRepos = 0, reviewRepos = 0, passRepos = 0, unverifiedRepos = 0;
+  repos.forEach(r => {
+    const c = cacheMap[r.full_name];
+    if (!c) { unverifiedRepos++; return; }
+    if (c.fail > 0) failRepos++;
+    else if (c.review > 0) reviewRepos++;
+    else passRepos++;
+  });
+  const summaryEl = document.getElementById('dashboard-summary');
+  summaryEl.style.display = '';
+  summaryEl.innerHTML = `
+    <div class="summary-card summary-card-fail" onclick="filterByStatus('fail')" title="FAILのあるリポジトリのみ表示">
+      <div class="summary-card-count">${failRepos}</div>
+      <div class="summary-card-label">FAIL</div>
+    </div>
+    <div class="summary-card summary-card-review" onclick="filterByStatus('review')" title="REVIEWのあるリポジトリのみ表示">
+      <div class="summary-card-count">${reviewRepos}</div>
+      <div class="summary-card-label">REVIEW</div>
+    </div>
+    <div class="summary-card summary-card-pass" onclick="filterByStatus('pass')" title="PASSのリポジトリのみ表示">
+      <div class="summary-card-count">${passRepos}</div>
+      <div class="summary-card-label">PASS</div>
+    </div>
+    <div class="summary-card summary-card-unverified" onclick="filterByStatus('unverified')" title="未検証のリポジトリのみ表示">
+      <div class="summary-card-count">${unverifiedRepos}</div>
+      <div class="summary-card-label">未検証</div>
+    </div>
+  `;
 }
 
 async function loadRepos() {
@@ -268,6 +298,37 @@ function sortRepos(mode) {
     return nameA.localeCompare(nameB);
   });
   cards.forEach(c => grid.appendChild(c));
+}
+
+let activeFilter = null;
+
+function filterByStatus(status) {
+  const cards = document.querySelectorAll('.repo-card');
+  const summaryCards = document.querySelectorAll('.summary-card');
+
+  if (activeFilter === status) {
+    // Toggle off
+    activeFilter = null;
+    cards.forEach(c => c.style.display = '');
+    summaryCards.forEach(c => c.classList.remove('active'));
+    document.getElementById('repos-title').textContent = `Repositories (${cards.length})`;
+    return;
+  }
+
+  activeFilter = status;
+  summaryCards.forEach(c => c.classList.remove('active'));
+  document.querySelector(`.summary-card-${status}`).classList.add('active');
+
+  let visible = 0;
+  cards.forEach(c => {
+    if (c.dataset.status === status) {
+      c.style.display = '';
+      visible++;
+    } else {
+      c.style.display = 'none';
+    }
+  });
+  document.getElementById('repos-title').textContent = `Repositories (${visible} / ${cards.length})`;
 }
 
 function exportCSV() {

@@ -296,13 +296,13 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
       else if (f.status === 'indeterminate') review++;
     }
     let badges = '';
-    if (pass > 0) badges += `<span class="badge badge-pass">P${pass}</span>`;
-    if (review > 0) badges += `<span class="badge badge-review">R${review}</span>`;
-    if (fail > 0) badges += `<span class="badge badge-fail">F${fail}</span>`;
+    if (pass > 0) badges += `<span class="badge badge-pass" title="PASS">PASS ${pass}</span>`;
+    if (review > 0) badges += `<span class="badge badge-review" title="REVIEW">REV ${review}</span>`;
+    if (fail > 0) badges += `<span class="badge badge-fail" title="FAIL">FAIL ${fail}</span>`;
     resultEl.innerHTML = badges;
     btn.textContent = '再検証';
   } catch (e) {
-    resultEl.innerHTML = '<span class="badge badge-fail">ERR</span>';
+    resultEl.innerHTML = '<span class="badge badge-fail" title="ERROR">ERR</span>';
     btn.textContent = '再試行';
   }
   btn.disabled = false;
@@ -326,10 +326,11 @@ function renderResult(data, baseTag, headTag) {
     else if (f.status === 'violated') badge = '<span class="badge badge-fail">FAIL</span>';
     else if (f.status === 'indeterminate') badge = '<span class="badge badge-review">REVIEW</span>';
     else badge = '<span class="badge badge-na">N/A</span>';
-    return `<tr>
+    const longText = (f.rationale || '').length > 120;
+    return `<tr class="status-${f.status}">
       <td>${esc(f.control_id)}</td>
       <td>${badge}</td>
-      <td class="rationale-cell">${esc(f.rationale)}</td>
+      <td class="rationale-cell${longText ? ' collapsed' : ''}" ${longText ? 'onclick="this.classList.toggle(\'collapsed\')"' : ''}>${esc(f.rationale)}</td>
     </tr>`;
   }).join('');
 

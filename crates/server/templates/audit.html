@@ -135,9 +135,9 @@ function typeBadge(type) {
 
 function resultBadges(e) {
   let b = '';
-  if (e.pass > 0) b += `<span class="badge badge-pass">P${e.pass}</span>`;
-  if (e.review > 0) b += `<span class="badge badge-review">R${e.review}</span>`;
-  if (e.fail > 0) b += `<span class="badge badge-fail">F${e.fail}</span>`;
+  if (e.pass > 0) b += `<span class="badge badge-pass" title="PASS">PASS ${e.pass}</span>`;
+  if (e.review > 0) b += `<span class="badge badge-review" title="REVIEW">REV ${e.review}</span>`;
+  if (e.fail > 0) b += `<span class="badge badge-fail" title="FAIL">FAIL ${e.fail}</span>`;
   return b || '<span style="color:var(--text-secondary)">—</span>';
 }
 

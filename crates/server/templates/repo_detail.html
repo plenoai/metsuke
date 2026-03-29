@@ -136,7 +136,8 @@ async function runVerify() {
     for (const f of findings) {
       const rationale = f.rationale || '';
       const escaped = rationale.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      html += `<tr><td style="white-space:nowrap">${f.control_id}</td><td>${statusBadge(f.status)}</td><td class="rationale">${escaped}</td></tr>`;
+      const longText = rationale.length > 120;
+      html += `<tr class="status-${f.status}"><td style="white-space:nowrap">${f.control_id}</td><td>${statusBadge(f.status)}</td><td class="rationale${longText ? ' collapsed' : ''}" ${longText ? `onclick="this.classList.toggle('collapsed')"` : ''}>${escaped}</td></tr>`;
     }
     html += '</tbody></table></div>';
 
