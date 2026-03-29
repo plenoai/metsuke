@@ -86,6 +86,7 @@ pub struct PullRequest {
     pub user: PullRequestUser,
     pub created_at: String,
     pub updated_at: String,
+    pub merged_at: Option<String>,
     pub draft: Option<bool>,
 }
 
@@ -268,7 +269,7 @@ impl GitHubApp {
         let client = reqwest::Client::new();
         client
             .get(format!("https://api.github.com/repos/{owner}/{repo}/pulls"))
-            .query(&[("state", "open"), ("per_page", "30"), ("sort", "updated")])
+            .query(&[("state", "all"), ("per_page", "30"), ("sort", "updated")])
             .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", "metsuke")

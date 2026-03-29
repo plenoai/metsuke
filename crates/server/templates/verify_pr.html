@@ -50,6 +50,28 @@
   display: flex;
   gap: 0.6rem;
 }
+.pr-state {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.pr-open {
+  background: rgba(35, 134, 54, 0.1);
+  color: #3fb950;
+  border: 1px solid rgba(35, 134, 54, 0.25);
+}
+.pr-closed {
+  background: rgba(218, 54, 51, 0.1);
+  color: #f85149;
+  border: 1px solid rgba(218, 54, 51, 0.25);
+}
+.pr-merged {
+  background: rgba(163, 113, 247, 0.1);
+  color: #a371f7;
+  border: 1px solid rgba(163, 113, 247, 0.25);
+}
 .pr-draft {
   background: rgba(138, 141, 160, 0.1);
   color: var(--text-secondary);
@@ -101,7 +123,7 @@
   </div>
 
   <div id="pr-list-section" style="margin-top:1.5rem">
-    <div class="section-title">オープン Pull Request</div>
+    <div class="section-title">Pull Request</div>
     <div id="pr-list" aria-live="polite"><div class="loading" role="status">PRを取得中</div></div>
   </div>
 
@@ -154,18 +176,23 @@ document.getElementById('pr-number').addEventListener('keydown', e => {
   if (e.key === 'Enter') verifyPR();
 });
 
-// Load open PRs
 function renderPRList(prs) {
   const container = document.getElementById('pr-list');
   if (prs.length === 0) {
-    container.innerHTML = '<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">オープンなPRはありません</div>';
+    container.innerHTML = '<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">PRはありません</div>';
     return;
+  }
+  function prStateBadge(pr) {
+    if (pr.merged_at) return '<span class="pr-state pr-merged">merged</span>';
+    if (pr.state === 'closed') return '<span class="pr-state pr-closed">closed</span>';
+    return '<span class="pr-state pr-open">open</span>';
   }
   container.innerHTML = '<div class="pr-list">' + prs.map(pr => `
     <div class="pr-item">
       <div class="pr-item-info">
         <div class="pr-item-title" style="cursor:pointer" onclick="document.getElementById('pr-number').value=${pr.number};document.getElementById('pr-number').focus()">#${pr.number} ${esc(pr.title)}</div>
         <div class="pr-item-meta">
+          ${prStateBadge(pr)}
           <span>${esc(pr.user.login)}</span>
           <span>${new Date(pr.updated_at).toLocaleDateString('ja-JP')}</span>
           ${pr.draft ? '<span class="pr-draft">draft</span>' : ''}

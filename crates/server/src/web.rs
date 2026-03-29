@@ -1606,7 +1606,7 @@ mod tests {
         let html = t.render().unwrap();
         assert!(html.contains("PR検証"));
         assert!(html.contains("pr-number"));
-        assert!(html.contains("オープン Pull Request"));
+        assert!(html.contains(">Pull Request<"));
     }
 
     #[test]
