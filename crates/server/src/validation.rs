@@ -47,6 +47,7 @@ pub fn validate_policy(value: &str) -> Result<(), ErrorData> {
 }
 
 /// Validate a git reference (branch, tag, SHA).
+/// Rejects git metacharacters per `git check-ref-format` rules.
 pub fn validate_git_ref(value: &str) -> Result<(), ErrorData> {
     if value.is_empty() || value.len() > 256 {
         return Err(ErrorData::invalid_params(
@@ -57,6 +58,16 @@ pub fn validate_git_ref(value: &str) -> Result<(), ErrorData> {
     if value.contains("..") || value.contains('\0') {
         return Err(ErrorData::invalid_params(
             "reference contains invalid characters".to_string(),
+            None,
+        ));
+    }
+    // Reject git revision operators and metacharacters
+    if value
+        .chars()
+        .any(|c| matches!(c, ' ' | '~' | '^' | ':' | '?' | '*' | '[' | '\\'))
+    {
+        return Err(ErrorData::invalid_params(
+            "reference contains git metacharacters (space, ~, ^, :, ?, *, [, \\)".to_string(),
             None,
         ));
     }
@@ -113,5 +124,33 @@ mod tests {
     fn rejects_bad_refs() {
         assert!(validate_git_ref("").is_err());
         assert!(validate_git_ref("a..b").is_err());
+    }
+
+    #[test]
+    fn rejects_git_metacharacters() {
+        assert!(validate_git_ref("main branch").is_err(), "space");
+        assert!(validate_git_ref("HEAD~1").is_err(), "tilde");
+        assert!(validate_git_ref("HEAD^2").is_err(), "caret");
+        assert!(validate_git_ref("refs:hack").is_err(), "colon");
+        assert!(validate_git_ref("ref?glob").is_err(), "question mark");
+        assert!(validate_git_ref("ref*glob").is_err(), "asterisk");
+        assert!(validate_git_ref("ref[0]").is_err(), "bracket");
+        assert!(validate_git_ref("ref\\path").is_err(), "backslash");
+    }
+
+    #[test]
+    fn github_name_boundary_length() {
+        let name_100 = "a".repeat(100);
+        assert!(validate_github_name(&name_100, "repo").is_ok());
+        let name_101 = "a".repeat(101);
+        assert!(validate_github_name(&name_101, "repo").is_err());
+    }
+
+    #[test]
+    fn git_ref_boundary_length() {
+        let ref_256 = "a".repeat(256);
+        assert!(validate_git_ref(&ref_256).is_ok());
+        let ref_257 = "a".repeat(257);
+        assert!(validate_git_ref(&ref_257).is_err());
     }
 }

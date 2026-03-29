@@ -572,10 +572,13 @@ impl Database {
             "DELETE FROM oauth_tokens WHERE expires_at <= datetime('now') AND refresh_expires_at <= datetime('now')",
             [],
         )? as u64;
-        total += conn.execute(
-            "DELETE FROM oauth_states WHERE expires_at <= datetime('now')",
-            [],
-        )? as u64;
+        // oauth_states table is created lazily by OAuth module; skip if not present
+        total += conn
+            .execute(
+                "DELETE FROM oauth_states WHERE expires_at <= datetime('now')",
+                [],
+            )
+            .unwrap_or(0) as u64;
         Ok(total)
     }
 
@@ -655,4 +658,59 @@ pub struct OAuthState {
     pub redirect_uri: String,
     pub code_challenge: String,
     pub scope: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn memory_db() -> Database {
+        Database::open(":memory:").unwrap()
+    }
+
+    #[test]
+    fn cleanup_expired_deletes_old_sessions_preserves_valid() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "test", None, None).unwrap();
+
+        // Create a valid session
+        let valid_sid = db.create_session(uid).unwrap();
+
+        // Insert an already-expired session
+        let expired_sid = {
+            let sid = uuid::Uuid::new_v4().to_string();
+            let conn = db.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO sessions (id, user_id, expires_at)
+                 VALUES (?1, ?2, datetime('now', '-1 second'))",
+                rusqlite::params![sid, uid],
+            )
+            .unwrap();
+            sid
+        };
+
+        let deleted = db.cleanup_expired().unwrap();
+        assert!(deleted >= 1, "should delete at least the expired session");
+
+        // Valid session still reachable
+        assert!(db.get_user_by_session(&valid_sid).unwrap().is_some());
+        // Expired session gone
+        assert!(db.get_user_by_session(&expired_sid).unwrap().is_none());
+    }
+
+    #[test]
+    fn cleanup_expired_returns_zero_when_nothing_expired() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "test", None, None).unwrap();
+        let _sid = db.create_session(uid).unwrap();
+
+        let deleted = db.cleanup_expired().unwrap();
+        assert_eq!(deleted, 0);
+    }
+
+    #[test]
+    fn ping_succeeds_on_valid_db() {
+        let db = memory_db();
+        assert!(db.ping().is_ok());
+    }
 }

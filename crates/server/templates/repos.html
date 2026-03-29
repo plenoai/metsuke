@@ -91,11 +91,11 @@
     </div>
   </div>
   <div id="dashboard-summary" class="dashboard-summary" style="display:none" aria-label="検証サマリー"></div>
-  <div id="verify-all-progress" style="display:none;margin-bottom:1rem">
+  <div id="verify-all-progress" style="display:none;margin-bottom:1rem" aria-live="polite">
     <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">
-      <span id="progress-text">0 / 0</span>
+      <span id="progress-text" role="status">0 / 0</span>
       <div style="margin-top:0.5rem;height:4px;background:var(--bg-deep);border-radius:2px;overflow:hidden">
-        <div id="progress-bar" style="height:100%;background:var(--accent-vermillion);width:0%;transition:width 0.3s ease"></div>
+        <div id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="検証進捗" style="height:100%;background:var(--accent-vermillion);width:0%;transition:width 0.3s ease"></div>
       </div>
     </div>
   </div>
@@ -325,6 +325,9 @@ function filterByOrg(org) {
 }
 
 function applyFilters() {
+  // Clear stale keyboard focus when filters change
+  document.querySelectorAll('.kbd-focus').forEach(el => el.classList.remove('kbd-focus'));
+
   const cards = document.querySelectorAll('.repo-card');
   let visible = 0;
   const q = (document.getElementById('search-input')?.value || '').toLowerCase();
@@ -423,8 +426,10 @@ async function verifyAll() {
       await verifyRepo(r.owner, r.name, verifyBtn);
     }
     done++;
+    const pct = (done / total * 100).toFixed(1);
     progressText.textContent = `${done} / ${total}`;
-    progressBar.style.width = `${(done / total * 100).toFixed(1)}%`;
+    progressBar.style.width = `${pct}%`;
+    progressBar.setAttribute('aria-valuenow', Math.round(pct));
   }
   btn.disabled = false;
   btn.textContent = '全リポジトリを検証';

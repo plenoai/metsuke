@@ -89,3 +89,64 @@ impl SwrCache {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn short_cache() -> SwrCache {
+        SwrCache::new(Duration::from_millis(100), Duration::from_millis(200))
+    }
+
+    #[tokio::test]
+    async fn fresh_within_max_age() {
+        let cache = short_cache();
+        cache.set("k".into(), serde_json::json!(42)).await;
+        assert!(matches!(cache.get("k").await, CacheStatus::Fresh(_)));
+    }
+
+    #[tokio::test]
+    async fn stale_after_max_age() {
+        let cache = short_cache();
+        cache.set("k".into(), serde_json::json!(1)).await;
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        assert!(matches!(cache.get("k").await, CacheStatus::Stale(_)));
+    }
+
+    #[tokio::test]
+    async fn miss_after_total_ttl() {
+        let cache = short_cache();
+        cache.set("k".into(), serde_json::json!(1)).await;
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        assert!(matches!(cache.get("k").await, CacheStatus::Miss));
+    }
+
+    #[tokio::test]
+    async fn revalidating_suppresses_stale() {
+        let cache = short_cache();
+        cache.set("k".into(), serde_json::json!(1)).await;
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        assert!(matches!(cache.get("k").await, CacheStatus::Stale(_)));
+        cache.mark_revalidating("k").await;
+        // Now returns Fresh to avoid duplicate background work
+        assert!(matches!(cache.get("k").await, CacheStatus::Fresh(_)));
+    }
+
+    #[tokio::test]
+    async fn set_evicts_expired_entries() {
+        let cache = short_cache();
+        cache.set("old".into(), serde_json::json!(1)).await;
+        tokio::time::sleep(Duration::from_millis(350)).await;
+
+        cache.set("new".into(), serde_json::json!(2)).await;
+        assert!(matches!(cache.get("old").await, CacheStatus::Miss));
+        assert!(matches!(cache.get("new").await, CacheStatus::Fresh(_)));
+    }
+
+    #[tokio::test]
+    async fn miss_on_unknown_key() {
+        let cache = short_cache();
+        assert!(matches!(cache.get("unknown").await, CacheStatus::Miss));
+    }
+}

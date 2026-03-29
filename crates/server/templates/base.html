@@ -128,8 +128,8 @@ function toggleShortcutHelp() {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-label', 'キーボードショートカット');
   overlay.innerHTML = `
-    <div class="kbd-help-backdrop" onclick="this.parentElement.remove()"></div>
-    <div class="kbd-help-panel">
+    <div class="kbd-help-backdrop"></div>
+    <div class="kbd-help-panel" tabindex="-1" role="document">
       <div style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;margin-bottom:0.75rem;color:var(--accent-gold)">キーボードショートカット</div>
       <table style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-primary);border-collapse:collapse;width:100%">
         <tr><td class="kbd-key">g r</td><td>リポジトリ一覧</td></tr>
@@ -140,13 +140,33 @@ function toggleShortcutHelp() {
         <tr><td class="kbd-key">o</td><td>選択項目を開く</td></tr>
         <tr><td class="kbd-key">?</td><td>このヘルプを表示</td></tr>
       </table>
-      <div style="margin-top:0.75rem;font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)">Esc または ? で閉じる</div>
+      <button class="verify-btn kbd-help-close" style="margin-top:0.75rem;font-size:0.6rem">閉じる (Esc)</button>
     </div>`;
   document.body.appendChild(overlay);
+  // Save and restore focus on close
+  const _prevFocus = document.activeElement;
+  const panel = overlay.querySelector('.kbd-help-panel');
+  function closeOverlay() {
+    overlay.remove();
+    if (_prevFocus) _prevFocus.focus();
+  }
   overlay.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') overlay.remove();
+    if (e.key === 'Escape') { closeOverlay(); return; }
+    // Focus trap: cycle focus within the dialog
+    if (e.key === 'Tab') {
+      const focusable = overlay.querySelectorAll('button, [tabindex="-1"]');
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    }
   });
-  overlay.querySelector('.kbd-help-panel').focus();
+  overlay.querySelector('.kbd-help-backdrop').onclick = closeOverlay;
+  overlay.querySelector('.kbd-help-close').onclick = closeOverlay;
+  panel.focus();
 }
 </script>
 {% block scripts %}{% endblock %}
