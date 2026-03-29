@@ -110,7 +110,6 @@ const POLICY_OPTIONS = `{% for p in policy_options %}<option value="{{ p }}">{{ 
 const PAGE_SIZE = 50;
 
 let allRepos = [];
-let allCache = {};
 let filteredRepos = [];
 let currentPage = 1;
 let activeFilter = null;
@@ -118,7 +117,7 @@ let activeOrg = '';
 let currentSort = 'activity';
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers — RepoRow has pass_count/fail_count/review_count/verified_at inline
 // ---------------------------------------------------------------------------
 
 function renderBadges(pass, fail, review) {
@@ -130,10 +129,9 @@ function renderBadges(pass, fail, review) {
 }
 
 function repoStatus(r) {
-  const c = allCache[r.full_name];
-  if (!c) return 'unverified';
-  if (c.fail > 0) return 'fail';
-  if (c.review > 0) return 'review';
+  if (r.verified_at == null) return 'unverified';
+  if ((r.fail_count || 0) > 0) return 'fail';
+  if ((r.review_count || 0) > 0) return 'review';
   return 'pass';
 }
 
@@ -161,12 +159,10 @@ function computeFiltered() {
 
   const mode = currentSort;
   list = [...list].sort((a, b) => {
-    const cA = allCache[a.full_name] || {};
-    const cB = allCache[b.full_name] || {};
     if (mode === 'activity') return (b.pushed_at || '').localeCompare(a.pushed_at || '');
-    if (mode === 'fail-desc') return (cB.fail || 0) - (cA.fail || 0);
-    if (mode === 'fail-asc') return (cA.fail || 0) - (cB.fail || 0);
-    if (mode === 'unverified') return (cA.verified_at ? 1 : 0) - (cB.verified_at ? 1 : 0);
+    if (mode === 'fail-desc') return (b.fail_count || 0) - (a.fail_count || 0);
+    if (mode === 'fail-asc') return (a.fail_count || 0) - (b.fail_count || 0);
+    if (mode === 'unverified') return (a.verified_at ? 1 : 0) - (b.verified_at ? 1 : 0);
     return a.full_name.toLowerCase().localeCompare(b.full_name.toLowerCase());
   });
 
@@ -182,9 +178,9 @@ function totalPages() {
 // ---------------------------------------------------------------------------
 
 function renderCard(r) {
-  const cached = allCache[r.full_name];
-  const cachedBadges = cached ? renderBadges(cached.pass, cached.fail, cached.review) : '<span class="badge badge-na">未検証</span>';
-  const cachedTime = cached ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${cached.verified_at}</span>` : '';
+  const hasVerification = r.verified_at != null;
+  const badges = hasVerification ? renderBadges(r.pass_count || 0, r.fail_count || 0, r.review_count || 0) : '<span class="badge badge-na">未検証</span>';
+  const verifiedTime = hasVerification ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${r.verified_at}</span>` : '';
   const desc = r.description ? `<div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">${esc(r.description)}</div>` : '';
 
   return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}">
@@ -200,15 +196,15 @@ function renderCard(r) {
         ${r.private ? '<span class="badge badge-private">private</span>' : ''}
         ${r.language ? `<span>${esc(r.language)}</span>` : ''}
         ${r.default_branch ? `<span>${esc(r.default_branch)}</span>` : ''}
-        ${cachedTime}
+        ${verifiedTime}
       </div>
     </div>
     <div class="repo-actions">
-      <div class="result-summary" id="result-${r.full_name.replace('/', '-')}">${cachedBadges}</div>
+      <div class="result-summary" id="result-${r.full_name.replace('/', '-')}">${badges}</div>
       <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/pulls" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="PR検証">PR</a>
       <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/releases" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="リリース検証">Rel</a>
       <select class="policy-select" id="policy-${r.full_name.replace('/', '-')}" aria-label="${esc(r.full_name)} のポリシー選択">${POLICY_OPTIONS}</select>
-      <button class="verify-btn" onclick="verifyRepo('${esc(r.owner)}', '${esc(r.name)}', this)">${cached ? '再検証' : '検証'}</button>
+      <button class="verify-btn" onclick="verifyRepo('${esc(r.owner)}', '${esc(r.name)}', this)">${hasVerification ? '再検証' : '検証'}</button>
     </div>
   </div>`;
 }
@@ -238,8 +234,6 @@ function renderPage() {
   if (currentPage > totalPages()) currentPage = totalPages();
 
   const container = document.getElementById('repo-list');
-
-  // Title
   const total = allRepos.length;
   const matched = filteredRepos.length;
   const titleText = matched < total ? `リポジトリ (${matched} / ${total})` : `リポジトリ (${total})`;
@@ -258,9 +252,7 @@ function renderPage() {
     return;
   }
 
-  // Preserve search input value across re-renders
   const prevQ = document.getElementById('search-input')?.value || '';
-
   const start = (currentPage - 1) * PAGE_SIZE;
   const pageRepos = filteredRepos.slice(start, start + PAGE_SIZE);
 
@@ -273,13 +265,12 @@ function renderPage() {
     + '<div class="repo-grid">' + pageRepos.map(renderCard).join('') + '</div>'
     + renderPagination();
 
-  // Toolbar
   if (total > 0) {
     document.getElementById('verify-all-btn').style.display = '';
     document.getElementById('export-csv-btn').style.display = '';
   }
 
-  // Dashboard summary (over filteredRepos, not just page)
+  // Dashboard summary
   let failRepos = 0, reviewRepos = 0, passRepos = 0, unverifiedRepos = 0;
   filteredRepos.forEach(r => {
     const s = repoStatus(r);
@@ -292,24 +283,19 @@ function renderPage() {
   summaryEl.style.display = '';
   summaryEl.innerHTML = `
     <div class="summary-card summary-card-fail${activeFilter === 'fail' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'fail'}" onclick="filterByStatus('fail')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('fail')}" title="FAILのあるリポジトリのみ表示">
-      <div class="summary-card-count">${failRepos}</div>
-      <div class="summary-card-label">FAIL</div>
+      <div class="summary-card-count">${failRepos}</div><div class="summary-card-label">FAIL</div>
     </div>
     <div class="summary-card summary-card-review${activeFilter === 'review' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'review'}" onclick="filterByStatus('review')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('review')}" title="REVIEWのあるリポジトリのみ表示">
-      <div class="summary-card-count">${reviewRepos}</div>
-      <div class="summary-card-label">REVIEW</div>
+      <div class="summary-card-count">${reviewRepos}</div><div class="summary-card-label">REVIEW</div>
     </div>
     <div class="summary-card summary-card-pass${activeFilter === 'pass' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'pass'}" onclick="filterByStatus('pass')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('pass')}" title="PASSのリポジトリのみ表示">
-      <div class="summary-card-count">${passRepos}</div>
-      <div class="summary-card-label">PASS</div>
+      <div class="summary-card-count">${passRepos}</div><div class="summary-card-label">PASS</div>
     </div>
     <div class="summary-card summary-card-unverified${activeFilter === 'unverified' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'unverified'}" onclick="filterByStatus('unverified')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('unverified')}" title="未検証のリポジトリのみ表示">
-      <div class="summary-card-count">${unverifiedRepos}</div>
-      <div class="summary-card-label">未検証</div>
+      <div class="summary-card-count">${unverifiedRepos}</div><div class="summary-card-label">未検証</div>
     </div>
   `;
 
-  // Org filter
   const orgs = [...new Set(allRepos.map(r => r.owner))].sort();
   const orgFilter = document.getElementById('org-filter');
   if (orgs.length > 1) {
@@ -353,50 +339,38 @@ function filterByOrg(org) {
 }
 
 // ---------------------------------------------------------------------------
-// Data loading (SSE)
+// Data loading: fetch JSON + SSE job events
 // ---------------------------------------------------------------------------
 
-function initData(repos, cacheArr) {
-  allRepos = repos;
-  allCache = {};
-  for (const c of (cacheArr || [])) {
-    allCache[`${c.owner}/${c.repo}`] = c;
-  }
-  currentPage = 1;
-  renderPage();
+async function fetchRepos() {
+  const resp = await fetch('/api/repos');
+  if (!resp.ok) throw new Error(await resp.text());
+  return resp.json();
 }
 
 async function loadRepos() {
-  let cacheArr = [];
   try {
-    cacheArr = await swrFetch('/api/verification-cache');
-  } catch (_) { /* proceed without cache */ }
-
-  const accumulated = [];
-
-  try {
-    await new Promise((resolve, reject) => {
-      const es = new EventSource('/api/repos');
-      es.addEventListener('repos', (e) => {
-        const batch = JSON.parse(e.data);
-        accumulated.push(...batch);
-        accumulated.sort((a, b) => (b.pushed_at || '').localeCompare(a.pushed_at || ''));
-        initData(accumulated, cacheArr);
-      });
-      es.addEventListener('done', () => {
-        es.close();
-        if (accumulated.length === 0) initData([], cacheArr);
-        resolve();
-      });
-      es.onerror = () => {
-        es.close();
-        if (accumulated.length > 0) { resolve(); }
-        else { reject(new Error('SSE connection failed')); }
-      };
-    });
+    allRepos = await fetchRepos();
+    renderPage();
   } catch (e) {
     renderLoadError('repo-list', 'リポジトリの取得に失敗しました。', 'loadRepos');
+    return;
   }
+
+  // Subscribe to job events for live updates
+  const es = new EventSource('/api/events');
+  es.addEventListener('job', async (e) => {
+    const event = JSON.parse(e.data);
+    if (event.type === 'repos_synced' || event.type === 'verification_complete') {
+      try {
+        allRepos = await fetchRepos();
+        renderPage();
+      } catch (_) { /* will retry on next event */ }
+    }
+  });
+  es.onerror = () => {
+    // Reconnect is automatic with EventSource; nothing to do
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -441,19 +415,16 @@ function exportCSV() {
   const origText = btn.textContent;
   btn.textContent = '出力中…';
   btn.disabled = true;
-  const rows = [['リポジトリ','言語','公開範囲','ポリシー','PASS','FAIL','REVIEW','N/A','検証日時']];
+  const rows = [['リポジトリ','言語','公開範囲','PASS','FAIL','REVIEW','検証日時']];
   allRepos.forEach(r => {
-    const c = allCache[r.full_name] || {};
     rows.push([
       r.full_name,
       r.language || '',
       r.private ? '非公開' : '公開',
-      c.policy || '',
-      c.pass || 0,
-      c.fail || 0,
-      c.review || 0,
-      c.na || 0,
-      c.verified_at || '未検証',
+      r.pass_count || 0,
+      r.fail_count || 0,
+      r.review_count || 0,
+      r.verified_at || '未検証',
     ]);
   });
   const csv = '\uFEFF' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');

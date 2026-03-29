@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::sync::Arc;
 
 use askama::Template;
@@ -13,9 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::blocking::run_blocking;
 use crate::config::AppConfig;
-use crate::db::Database;
+use crate::db::{CachedPullRow, CachedReleaseRow, Database, RepoRow};
 use crate::github_app::GitHubApp;
-use crate::swr_cache::{CacheStatus, SwrCache};
 use crate::validation::{self, validate_git_ref};
 
 // ---------------------------------------------------------------------------
@@ -27,6 +25,35 @@ const POLICY_OPTIONS: &[&str] = &[
 ];
 
 // ---------------------------------------------------------------------------
+// Job events (broadcast to SSE clients)
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Serialize)]
+#[serde(tag = "type")]
+pub enum JobEvent {
+    #[serde(rename = "repos_synced")]
+    ReposSynced { user_id: i64 },
+    #[serde(rename = "pulls_synced")]
+    PullsSynced {
+        user_id: i64,
+        owner: String,
+        repo: String,
+    },
+    #[serde(rename = "releases_synced")]
+    ReleasesSynced {
+        user_id: i64,
+        owner: String,
+        repo: String,
+    },
+    #[serde(rename = "verification_complete")]
+    VerificationComplete {
+        user_id: i64,
+        owner: String,
+        repo: String,
+    },
+}
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
@@ -35,18 +62,16 @@ struct WebState {
     db: Arc<Database>,
     github_app: Arc<GitHubApp>,
     base_url: String,
-    cache: SwrCache,
+    events_tx: tokio::sync::broadcast::Sender<JobEvent>,
 }
 
 pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig) -> Router {
+    let (events_tx, _) = tokio::sync::broadcast::channel::<JobEvent>(256);
     let state = WebState {
         db,
         github_app,
         base_url: config.base_url.clone(),
-        cache: SwrCache::new(
-            std::time::Duration::from_secs(60),
-            std::time::Duration::from_secs(300),
-        ),
+        events_tx,
     };
 
     Router::new()
@@ -94,60 +119,13 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             "/api/repos/{owner}/{repo}/verify-pr/{pr_number}",
             axum::routing::post(api_verify_pr),
         )
-        .route(
-            "/api/verification-cache",
-            axum::routing::get(api_verification_cache),
-        )
+        .route("/api/events", axum::routing::get(api_events))
         .route("/api/audit-history", axum::routing::get(api_audit_history))
         .route(
             "/api/audit-history/export",
             axum::routing::get(api_audit_export_csv),
         )
         .with_state(state)
-}
-
-// ---------------------------------------------------------------------------
-// SWR cache helper
-// ---------------------------------------------------------------------------
-
-/// Shared SWR response logic for GitHub API endpoints.
-/// On Fresh: return cached. On Stale: return cached + spawn background refresh.
-/// On Miss: fetch synchronously and cache.
-async fn swr_respond<F, Fut, T>(cache: &SwrCache, key: String, label: &str, fetch_fn: F) -> Response
-where
-    F: FnOnce() -> Fut + Clone + Send + 'static,
-    Fut: Future<Output = anyhow::Result<T>> + Send,
-    T: Serialize + Send + 'static,
-{
-    match cache.get(&key).await {
-        CacheStatus::Fresh(v) => Json(v).into_response(),
-        CacheStatus::Stale(v) => {
-            let cache = cache.clone();
-            let ck = key.clone();
-            let label = label.to_owned();
-            let f = fetch_fn.clone();
-            cache.mark_revalidating(&ck).await;
-            tokio::spawn(async move {
-                match f().await {
-                    Ok(fresh) => cache.set(ck, fresh).await,
-                    Err(e) => {
-                        tracing::warn!("SWR background revalidation failed for {label}: {e:#}")
-                    }
-                }
-            });
-            Json(v).into_response()
-        }
-        CacheStatus::Miss => match fetch_fn().await {
-            Ok(fresh) => {
-                cache.set(key, &fresh).await;
-                Json(fresh).into_response()
-            }
-            Err(e) => {
-                tracing::warn!("SWR fetch failed for {label}: {e:#}");
-                Json(serde_json::Value::Array(vec![])).into_response()
-            }
-        },
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -689,78 +667,29 @@ async fn settings(headers: HeaderMap, State(state): State<WebState>) -> Response
 // API Endpoints
 // ---------------------------------------------------------------------------
 
-#[derive(Serialize)]
-struct RepoWithOwner {
-    owner: String,
-    name: String,
-    full_name: String,
-    private: bool,
-    description: Option<String>,
-    language: Option<String>,
-    default_branch: Option<String>,
-    updated_at: Option<String>,
-    pushed_at: Option<String>,
-}
-
 async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Response {
     let (user_id, _login) = match require_user(&state.db, &headers).await {
         Some(u) => u,
         None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     };
 
-    let cache_key = format!("repos:user:{user_id}");
+    let db = state.db.clone();
+    let repos = run_blocking(move || db.get_repositories_for_user(user_id))
+        .await
+        .unwrap_or_default();
 
-    // Cache hit → return all repos as a single SSE batch then close.
-    match state.cache.get(&cache_key).await {
-        CacheStatus::Fresh(v) => {
-            let stream = futures::stream::iter(vec![
-                Ok::<_, std::convert::Infallible>(
-                    Event::default().event("repos").json_data(&*v).unwrap(),
-                ),
-                Ok(Event::default().event("done").data("")),
-            ]);
-            return Sse::new(stream)
-                .keep_alive(KeepAlive::default())
-                .into_response();
-        }
-        CacheStatus::Stale(v) => {
-            // Return stale data immediately, revalidate in background.
-            let cache = state.cache.clone();
-            let ck = cache_key.clone();
-            let st = state.clone();
-            cache.mark_revalidating(&ck).await;
-            tokio::spawn(async move {
-                let fresh = fetch_repos_all(&st, user_id).await;
-                cache.set(ck, fresh).await;
-            });
-            let stream = futures::stream::iter(vec![
-                Ok::<_, std::convert::Infallible>(
-                    Event::default().event("repos").json_data(&*v).unwrap(),
-                ),
-                Ok(Event::default().event("done").data("")),
-            ]);
-            return Sse::new(stream)
-                .keep_alive(KeepAlive::default())
-                .into_response();
-        }
-        CacheStatus::Miss => { /* fall through to streaming fetch */ }
+    let needs_sync = repos.is_empty() || {
+        let db = state.db.clone();
+        run_blocking(move || db.is_repos_stale(user_id))
+            .await
+            .unwrap_or(true)
+    };
+
+    if needs_sync {
+        spawn_sync_repos_job(&state, user_id);
     }
 
-    // Cache miss → stream repos incrementally as each installation completes.
-    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, std::convert::Infallible>>(32);
-
-    let cache = state.cache.clone();
-    let ck = cache_key.clone();
-    tokio::spawn(async move {
-        let all_repos = fetch_repos_streaming(&state, user_id, &tx).await;
-        cache.set(ck, &all_repos).await;
-        let _ = tx.send(Ok(Event::default().event("done").data(""))).await;
-    });
-
-    let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
-    Sse::new(stream)
-        .keep_alive(KeepAlive::default())
-        .into_response()
+    Json(repos).into_response()
 }
 
 async fn sync_installations(state: &WebState, user_id: i64) {
@@ -791,73 +720,211 @@ async fn sync_installations(state: &WebState, user_id: i64) {
     }
 }
 
-/// Fetch repos with streaming: sends each installation's repos via SSE as they complete.
-/// Returns the full collected list for caching.
-async fn fetch_repos_streaming(
-    state: &WebState,
-    user_id: i64,
-    tx: &tokio::sync::mpsc::Sender<Result<Event, std::convert::Infallible>>,
-) -> Vec<RepoWithOwner> {
-    sync_installations(state, user_id).await;
+// ---------------------------------------------------------------------------
+// SSE events endpoint
+// ---------------------------------------------------------------------------
 
-    let db = state.db.clone();
-    let installations = run_blocking(move || db.get_installations_for_user(user_id))
-        .await
-        .unwrap_or_default();
+async fn api_events(headers: HeaderMap, State(state): State<WebState>) -> Response {
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
 
-    let mut join_set = tokio::task::JoinSet::new();
-    for (installation_id, account_login, _account_type) in installations {
-        let github_app = state.github_app.clone();
-        join_set.spawn(async move {
-            match github_app.list_installation_repos(installation_id).await {
-                Ok(repo_list) => repo_list
-                    .into_iter()
-                    .map(|r| RepoWithOwner {
-                        owner: account_login.clone(),
-                        name: r.name,
-                        full_name: r.full_name,
-                        private: r.private,
-                        description: r.description,
-                        language: r.language,
-                        default_branch: r.default_branch,
-                        updated_at: r.updated_at,
-                        pushed_at: r.pushed_at,
-                    })
-                    .collect::<Vec<_>>(),
-                Err(e) => {
-                    tracing::warn!("Failed to list repos for {account_login}: {e:#}");
-                    Vec::new()
+    let mut rx = state.events_tx.subscribe();
+    let stream = async_stream::stream! {
+        loop {
+            match rx.recv().await {
+                Ok(event) => {
+                    let event_user_id = match &event {
+                        JobEvent::ReposSynced { user_id, .. } => *user_id,
+                        JobEvent::PullsSynced { user_id, .. } => *user_id,
+                        JobEvent::ReleasesSynced { user_id, .. } => *user_id,
+                        JobEvent::VerificationComplete { user_id, .. } => *user_id,
+                    };
+                    if event_user_id == user_id {
+                        let data = serde_json::to_string(&event).unwrap_or_default();
+                        yield Ok::<_, std::convert::Infallible>(
+                            Event::default().event("job").data(data)
+                        );
+                    }
                 }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(_) => break,
             }
-        });
-    }
+        }
+    };
+    Sse::new(stream)
+        .keep_alive(KeepAlive::default())
+        .into_response()
+}
 
-    let mut all_repos: Vec<RepoWithOwner> = Vec::new();
-    while let Some(result) = join_set.join_next().await {
-        if let Ok(batch) = result {
-            if !batch.is_empty() {
-                let _ = tx
-                    .send(Ok(Event::default()
-                        .event("repos")
-                        .json_data(&batch)
-                        .unwrap()))
-                    .await;
+// ---------------------------------------------------------------------------
+// Background sync jobs
+// ---------------------------------------------------------------------------
+
+fn spawn_sync_repos_job(state: &WebState, user_id: i64) {
+    let state = state.clone();
+    tokio::spawn(async move {
+        sync_installations(&state, user_id).await;
+
+        let db = state.db.clone();
+        let installations = run_blocking(move || db.get_installations_for_user(user_id))
+            .await
+            .unwrap_or_default();
+
+        let mut join_set = tokio::task::JoinSet::new();
+        for (installation_id, account_login, _account_type) in installations {
+            let github_app = state.github_app.clone();
+            join_set.spawn(async move {
+                match github_app.list_installation_repos(installation_id).await {
+                    Ok(repos) => repos
+                        .into_iter()
+                        .map(|r| RepoRow {
+                            owner: account_login.clone(),
+                            name: r.name,
+                            full_name: r.full_name,
+                            private: r.private,
+                            description: r.description,
+                            language: r.language,
+                            default_branch: r.default_branch,
+                            pushed_at: r.pushed_at,
+                            synced_at: String::new(), // set by DB
+                            pass_count: None,
+                            fail_count: None,
+                            review_count: None,
+                            verified_at: None,
+                        })
+                        .collect::<Vec<_>>(),
+                    Err(e) => {
+                        tracing::warn!("Failed to list repos for {account_login}: {e:#}");
+                        Vec::new()
+                    }
+                }
+            });
+        }
+
+        let mut all_repos = Vec::new();
+        while let Some(result) = join_set.join_next().await {
+            if let Ok(batch) = result {
                 all_repos.extend(batch);
             }
         }
-    }
-    all_repos.sort_by(|a, b| {
-        let ta = a.pushed_at.as_deref().unwrap_or("");
-        let tb = b.pushed_at.as_deref().unwrap_or("");
-        tb.cmp(ta)
+
+        let db = state.db.clone();
+        if let Err(e) = run_blocking(move || db.upsert_repositories(user_id, &all_repos)).await {
+            tracing::warn!("Failed to save repos to DB: {e:#}");
+            return;
+        }
+
+        let _ = state.events_tx.send(JobEvent::ReposSynced { user_id });
     });
-    all_repos
 }
 
-/// Non-streaming variant for background SWR revalidation.
-async fn fetch_repos_all(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
-    let (tx, _rx) = tokio::sync::mpsc::channel(1);
-    fetch_repos_streaming(state, user_id, &tx).await
+fn spawn_sync_pulls_job(state: &WebState, user_id: i64, owner: String, repo: String) {
+    let state = state.clone();
+    tokio::spawn(async move {
+        let db = state.db.clone();
+        let owner_q = owner.clone();
+        let installation_id =
+            match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
+                Ok(Some(id)) => id,
+                _ => return,
+            };
+
+        let pulls = match state
+            .github_app
+            .list_pull_requests(installation_id, &owner, &repo)
+            .await
+        {
+            Ok(prs) => prs
+                .into_iter()
+                .map(|p| CachedPullRow {
+                    pr_number: p.number as i64,
+                    title: p.title,
+                    state: p.state,
+                    author: p.user.login,
+                    created_at: p.created_at,
+                    updated_at: p.updated_at,
+                    merged_at: p.merged_at,
+                    draft: p.draft.unwrap_or(false),
+                })
+                .collect::<Vec<_>>(),
+            Err(e) => {
+                tracing::warn!("Failed to list pulls for {owner}/{repo}: {e:#}");
+                return;
+            }
+        };
+
+        let db = state.db.clone();
+        let o = owner.clone();
+        let r = repo.clone();
+        if let Err(e) = run_blocking(move || db.upsert_cached_pulls(user_id, &o, &r, &pulls)).await
+        {
+            tracing::warn!("Failed to save pulls to DB: {e:#}");
+            return;
+        }
+
+        let _ = state.events_tx.send(JobEvent::PullsSynced {
+            user_id,
+            owner,
+            repo,
+        });
+    });
+}
+
+fn spawn_sync_releases_job(state: &WebState, user_id: i64, owner: String, repo: String) {
+    let state = state.clone();
+    tokio::spawn(async move {
+        let db = state.db.clone();
+        let owner_q = owner.clone();
+        let installation_id =
+            match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
+                Ok(Some(id)) => id,
+                _ => return,
+            };
+
+        let releases = match state
+            .github_app
+            .list_releases(installation_id, &owner, &repo)
+            .await
+        {
+            Ok(rels) => rels
+                .into_iter()
+                .map(|r| CachedReleaseRow {
+                    release_id: r.id,
+                    tag_name: r.tag_name,
+                    name: r.name,
+                    draft: r.draft,
+                    prerelease: r.prerelease,
+                    created_at: r.created_at,
+                    published_at: r.published_at,
+                    author: r.author.login,
+                    html_url: r.html_url,
+                    body: r.body,
+                })
+                .collect::<Vec<_>>(),
+            Err(e) => {
+                tracing::warn!("Failed to list releases for {owner}/{repo}: {e:#}");
+                return;
+            }
+        };
+
+        let db = state.db.clone();
+        let o = owner.clone();
+        let r = repo.clone();
+        if let Err(e) =
+            run_blocking(move || db.upsert_cached_releases(user_id, &o, &r, &releases)).await
+        {
+            tracing::warn!("Failed to save releases to DB: {e:#}");
+            return;
+        }
+
+        let _ = state.events_tx.send(JobEvent::ReleasesSynced {
+            user_id,
+            owner,
+            repo,
+        });
+    });
 }
 
 #[derive(Deserialize)]
@@ -993,42 +1060,6 @@ fn count_findings(json: &str) -> (i64, i64, i64, i64) {
 }
 
 // ---------------------------------------------------------------------------
-// Cached verification results API (reads from audit_log)
-// ---------------------------------------------------------------------------
-
-async fn api_verification_cache(headers: HeaderMap, State(state): State<WebState>) -> Response {
-    let (user_id, _login) = match require_user(&state.db, &headers).await {
-        Some(u) => u,
-        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-    };
-
-    let db = state.db.clone();
-    let entries = run_blocking(move || db.get_latest_verifications_for_user(user_id))
-        .await
-        .unwrap_or_default();
-
-    let json: Vec<serde_json::Value> = entries
-        .iter()
-        .map(|e| {
-            serde_json::json!({
-                "owner": e.owner,
-                "repo": e.repo,
-                "type": e.verification_type,
-                "target_ref": e.target_ref,
-                "policy": e.policy,
-                "pass": e.pass_count,
-                "fail": e.fail_count,
-                "review": e.review_count,
-                "na": e.na_count,
-                "verified_at": e.verified_at,
-            })
-        })
-        .collect();
-
-    Json(json).into_response()
-}
-
-// ---------------------------------------------------------------------------
 // PR list API
 // ---------------------------------------------------------------------------
 
@@ -1047,21 +1078,26 @@ async fn api_list_pulls(
     };
 
     let db = state.db.clone();
-    let owner_q = owner.clone();
-    let installation_id =
-        match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
-            Ok(Some(id)) => id,
-            _ => return Json(Vec::<serde_json::Value>::new()).into_response(),
-        };
-
-    let cache_key = format!("pulls:{owner}/{repo}:inst:{installation_id}");
-    let app = state.github_app.clone();
     let o = owner.clone();
     let r = repo.clone();
-    swr_respond(&state.cache, cache_key, "pulls", move || async move {
-        app.list_pull_requests(installation_id, &o, &r).await
-    })
-    .await
+    let pulls = run_blocking(move || db.get_cached_pulls(user_id, &o, &r))
+        .await
+        .unwrap_or_default();
+
+    let needs_sync = pulls.is_empty() || {
+        let db = state.db.clone();
+        let o = owner.clone();
+        let r = repo.clone();
+        run_blocking(move || db.is_pulls_stale(user_id, &o, &r))
+            .await
+            .unwrap_or(true)
+    };
+
+    if needs_sync {
+        spawn_sync_pulls_job(&state, user_id, owner, repo);
+    }
+
+    Json(pulls).into_response()
 }
 
 // ---------------------------------------------------------------------------
@@ -1083,21 +1119,26 @@ async fn api_list_releases(
     };
 
     let db = state.db.clone();
-    let owner_q = owner.clone();
-    let installation_id =
-        match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
-            Ok(Some(id)) => id,
-            _ => return Json(Vec::<serde_json::Value>::new()).into_response(),
-        };
-
-    let cache_key = format!("releases:{owner}/{repo}:inst:{installation_id}");
-    let app = state.github_app.clone();
     let o = owner.clone();
     let r = repo.clone();
-    swr_respond(&state.cache, cache_key, "releases", move || async move {
-        app.list_releases(installation_id, &o, &r).await
-    })
-    .await
+    let releases = run_blocking(move || db.get_cached_releases(user_id, &o, &r))
+        .await
+        .unwrap_or_default();
+
+    let needs_sync = releases.is_empty() || {
+        let db = state.db.clone();
+        let o = owner.clone();
+        let r = repo.clone();
+        run_blocking(move || db.is_releases_stale(user_id, &o, &r))
+            .await
+            .unwrap_or(true)
+    };
+
+    if needs_sync {
+        spawn_sync_releases_job(&state, user_id, owner, repo);
+    }
+
+    Json(releases).into_response()
 }
 
 // ---------------------------------------------------------------------------

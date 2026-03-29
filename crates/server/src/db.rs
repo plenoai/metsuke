@@ -1,5 +1,6 @@
 use anyhow::Result;
 use rusqlite::Connection;
+use serde::Serialize;
 use std::sync::Mutex;
 
 pub struct Database {
@@ -95,6 +96,64 @@ impl Database {
         )?;
         // Add github_token column to users (idempotent migration)
         let _ = conn.execute_batch("ALTER TABLE users ADD COLUMN github_token TEXT;");
+
+        // Cache tables for GitHub data
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS repositories (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                owner TEXT NOT NULL,
+                name TEXT NOT NULL,
+                full_name TEXT NOT NULL,
+                private INTEGER NOT NULL DEFAULT 0,
+                description TEXT,
+                language TEXT,
+                default_branch TEXT,
+                pushed_at TEXT,
+                synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(user_id, full_name)
+            );
+            CREATE INDEX IF NOT EXISTS idx_repositories_user ON repositories(user_id);
+
+            CREATE TABLE IF NOT EXISTS cached_pulls (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                owner TEXT NOT NULL,
+                repo TEXT NOT NULL,
+                pr_number INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                state TEXT NOT NULL,
+                author TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                merged_at TEXT,
+                draft INTEGER NOT NULL DEFAULT 0,
+                synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(user_id, owner, repo, pr_number)
+            );
+            CREATE INDEX IF NOT EXISTS idx_cached_pulls_repo ON cached_pulls(user_id, owner, repo);
+
+            CREATE TABLE IF NOT EXISTS cached_releases (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                owner TEXT NOT NULL,
+                repo TEXT NOT NULL,
+                release_id INTEGER NOT NULL,
+                tag_name TEXT NOT NULL,
+                name TEXT,
+                draft INTEGER NOT NULL DEFAULT 0,
+                prerelease INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                published_at TEXT,
+                author TEXT NOT NULL,
+                html_url TEXT NOT NULL,
+                body TEXT,
+                synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(user_id, owner, repo, release_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_cached_releases_repo ON cached_releases(user_id, owner, repo);",
+        )?;
+
         Ok(())
     }
 
@@ -582,6 +641,277 @@ impl Database {
         Ok(total)
     }
 
+    // --- Repository Cache ---
+
+    pub fn upsert_repositories(&self, user_id: i64, repos: &[RepoRow]) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "INSERT INTO repositories (user_id, owner, name, full_name, private, description, language, default_branch, pushed_at, synced_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))
+             ON CONFLICT(user_id, full_name) DO UPDATE SET
+                owner = excluded.owner,
+                name = excluded.name,
+                private = excluded.private,
+                description = excluded.description,
+                language = excluded.language,
+                default_branch = excluded.default_branch,
+                pushed_at = excluded.pushed_at,
+                synced_at = datetime('now')",
+        )?;
+        for r in repos {
+            stmt.execute(rusqlite::params![
+                user_id,
+                r.owner,
+                r.name,
+                r.full_name,
+                r.private as i32,
+                r.description,
+                r.language,
+                r.default_branch,
+                r.pushed_at,
+            ])?;
+        }
+        Ok(())
+    }
+
+    pub fn get_repositories_for_user(&self, user_id: i64) -> Result<Vec<RepoRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT r.owner, r.name, r.full_name, r.private, r.description, r.language,
+                    r.default_branch, r.pushed_at, r.synced_at,
+                    a.pass_count, a.fail_count, a.review_count, a.verified_at
+             FROM repositories r
+             LEFT JOIN (
+                 SELECT owner, repo, pass_count, fail_count, review_count, verified_at
+                 FROM audit_log WHERE user_id = ?1 AND verification_type = 'repo'
+                 AND id IN (SELECT MAX(id) FROM audit_log WHERE user_id = ?1 AND verification_type = 'repo' GROUP BY owner, repo)
+             ) a ON r.owner = a.owner AND r.name = a.repo
+             WHERE r.user_id = ?1
+             ORDER BY r.pushed_at DESC NULLS LAST",
+        )?;
+        let rows = stmt.query_map([user_id], |row| {
+            Ok(RepoRow {
+                owner: row.get(0)?,
+                name: row.get(1)?,
+                full_name: row.get(2)?,
+                private: row.get::<_, i32>(3)? != 0,
+                description: row.get(4)?,
+                language: row.get(5)?,
+                default_branch: row.get(6)?,
+                pushed_at: row.get(7)?,
+                synced_at: row.get(8)?,
+                pass_count: row.get(9)?,
+                fail_count: row.get(10)?,
+                review_count: row.get(11)?,
+                verified_at: row.get(12)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn get_repos_synced_at(&self, user_id: i64) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let result = conn.query_row(
+            "SELECT MIN(synced_at) FROM repositories WHERE user_id = ?1",
+            [user_id],
+            |row| row.get(0),
+        );
+        match result {
+            Ok(v) => Ok(v),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    pub fn is_repos_stale(&self, user_id: i64) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let result: Result<String, _> = conn.query_row(
+            "SELECT MIN(synced_at) FROM repositories WHERE user_id = ?1",
+            [user_id],
+            |row| row.get(0),
+        );
+        match result {
+            Ok(ts) => {
+                let stale: bool =
+                    conn.query_row("SELECT ?1 < datetime('now', '-5 minutes')", [&ts], |row| {
+                        row.get(0)
+                    })?;
+                Ok(stale)
+            }
+            Err(_) => Ok(true),
+        }
+    }
+
+    pub fn is_pulls_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let result: Result<String, _> = conn.query_row(
+            "SELECT MIN(synced_at) FROM cached_pulls WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+            rusqlite::params![user_id, owner, repo],
+            |row| row.get(0),
+        );
+        match result {
+            Ok(ts) => {
+                let stale: bool =
+                    conn.query_row("SELECT ?1 < datetime('now', '-5 minutes')", [&ts], |row| {
+                        row.get(0)
+                    })?;
+                Ok(stale)
+            }
+            Err(_) => Ok(true),
+        }
+    }
+
+    pub fn is_releases_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let result: Result<String, _> = conn.query_row(
+            "SELECT MIN(synced_at) FROM cached_releases WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+            rusqlite::params![user_id, owner, repo],
+            |row| row.get(0),
+        );
+        match result {
+            Ok(ts) => {
+                let stale: bool =
+                    conn.query_row("SELECT ?1 < datetime('now', '-5 minutes')", [&ts], |row| {
+                        row.get(0)
+                    })?;
+                Ok(stale)
+            }
+            Err(_) => Ok(true),
+        }
+    }
+
+    // --- Cached Pulls ---
+
+    pub fn upsert_cached_pulls(
+        &self,
+        user_id: i64,
+        owner: &str,
+        repo: &str,
+        pulls: &[CachedPullRow],
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM cached_pulls WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+            rusqlite::params![user_id, owner, repo],
+        )?;
+        let mut stmt = conn.prepare(
+            "INSERT INTO cached_pulls (user_id, owner, repo, pr_number, title, state, author, created_at, updated_at, merged_at, draft, synced_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))",
+        )?;
+        for p in pulls {
+            stmt.execute(rusqlite::params![
+                user_id,
+                owner,
+                repo,
+                p.pr_number,
+                p.title,
+                p.state,
+                p.author,
+                p.created_at,
+                p.updated_at,
+                p.merged_at,
+                p.draft as i32,
+            ])?;
+        }
+        Ok(())
+    }
+
+    pub fn get_cached_pulls(
+        &self,
+        user_id: i64,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<CachedPullRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT pr_number, title, state, author, created_at, updated_at, merged_at, draft
+             FROM cached_pulls
+             WHERE user_id = ?1 AND owner = ?2 AND repo = ?3
+             ORDER BY updated_at DESC",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![user_id, owner, repo], |row| {
+            Ok(CachedPullRow {
+                pr_number: row.get(0)?,
+                title: row.get(1)?,
+                state: row.get(2)?,
+                author: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+                merged_at: row.get(6)?,
+                draft: row.get::<_, i32>(7)? != 0,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    // --- Cached Releases ---
+
+    pub fn upsert_cached_releases(
+        &self,
+        user_id: i64,
+        owner: &str,
+        repo: &str,
+        releases: &[CachedReleaseRow],
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM cached_releases WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+            rusqlite::params![user_id, owner, repo],
+        )?;
+        let mut stmt = conn.prepare(
+            "INSERT INTO cached_releases (user_id, owner, repo, release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body, synced_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now'))",
+        )?;
+        for r in releases {
+            stmt.execute(rusqlite::params![
+                user_id,
+                owner,
+                repo,
+                r.release_id,
+                r.tag_name,
+                r.name,
+                r.draft as i32,
+                r.prerelease as i32,
+                r.created_at,
+                r.published_at,
+                r.author,
+                r.html_url,
+                r.body,
+            ])?;
+        }
+        Ok(())
+    }
+
+    pub fn get_cached_releases(
+        &self,
+        user_id: i64,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<CachedReleaseRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body
+             FROM cached_releases
+             WHERE user_id = ?1 AND owner = ?2 AND repo = ?3
+             ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![user_id, owner, repo], |row| {
+            Ok(CachedReleaseRow {
+                release_id: row.get(0)?,
+                tag_name: row.get(1)?,
+                name: row.get(2)?,
+                draft: row.get::<_, i32>(3)? != 0,
+                prerelease: row.get::<_, i32>(4)? != 0,
+                created_at: row.get(5)?,
+                published_at: row.get(6)?,
+                author: row.get(7)?,
+                html_url: row.get(8)?,
+                body: row.get(9)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
     /// Latest verification per (owner, repo, type) for cache display on repos list
     pub fn get_latest_verifications_for_user(&self, user_id: i64) -> Result<Vec<AuditEntry>> {
         let conn = self.conn.lock().unwrap();
@@ -627,6 +957,50 @@ pub struct AuditEntry {
     pub review_count: i64,
     pub na_count: i64,
     pub verified_at: String,
+}
+
+#[derive(Serialize)]
+pub struct RepoRow {
+    pub owner: String,
+    pub name: String,
+    pub full_name: String,
+    pub private: bool,
+    pub description: Option<String>,
+    pub language: Option<String>,
+    pub default_branch: Option<String>,
+    pub pushed_at: Option<String>,
+    pub synced_at: String,
+    // From audit_log LEFT JOIN (latest repo verification)
+    pub pass_count: Option<i64>,
+    pub fail_count: Option<i64>,
+    pub review_count: Option<i64>,
+    pub verified_at: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct CachedPullRow {
+    pub pr_number: i64,
+    pub title: String,
+    pub state: String,
+    pub author: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub merged_at: Option<String>,
+    pub draft: bool,
+}
+
+#[derive(Serialize)]
+pub struct CachedReleaseRow {
+    pub release_id: i64,
+    pub tag_name: String,
+    pub name: Option<String>,
+    pub draft: bool,
+    pub prerelease: bool,
+    pub created_at: String,
+    pub published_at: Option<String>,
+    pub author: String,
+    pub html_url: String,
+    pub body: Option<String>,
 }
 
 pub struct OAuthClient {
