@@ -138,7 +138,7 @@ function resultBadges(e) {
   if (e.pass > 0) b += `<span class="badge badge-pass">P${e.pass}</span>`;
   if (e.review > 0) b += `<span class="badge badge-review">R${e.review}</span>`;
   if (e.fail > 0) b += `<span class="badge badge-fail">F${e.fail}</span>`;
-  return b;
+  return b || '<span style="color:var(--text-secondary)">—</span>';
 }
 
 async function loadAudit() {
@@ -181,7 +181,7 @@ async function loadAudit() {
     const pag = document.getElementById('audit-pagination');
     pag.innerHTML = `
       <button onclick="prevPage()" ${currentOffset === 0 ? 'disabled' : ''}>前へ</button>
-      <span style="color:var(--text-secondary);align-self:center">${currentOffset + 1} - ${currentOffset + entries.length}</span>
+      <span style="color:var(--text-secondary);align-self:center">${currentOffset + 1}〜${currentOffset + entries.length} 件</span>
       <button onclick="nextPage()" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
     `;
   } catch (e) {

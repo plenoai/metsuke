@@ -119,13 +119,22 @@ function esc(s) {
 
 function filterRepos() {
   const q = (document.getElementById('search-input')?.value || '').toLowerCase();
-  document.querySelectorAll('.repo-card').forEach(card => {
+  const cards = document.querySelectorAll('.repo-card');
+  let visible = 0;
+  cards.forEach(card => {
     const name = card.dataset.name || '';
     const desc = card.dataset.desc || '';
     const lang = card.dataset.lang || '';
     const match = name.includes(q) || desc.includes(q) || lang.includes(q);
     card.style.display = match ? '' : 'none';
+    if (match) visible++;
   });
+  const title = document.getElementById('repos-title');
+  if (q) {
+    title.textContent = `Repositories (${visible} / ${cards.length})`;
+  } else {
+    title.textContent = `Repositories (${cards.length})`;
+  }
 }
 
 function renderRepoList(repos, cacheArr) {

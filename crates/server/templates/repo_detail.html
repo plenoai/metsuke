@@ -65,7 +65,7 @@
         </a>
       </div>
       <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
-        <a class="btn" href="/repos/{{ owner }}/{{ repo }}/releases" style="text-decoration:none;font-size:0.8rem">リリース検証</a>
+        <a class="verify-btn" href="/repos/{{ owner }}/{{ repo }}/releases" style="text-decoration:none">リリース検証</a>
         <a class="verify-btn" href="/repos/{{ owner }}/{{ repo }}/pulls" style="text-decoration:none">PR検証</a>
         <select class="policy-select" id="policy-select">
           {% for p in policy_options %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
@@ -75,7 +75,12 @@
     </div>
   </div>
 
-  <div id="result-area"></div>
+  <div id="result-area">
+    <div class="card" style="text-align:center;padding:2rem;color:var(--text-secondary);font-family:var(--font-mono);font-size:0.8rem">
+      「リポジトリ検証」をクリックしてSDLCコンプライアンスを検証してください。<br>
+      または「リリース検証」「PR検証」で個別に検証できます。
+    </div>
+  </div>
 {% endblock %}
 
 {% block scripts %}
