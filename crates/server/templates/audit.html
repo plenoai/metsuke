@@ -208,7 +208,7 @@ async function loadAudit() {
       <button onclick="nextPage()" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
     `;
   } catch (e) {
-    container.innerHTML = '<div class="empty-state">監査ログの取得に失敗しました</div>';
+    renderLoadError('audit-content', '監査ログの取得に失敗しました。', 'loadAudit');
   }
 }
 

@@ -227,8 +227,7 @@ async function loadRepos() {
     ]);
     renderRepoList(repos, cache);
   } catch (e) {
-    document.getElementById('repo-list').innerHTML =
-      '<div class="empty-state">リポジトリの取得に失敗しました。</div>';
+    renderLoadError('repo-list', 'リポジトリの取得に失敗しました。', 'loadRepos');
   }
 }
 

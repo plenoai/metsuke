@@ -13,6 +13,10 @@ mod webhook;
 use std::sync::Arc;
 
 use auth::OAuthAuthLayer;
+use axum::Json;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use config::AppConfig;
 use db::Database;
 use github_app::GitHubApp;
@@ -61,6 +65,8 @@ async fn main() -> anyhow::Result<()> {
         .nest_service("/mcp", authed_mcp)
         .nest_service("/static", tower_http::services::ServeDir::new(&static_dir))
         .route("/health", axum::routing::get(|| async { "ok" }))
+        .route("/healthz", axum::routing::get(healthz))
+        .with_state(db.clone())
         .merge(oauth::router(db.clone(), github_app.clone(), &config))
         .merge(webhook::router(db.clone(), github_app.clone(), &config))
         .merge(web::router(db, github_app, &config));
@@ -75,4 +81,24 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     Ok(())
+}
+
+async fn healthz(State(db): State<Arc<Database>>) -> impl IntoResponse {
+    match db.ping() {
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "status": "ok",
+                "version": env!("CARGO_PKG_VERSION"),
+            })),
+        ),
+        Err(e) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({
+                "status": "degraded",
+                "error": format!("{e}"),
+                "version": env!("CARGO_PKG_VERSION"),
+            })),
+        ),
+    }
 }

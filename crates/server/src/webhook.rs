@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 
 use axum::Router;
 use axum::body::Bytes;
@@ -14,16 +15,21 @@ use crate::github_app::GitHubApp;
 
 type HmacSha256 = Hmac<Sha256>;
 
+/// Maximum number of delivery IDs to keep in the dedup cache.
+const MAX_DELIVERY_IDS: usize = 1000;
+
 #[derive(Clone)]
 struct WebhookState {
     github_app: Arc<GitHubApp>,
     webhook_secret: Option<String>,
+    delivery_ids: Arc<Mutex<HashSet<String>>>,
 }
 
 pub fn router(_db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig) -> Router {
     let state = WebhookState {
         github_app,
         webhook_secret: config.github_webhook_secret.clone(),
+        delivery_ids: Arc::new(Mutex::new(HashSet::new())),
     };
 
     Router::new()
@@ -50,6 +56,23 @@ async fn handle_webhook(
     headers: HeaderMap,
     body: Bytes,
 ) -> StatusCode {
+    // Deduplicate by X-GitHub-Delivery header
+    if let Some(delivery_id) = headers
+        .get("x-github-delivery")
+        .and_then(|v| v.to_str().ok())
+    {
+        let mut ids = state.delivery_ids.lock().unwrap();
+        if ids.contains(delivery_id) {
+            tracing::debug!("webhook: duplicate delivery {delivery_id}, skipping");
+            return StatusCode::OK;
+        }
+        // Cap the set size to avoid unbounded memory growth
+        if ids.len() >= MAX_DELIVERY_IDS {
+            ids.clear();
+        }
+        ids.insert(delivery_id.to_string());
+    }
+
     // Verify webhook signature if secret is configured
     if let Some(ref secret) = state.webhook_secret {
         let sig = headers

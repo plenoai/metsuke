@@ -131,7 +131,7 @@ async function verifyPR() {
   area.innerHTML = '<div class="loading" role="status">検証を実行中</div>';
 
   try {
-    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-pr/${prNum}?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
+    const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${prNum}?policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     renderResult(data, prNum);
@@ -183,7 +183,7 @@ async function loadPRs() {
     const prs = await swrFetch(`/api/repos/${OWNER}/${REPO}/pulls`);
     renderPRList(prs);
   } catch (e) {
-    document.getElementById('pr-list').innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem">PRの取得に失敗しました</div>';
+    renderLoadError('pr-list', 'PRの取得に失敗しました。', 'loadPRs');
   }
 }
 

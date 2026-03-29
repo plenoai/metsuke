@@ -53,7 +53,7 @@ async function runVerify() {
   area.innerHTML = '<div class="loading" role="status">検証を実行中</div>';
 
   try {
-    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
+    const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify?policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     const profileName = data.profile_name || policy;

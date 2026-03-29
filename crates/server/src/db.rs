@@ -549,6 +549,13 @@ impl Database {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
+    /// Check database connectivity.
+    pub fn ping(&self) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("SELECT 1")?;
+        Ok(())
+    }
+
     /// Latest verification per (owner, repo, type) for cache display on repos list
     pub fn get_latest_verifications_for_user(&self, user_id: i64) -> Result<Vec<AuditEntry>> {
         let conn = self.conn.lock().unwrap();

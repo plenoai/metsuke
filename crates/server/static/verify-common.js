@@ -70,3 +70,40 @@ function compactBadges(pass, fail, review) {
   if (fail > 0) badges += `<span class="badge badge-fail" title="FAIL">FAIL ${fail}</span>`;
   return badges;
 }
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const resp = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return resp;
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      throw new Error('リクエストがタイムアウトしました。サーバーの応答が遅延しています。');
+    }
+    throw e;
+  }
+}
+
+function classifyError(err, resp) {
+  if (!navigator.onLine || (err && err instanceof TypeError)) {
+    return 'ネットワーク接続を確認してください。';
+  }
+  if (resp) {
+    if (resp.status === 401 || resp.status === 403) return '認証の有効期限が切れました。ページを再読み込みしてください。';
+    if (resp.status === 429) return 'リクエスト制限に達しました。しばらく待ってから再試行してください。';
+    if (resp.status >= 500) return `サーバーエラー (${resp.status})。しばらく待ってから再試行してください。`;
+  }
+  return err?.message || '不明なエラーが発生しました。';
+}
+
+function renderLoadError(containerId, message, retryFnName) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = `<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;gap:0.75rem">
+    <div>${esc(message)}</div>
+    <button class="verify-btn" onclick="this.disabled=true;this.textContent='再取得中…';${retryFnName}()">再取得</button>
+  </div>`;
+}
