@@ -128,7 +128,7 @@ function classifyError(err, resp) {
     if (resp.status === 429) return 'リクエスト制限に達しました。しばらく待ってから再試行してください。';
     if (resp.status >= 500) return `サーバーエラー (${resp.status})。しばらく待ってから再試行してください。`;
   }
-  return err?.message || '不明なエラーが発生しました。';
+  return (err && err.message) || '不明なエラーが発生しました。';
 }
 
 function renderLoadError(containerId, message, retryFnName) {

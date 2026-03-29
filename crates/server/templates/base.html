@@ -62,7 +62,7 @@ async function swrFetch(url, { maxAge = 60000 } = {}) {
 <script>
 // Global keyboard shortcuts (when not focused on input/select/textarea)
 document.addEventListener('keydown', function(e) {
-  const tag = document.activeElement?.tagName;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 
@@ -168,6 +168,11 @@ function toggleShortcutHelp() {
   overlay.querySelector('.kbd-help-close').onclick = closeOverlay;
   panel.focus();
 }
+// Stamp print date for @media print header
+window.addEventListener('beforeprint', function() {
+  var h = document.querySelector('.header');
+  if (h) h.setAttribute('data-print-date', '出力日時: ' + new Date().toLocaleString('ja-JP'));
+});
 </script>
 {% block scripts %}{% endblock %}
 </body>

@@ -29,7 +29,7 @@ body {
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='%232a2d47' stroke-width='0.5' opacity='0.3'/%3E%3C/svg%3E");
   background-size: 60px 60px;
   z-index: 0;
@@ -541,7 +541,7 @@ select:focus-visible {
 /* Keyboard shortcut help overlay */
 #kbd-help-overlay {
   position: fixed;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   z-index: 999;
   display: flex;
   align-items: center;
@@ -549,7 +549,7 @@ select:focus-visible {
 }
 .kbd-help-backdrop {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background: rgba(0, 0, 0, 0.6);
 }
 .kbd-help-panel {
@@ -621,5 +621,123 @@ select:focus-visible {
   }
   .summary-card-count {
     font-size: 1.1rem;
+  }
+}
+
+/* Print stylesheet */
+@media print {
+  :root {
+    --bg-deep: #fff;
+    --bg-surface: #fff;
+    --bg-elevated: #f5f5f5;
+    --border: #ccc;
+    --border-subtle: #e0e0e0;
+    --text-primary: #111;
+    --text-secondary: #555;
+    --accent-vermillion: #c73e3a;
+    --accent-gold: #8a6d00;
+    --accent-indigo: #3348a8;
+    --accent-green: #1a7a3a;
+    --accent-green-dim: transparent;
+    --accent-vermillion-glow: transparent;
+    --accent-gold-dim: transparent;
+  }
+  body::before { display: none; }
+  body { background: #fff; color: #111; }
+  .shell { max-width: 100%; padding: 0; }
+
+  /* Disable animations */
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Hide interactive elements */
+  .verify-btn, .policy-select, .btn,
+  .logout-link, .nav-links,
+  #kbd-help-overlay, .skip-link,
+  #verify-all-progress, #search-input,
+  #org-filter, #sort-select,
+  #export-csv-btn, #verify-all-btn,
+  .audit-toolbar, .pagination { display: none !important; }
+
+  /* Header for print */
+  .header {
+    border-bottom: 2px solid #111;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .brand { color: #111; }
+  .user-badge { color: #333; }
+  .user-badge strong { color: #111; }
+
+  /* Dashboard summary: static */
+  .dashboard-summary { display: flex !important; }
+  .summary-card {
+    border: 1px solid #ccc;
+    border-radius: 0;
+    background: #fff;
+    cursor: default;
+  }
+  .summary-card.active { box-shadow: none; }
+
+  /* Badges: high-contrast for print */
+  .badge-pass {
+    background: #d4edda !important;
+    color: #155724 !important;
+    border-color: #155724 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .badge-fail {
+    background: #f8d7da !important;
+    color: #721c24 !important;
+    border-color: #721c24 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .badge-review {
+    background: #fff3cd !important;
+    color: #856404 !important;
+    border-color: #856404 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Tables: page breaks */
+  .findings-table tr, .audit-table tr { page-break-inside: avoid; }
+  .findings-table thead, .audit-table thead { display: table-header-group; }
+  .findings-table th, .audit-table th {
+    background: #f0f0f0 !important;
+    color: #111;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Expand collapsed rationale */
+  .rationale-cell.collapsed { max-height: none; overflow: visible; }
+  .rationale-cell.collapsed::after { display: none; }
+
+  /* Status row borders */
+  .findings-table tr.status-violated td:first-child,
+  .findings-table tr.status-indeterminate td:first-child,
+  .findings-table tr.status-satisfied td:first-child {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Print timestamp */
+  .header::after {
+    content: attr(data-print-date);
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: #888;
+    margin-top: 0.25rem;
+  }
+
+  /* Page setup */
+  @page {
+    margin: 2cm 1.5cm;
   }
 }
