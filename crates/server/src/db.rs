@@ -713,4 +713,273 @@ mod tests {
         let db = memory_db();
         assert!(db.ping().is_ok());
     }
+
+    // --- User / Session tests ---
+
+    #[test]
+    fn upsert_user_creates_and_updates() {
+        let db = memory_db();
+        let id1 = db.upsert_user(42, "alice", Some("https://img/a"), None).unwrap();
+        // Same github_id → same internal id, updated login
+        let id2 = db.upsert_user(42, "alice-renamed", Some("https://img/b"), None).unwrap();
+        assert_eq!(id1, id2);
+
+        // Login was updated
+        let sid = db.create_session(id1).unwrap();
+        let (_, login) = db.get_user_by_session(&sid).unwrap().unwrap();
+        assert_eq!(login, "alice-renamed");
+    }
+
+    #[test]
+    fn upsert_user_preserves_token_when_new_is_none() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "bob", None, Some("tok123")).unwrap();
+        assert_eq!(db.get_github_token(uid).unwrap(), Some("tok123".into()));
+
+        // Update without token → old token preserved
+        db.upsert_user(1, "bob", None, None).unwrap();
+        assert_eq!(db.get_github_token(uid).unwrap(), Some("tok123".into()));
+
+        // Update with new token → overwritten
+        db.upsert_user(1, "bob", None, Some("tok456")).unwrap();
+        assert_eq!(db.get_github_token(uid).unwrap(), Some("tok456".into()));
+    }
+
+    #[test]
+    fn get_github_token_returns_none_for_missing_user() {
+        let db = memory_db();
+        assert_eq!(db.get_github_token(999).unwrap(), None);
+    }
+
+    #[test]
+    fn create_and_get_session() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        let sid = db.create_session(uid).unwrap();
+        let (found_uid, login) = db.get_user_by_session(&sid).unwrap().unwrap();
+        assert_eq!(found_uid, uid);
+        assert_eq!(login, "user");
+    }
+
+    #[test]
+    fn get_user_by_session_returns_none_for_unknown() {
+        let db = memory_db();
+        assert!(db.get_user_by_session("no-such-session").unwrap().is_none());
+    }
+
+    #[test]
+    fn delete_session_removes_it() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        let sid = db.create_session(uid).unwrap();
+        db.delete_session(&sid).unwrap();
+        assert!(db.get_user_by_session(&sid).unwrap().is_none());
+    }
+
+    // --- Installation tests ---
+
+    #[test]
+    fn save_and_get_installation() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        db.save_installation(100, uid, "my-org", "Organization").unwrap();
+
+        assert_eq!(db.get_installation_for_owner(uid, "my-org").unwrap(), Some(100));
+        assert_eq!(db.get_installation_for_owner(uid, "other").unwrap(), None);
+
+        let all = db.get_installations_for_user(uid).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0], (100, "my-org".into(), "Organization".into()));
+    }
+
+    #[test]
+    fn save_installation_upserts_on_conflict() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        db.save_installation(100, uid, "org-old", "Organization").unwrap();
+        // Same installation_id, different account
+        db.save_installation(100, uid, "org-new", "Organization").unwrap();
+        assert_eq!(db.get_installation_for_owner(uid, "org-new").unwrap(), Some(100));
+        assert_eq!(db.get_installations_for_user(uid).unwrap().len(), 1);
+    }
+
+    // --- OAuth Client tests ---
+
+    #[test]
+    fn register_and_get_oauth_client() {
+        let db = memory_db();
+        let uris = vec!["https://example.com/cb".to_string()];
+        db.register_oauth_client("cid", Some("secret"), Some("My App"), &uris, "client_secret_post").unwrap();
+
+        let client = db.get_oauth_client("cid").unwrap().unwrap();
+        assert_eq!(client.client_secret, Some("secret".into()));
+        assert_eq!(client.token_endpoint_auth_method, "client_secret_post");
+        assert_eq!(client.redirect_uris(), vec!["https://example.com/cb"]);
+    }
+
+    #[test]
+    fn get_oauth_client_returns_none_for_unknown() {
+        let db = memory_db();
+        assert!(db.get_oauth_client("nope").unwrap().is_none());
+    }
+
+    // --- Authorization Code tests ---
+
+    #[test]
+    fn create_and_consume_authorization_code() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        let uris = vec!["https://cb".to_string()];
+        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+
+        db.create_authorization_code("code1", "cid", uid, "https://cb", "challenge", "mcp").unwrap();
+
+        let ac = db.consume_authorization_code("code1").unwrap().unwrap();
+        assert_eq!(ac.client_id, "cid");
+        assert_eq!(ac.user_id, uid);
+        assert_eq!(ac.redirect_uri, "https://cb");
+        assert_eq!(ac.code_challenge, "challenge");
+        assert_eq!(ac.scope, "mcp");
+    }
+
+    #[test]
+    fn consume_authorization_code_is_single_use() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        let uris = vec!["https://cb".to_string()];
+        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+        db.create_authorization_code("code1", "cid", uid, "https://cb", "ch", "mcp").unwrap();
+
+        assert!(db.consume_authorization_code("code1").unwrap().is_some());
+        // Second consume → None (already used)
+        assert!(db.consume_authorization_code("code1").unwrap().is_none());
+    }
+
+    #[test]
+    fn consume_authorization_code_returns_none_for_unknown() {
+        let db = memory_db();
+        assert!(db.consume_authorization_code("nonexistent").unwrap().is_none());
+    }
+
+    // --- OAuth Token tests ---
+
+    #[test]
+    fn create_and_validate_access_token() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        let uris = vec!["https://cb".to_string()];
+        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+
+        db.create_oauth_token("at", "rt", "cid", uid, "mcp", 3600, 86400).unwrap();
+
+        assert_eq!(db.validate_access_token("at").unwrap(), Some(uid));
+        assert_eq!(db.validate_access_token("unknown").unwrap(), None);
+    }
+
+    #[test]
+    fn refresh_oauth_token_rotates_tokens() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        let uris = vec!["https://cb".to_string()];
+        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+        db.create_oauth_token("at1", "rt1", "cid", uid, "mcp", 3600, 86400).unwrap();
+
+        let refreshed = db.refresh_oauth_token("rt1", "at2", "rt2", 3600, 86400).unwrap().unwrap();
+        assert_eq!(refreshed.scope, "mcp");
+
+        // Old token invalid, new token valid
+        assert_eq!(db.validate_access_token("at1").unwrap(), None);
+        assert_eq!(db.validate_access_token("at2").unwrap(), Some(uid));
+    }
+
+    #[test]
+    fn refresh_oauth_token_returns_none_for_unknown() {
+        let db = memory_db();
+        assert!(db.refresh_oauth_token("nope", "a", "b", 3600, 86400).unwrap().is_none());
+    }
+
+    // --- OAuth State tests ---
+
+    #[test]
+    fn create_and_consume_oauth_state() {
+        let db = memory_db();
+        db.create_oauth_state("state1", "cid", "https://cb", "ch", "mcp").unwrap();
+
+        let s = db.consume_oauth_state("state1").unwrap().unwrap();
+        assert_eq!(s.client_id, "cid");
+        assert_eq!(s.redirect_uri, "https://cb");
+        assert_eq!(s.code_challenge, "ch");
+        assert_eq!(s.scope, "mcp");
+    }
+
+    #[test]
+    fn consume_oauth_state_is_single_use() {
+        let db = memory_db();
+        db.create_oauth_state("s1", "cid", "https://cb", "ch", "mcp").unwrap();
+        assert!(db.consume_oauth_state("s1").unwrap().is_some());
+        assert!(db.consume_oauth_state("s1").unwrap().is_none());
+    }
+
+    // --- Audit Log tests ---
+
+    #[test]
+    fn append_and_get_audit_history() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+
+        db.append_audit_entry(uid, "pr", "owner", "repo", "refs/pull/1", "default", 5, 1, 0, 2, "{}").unwrap();
+        db.append_audit_entry(uid, "release", "owner", "repo", "v1.0", "oss", 3, 0, 0, 0, "{}").unwrap();
+
+        // No filters
+        let all = db.get_audit_history(uid, None, None, None, None, None, 100, 0).unwrap();
+        assert_eq!(all.len(), 2);
+
+        // Filter by type
+        let prs = db.get_audit_history(uid, Some("pr"), None, None, None, None, 100, 0).unwrap();
+        assert_eq!(prs.len(), 1);
+        assert_eq!(prs[0].verification_type, "pr");
+
+        // Filter by owner
+        let by_owner = db.get_audit_history(uid, None, Some("owner"), None, None, None, 100, 0).unwrap();
+        assert_eq!(by_owner.len(), 2);
+        let by_nobody = db.get_audit_history(uid, None, Some("nobody"), None, None, None, 100, 0).unwrap();
+        assert_eq!(by_nobody.len(), 0);
+    }
+
+    #[test]
+    fn get_audit_history_respects_limit_and_offset() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        for i in 0..5 {
+            db.append_audit_entry(uid, "pr", "o", "r", &format!("ref{i}"), "default", 1, 0, 0, 0, "{}").unwrap();
+        }
+
+        let page1 = db.get_audit_history(uid, None, None, None, None, None, 2, 0).unwrap();
+        assert_eq!(page1.len(), 2);
+
+        let page2 = db.get_audit_history(uid, None, None, None, None, None, 2, 2).unwrap();
+        assert_eq!(page2.len(), 2);
+
+        let page3 = db.get_audit_history(uid, None, None, None, None, None, 2, 4).unwrap();
+        assert_eq!(page3.len(), 1);
+    }
+
+    #[test]
+    fn get_latest_verifications_for_user() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+
+        // Two PRs for same repo → only latest returned
+        db.append_audit_entry(uid, "pr", "o", "r", "ref1", "default", 1, 0, 0, 0, "{}").unwrap();
+        db.append_audit_entry(uid, "pr", "o", "r", "ref2", "default", 2, 0, 0, 0, "{}").unwrap();
+        // Different type for same repo → separate entry
+        db.append_audit_entry(uid, "release", "o", "r", "v1", "default", 3, 0, 0, 0, "{}").unwrap();
+
+        let latest = db.get_latest_verifications_for_user(uid).unwrap();
+        assert_eq!(latest.len(), 2);
+        // The PR entry should be the latest one (pass_count=2)
+        let pr_entry = latest.iter().find(|e| e.verification_type == "pr").unwrap();
+        assert_eq!(pr_entry.pass_count, 2);
+        assert_eq!(pr_entry.target_ref, "ref2");
+    }
 }
