@@ -259,28 +259,59 @@ impl GitHubApp {
 
     pub async fn list_installation_repos(&self, installation_id: i64) -> Result<Vec<Repository>> {
         let token = self.create_installation_token(installation_id).await?;
-        let mut repos = Vec::new();
-        let mut page = 1u32;
-        loop {
-            let resp: RepoListResponse = self
-                .http
-                .get("https://api.github.com/installation/repositories")
-                .query(&[("per_page", "100"), ("page", &page.to_string())])
-                .header("Authorization", format!("Bearer {token}"))
-                .header("Accept", "application/vnd.github+json")
-                .send()
-                .await?
-                .error_for_status()
-                .context("Failed to list installation repositories")?
-                .json()
-                .await?;
-            let count = resp.repositories.len();
-            repos.extend(resp.repositories);
-            if count < 100 || repos.len() as i64 >= resp.total_count {
-                break;
-            }
-            page += 1;
+
+        // Fetch first page to get total_count
+        let first_resp: RepoListResponse = self
+            .http
+            .get("https://api.github.com/installation/repositories")
+            .query(&[("per_page", "100"), ("page", "1")])
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await?
+            .error_for_status()
+            .context("Failed to list installation repositories")?
+            .json()
+            .await?;
+
+        let mut repos = first_resp.repositories;
+        let total = first_resp.total_count as usize;
+
+        if repos.len() >= total {
+            return Ok(repos);
         }
+
+        // Calculate remaining pages and fetch in parallel
+        let total_pages = (total + 99) / 100;
+        let mut join_set = tokio::task::JoinSet::new();
+
+        for page in 2..=total_pages {
+            let http = self.http.clone();
+            let tok = token.clone();
+            join_set.spawn(async move {
+                let resp: RepoListResponse = http
+                    .get("https://api.github.com/installation/repositories")
+                    .query(&[("per_page", "100"), ("page", &page.to_string())])
+                    .header("Authorization", format!("Bearer {tok}"))
+                    .header("Accept", "application/vnd.github+json")
+                    .send()
+                    .await?
+                    .error_for_status()
+                    .context("Failed to list installation repositories")?
+                    .json()
+                    .await?;
+                Ok::<_, anyhow::Error>(resp.repositories)
+            });
+        }
+
+        while let Some(result) = join_set.join_next().await {
+            match result {
+                Ok(Ok(batch)) => repos.extend(batch),
+                Ok(Err(e)) => tracing::warn!("Failed to fetch repo page: {e:#}"),
+                Err(e) => tracing::warn!("Repo page task panicked: {e}"),
+            }
+        }
+
         Ok(repos)
     }
 

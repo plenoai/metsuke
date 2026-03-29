@@ -1,25 +1,42 @@
 use anyhow::Result;
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
 use std::sync::Mutex;
 
 pub struct Database {
-    conn: Mutex<Connection>,
+    writer: Mutex<Connection>,
+    reader: Mutex<Connection>,
 }
 
 impl Database {
     pub fn open(path: &str) -> Result<Self> {
-        let conn = Connection::open(path)?;
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+        let uri_flag = OpenFlags::SQLITE_OPEN_URI;
+
+        let writer = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+                | OpenFlags::SQLITE_OPEN_CREATE
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | uri_flag,
+        )?;
+        writer.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+
+        let reader = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX | uri_flag,
+        )?;
+        reader.execute_batch("PRAGMA foreign_keys=ON;")?;
+
         let db = Self {
-            conn: Mutex::new(conn),
+            writer: Mutex::new(writer),
+            reader: Mutex::new(reader),
         };
         db.migrate()?;
         Ok(db)
     }
 
     fn migrate(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
@@ -165,7 +182,7 @@ impl Database {
         avatar_url: Option<&str>,
         github_token: Option<&str>,
     ) -> Result<i64> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         conn.execute(
             "INSERT INTO users (github_id, github_login, avatar_url, github_token)
              VALUES (?1, ?2, ?3, ?4)
@@ -185,7 +202,7 @@ impl Database {
     }
 
     pub fn get_github_token(&self, user_id: i64) -> Result<Option<String>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let result = conn.query_row(
             "SELECT github_token FROM users WHERE id = ?1",
             [user_id],
@@ -200,7 +217,7 @@ impl Database {
 
     pub fn create_session(&self, user_id: i64) -> Result<String> {
         let session_id = uuid::Uuid::new_v4().to_string();
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         conn.execute(
             "INSERT INTO sessions (id, user_id, expires_at)
              VALUES (?1, ?2, datetime('now', '+30 days'))",
@@ -210,7 +227,7 @@ impl Database {
     }
 
     pub fn get_user_by_session(&self, session_id: &str) -> Result<Option<(i64, String)>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let result = conn.query_row(
             "SELECT u.id, u.github_login
              FROM sessions s JOIN users u ON s.user_id = u.id
@@ -232,7 +249,7 @@ impl Database {
         account_login: &str,
         account_type: &str,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         conn.execute(
             "INSERT OR REPLACE INTO installations (installation_id, user_id, account_login, account_type)
              VALUES (?1, ?2, ?3, ?4)",
@@ -246,7 +263,7 @@ impl Database {
         user_id: i64,
         installations: &[(i64, String, String)],
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         let mut stmt = conn.prepare(
             "INSERT OR REPLACE INTO installations (installation_id, user_id, account_login, account_type)
              VALUES (?1, ?2, ?3, ?4)",
@@ -258,7 +275,7 @@ impl Database {
     }
 
     pub fn get_installation_for_owner(&self, user_id: i64, owner: &str) -> Result<Option<i64>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let result = conn.query_row(
             "SELECT installation_id FROM installations
              WHERE user_id = ?1 AND account_login = ?2",
@@ -273,7 +290,7 @@ impl Database {
     }
 
     pub fn get_installations_for_user(&self, user_id: i64) -> Result<Vec<(i64, String, String)>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT installation_id, account_login, account_type
              FROM installations WHERE user_id = ?1",
@@ -283,7 +300,7 @@ impl Database {
     }
 
     pub fn delete_session(&self, session_id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         conn.execute("DELETE FROM sessions WHERE id = ?1", [session_id])?;
         Ok(())
     }
@@ -298,7 +315,7 @@ impl Database {
         redirect_uris: &[String],
         token_endpoint_auth_method: &str,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         let uris_json = serde_json::to_string(redirect_uris)?;
         conn.execute(
             "INSERT INTO oauth_clients (client_id, client_secret, client_name, redirect_uris, grant_types, token_endpoint_auth_method)
@@ -309,7 +326,7 @@ impl Database {
     }
 
     pub fn get_oauth_client(&self, client_id: &str) -> Result<Option<OAuthClient>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let result = conn.query_row(
             "SELECT client_id, client_secret, client_name, redirect_uris, token_endpoint_auth_method FROM oauth_clients WHERE client_id = ?1",
             [client_id],
@@ -339,7 +356,7 @@ impl Database {
         code_challenge: &str,
         scope: &str,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         conn.execute(
             "INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, code_challenge, scope, expires_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now', '+10 minutes'))",
@@ -349,7 +366,7 @@ impl Database {
     }
 
     pub fn consume_authorization_code(&self, code: &str) -> Result<Option<AuthorizationCode>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         let result = conn.query_row(
             "SELECT client_id, user_id, redirect_uri, code_challenge, scope
              FROM authorization_codes
@@ -391,7 +408,7 @@ impl Database {
         access_token_ttl_secs: i64,
         refresh_token_ttl_secs: i64,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         conn.execute(
             "INSERT INTO oauth_tokens (access_token, refresh_token, client_id, user_id, scope, expires_at, refresh_expires_at)
              VALUES (?1, ?2, ?3, ?4, ?5, datetime('now', ?6), datetime('now', ?7))",
@@ -409,7 +426,7 @@ impl Database {
     }
 
     pub fn validate_access_token(&self, access_token: &str) -> Result<Option<i64>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let result = conn.query_row(
             "SELECT user_id FROM oauth_tokens WHERE access_token = ?1 AND expires_at > datetime('now')",
             [access_token],
@@ -430,7 +447,7 @@ impl Database {
         access_token_ttl_secs: i64,
         refresh_token_ttl_secs: i64,
     ) -> Result<Option<RefreshedToken>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         let existing = conn.query_row(
             "SELECT client_id, user_id, scope FROM oauth_tokens
              WHERE refresh_token = ?1 AND refresh_expires_at > datetime('now')",
@@ -480,7 +497,7 @@ impl Database {
         code_challenge: &str,
         scope: &str,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS oauth_states (
                 state TEXT PRIMARY KEY,
@@ -501,7 +518,7 @@ impl Database {
     }
 
     pub fn consume_oauth_state(&self, state: &str) -> Result<Option<OAuthState>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         // Table might not exist yet if no authorize calls have been made
         let result = conn.query_row(
             "SELECT state, client_id, redirect_uri, code_challenge, scope
@@ -543,7 +560,7 @@ impl Database {
         na_count: i64,
         result_json: &str,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         conn.execute(
             "INSERT INTO audit_log (user_id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, result_json)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
@@ -564,7 +581,7 @@ impl Database {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<AuditEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let mut sql = String::from(
             "SELECT id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, verified_at
              FROM audit_log WHERE user_id = ?1",
@@ -627,14 +644,14 @@ impl Database {
 
     /// Check database connectivity.
     pub fn ping(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         conn.execute_batch("SELECT 1")?;
         Ok(())
     }
 
     /// Delete expired sessions, authorization codes, tokens, and OAuth states.
     pub fn cleanup_expired(&self) -> Result<u64> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.writer.lock().unwrap();
         let mut total = 0u64;
         total += conn.execute(
             "DELETE FROM sessions WHERE expires_at <= datetime('now')",
@@ -661,7 +678,7 @@ impl Database {
     // --- Repository Cache ---
 
     pub fn upsert_repositories(&self, user_id: i64, repos: &[RepoRow]) -> Result<()> {
-        let mut conn = self.conn.lock().unwrap();
+        let mut conn = self.writer.lock().unwrap();
         let tx = conn.transaction()?;
         {
             let mut stmt = tx.prepare(
@@ -696,7 +713,7 @@ impl Database {
     }
 
     pub fn get_repositories_for_user(&self, user_id: i64) -> Result<Vec<RepoRow>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT r.owner, r.name, r.full_name, r.private, r.description, r.language,
                     r.default_branch, r.pushed_at, r.synced_at,
@@ -731,7 +748,7 @@ impl Database {
     }
 
     pub fn get_repos_synced_at(&self, user_id: i64) -> Result<Option<String>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let result = conn.query_row(
             "SELECT MIN(synced_at) FROM repositories WHERE user_id = ?1",
             [user_id],
@@ -745,7 +762,7 @@ impl Database {
     }
 
     pub fn is_repos_stale(&self, user_id: i64) -> Result<bool> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let stale: bool = conn.query_row(
             "SELECT CASE WHEN COUNT(*) = 0 THEN 1
                     ELSE MIN(synced_at) < datetime('now', '-5 minutes')
@@ -758,7 +775,7 @@ impl Database {
     }
 
     pub fn is_pulls_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let stale: bool = conn.query_row(
             "SELECT CASE WHEN COUNT(*) = 0 THEN 1
                     ELSE MIN(synced_at) < datetime('now', '-5 minutes')
@@ -771,7 +788,7 @@ impl Database {
     }
 
     pub fn is_releases_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let stale: bool = conn.query_row(
             "SELECT CASE WHEN COUNT(*) = 0 THEN 1
                     ELSE MIN(synced_at) < datetime('now', '-5 minutes')
@@ -792,7 +809,7 @@ impl Database {
         repo: &str,
         pulls: &[CachedPullRow],
     ) -> Result<()> {
-        let mut conn = self.conn.lock().unwrap();
+        let mut conn = self.writer.lock().unwrap();
         let tx = conn.transaction()?;
         {
             tx.execute(
@@ -829,7 +846,7 @@ impl Database {
         owner: &str,
         repo: &str,
     ) -> Result<Vec<CachedPullRow>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT pr_number, title, state, author, created_at, updated_at, merged_at, draft
              FROM cached_pulls
@@ -860,7 +877,7 @@ impl Database {
         repo: &str,
         releases: &[CachedReleaseRow],
     ) -> Result<()> {
-        let mut conn = self.conn.lock().unwrap();
+        let mut conn = self.writer.lock().unwrap();
         let tx = conn.transaction()?;
         {
             tx.execute(
@@ -899,7 +916,7 @@ impl Database {
         owner: &str,
         repo: &str,
     ) -> Result<Vec<CachedReleaseRow>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body
              FROM cached_releases
@@ -925,7 +942,7 @@ impl Database {
 
     /// Latest verification per (owner, repo, type) for cache display on repos list
     pub fn get_latest_verifications_for_user(&self, user_id: i64) -> Result<Vec<AuditEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.reader.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT a.id, a.verification_type, a.owner, a.repo, a.target_ref, a.policy,
                     a.pass_count, a.fail_count, a.review_count, a.na_count, a.verified_at
@@ -1050,7 +1067,11 @@ mod tests {
     use super::*;
 
     fn memory_db() -> Database {
-        Database::open(":memory:").unwrap()
+        let path = std::env::temp_dir()
+            .join(format!("metsuke-test-{}.db", uuid::Uuid::new_v4()))
+            .to_string_lossy()
+            .into_owned();
+        Database::open(&path).unwrap()
     }
 
     #[test]
@@ -1064,7 +1085,7 @@ mod tests {
         // Insert an already-expired session
         let expired_sid = {
             let sid = uuid::Uuid::new_v4().to_string();
-            let conn = db.conn.lock().unwrap();
+            let conn = db.writer.lock().unwrap();
             conn.execute(
                 "INSERT INTO sessions (id, user_id, expires_at)
                  VALUES (?1, ?2, datetime('now', '-1 second'))",
@@ -1465,7 +1486,7 @@ mod tests {
 
         // Insert an already-expired authorization code
         {
-            let conn = db.conn.lock().unwrap();
+            let conn = db.writer.lock().unwrap();
             conn.execute(
                 "INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, code_challenge, scope, expires_at)
                  VALUES ('expired-code', 'cid', ?1, 'https://cb', 'ch', 'mcp', datetime('now', '-1 second'))",
@@ -1504,7 +1525,7 @@ mod tests {
 
         // Insert a token where both access and refresh are expired
         {
-            let conn = db.conn.lock().unwrap();
+            let conn = db.writer.lock().unwrap();
             conn.execute(
                 "INSERT INTO oauth_tokens (access_token, refresh_token, client_id, user_id, scope, expires_at, refresh_expires_at)
                  VALUES ('at-expired', 'rt-expired', 'cid', ?1, 'mcp', datetime('now', '-1 hour'), datetime('now', '-1 second'))",
@@ -1514,7 +1535,7 @@ mod tests {
 
         // Insert a token where access expired but refresh is still valid (should NOT be deleted)
         {
-            let conn = db.conn.lock().unwrap();
+            let conn = db.writer.lock().unwrap();
             conn.execute(
                 "INSERT INTO oauth_tokens (access_token, refresh_token, client_id, user_id, scope, expires_at, refresh_expires_at)
                  VALUES ('at-refreshable', 'rt-valid', 'cid', ?1, 'mcp', datetime('now', '-1 second'), datetime('now', '+1 hour'))",
@@ -1545,7 +1566,7 @@ mod tests {
 
         // Insert an expired state
         {
-            let conn = db.conn.lock().unwrap();
+            let conn = db.writer.lock().unwrap();
             conn.execute(
                 "INSERT INTO oauth_states (state, client_id, redirect_uri, code_challenge, scope, expires_at)
                  VALUES ('expired-state', 'cid', 'https://cb', 'ch', 'mcp', datetime('now', '-1 second'))",

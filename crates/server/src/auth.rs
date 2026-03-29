@@ -122,7 +122,11 @@ mod tests {
     use tower::{ServiceBuilder, ServiceExt};
 
     fn test_db() -> Arc<Database> {
-        Arc::new(Database::open(":memory:").unwrap())
+        let path = std::env::temp_dir()
+            .join(format!("metsuke-test-{}.db", uuid::Uuid::new_v4()))
+            .to_string_lossy()
+            .into_owned();
+        Arc::new(Database::open(&path).unwrap())
     }
 
     #[test]
