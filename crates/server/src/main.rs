@@ -24,6 +24,7 @@ use rmcp::transport::StreamableHttpService;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use server::MetsukeServer;
 use tower::ServiceBuilder;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -92,7 +93,25 @@ async fn main() -> anyhow::Result<()> {
         .merge(oauth::router(db.clone(), github_app.clone(), &config))
         .merge(webhook::router(db.clone(), github_app.clone(), &config))
         .merge(web::router(db, github_app, &config))
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::X_FRAME_OPTIONS,
+            axum::http::HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::X_CONTENT_TYPE_OPTIONS,
+            axum::http::HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::REFERRER_POLICY,
+            axum::http::HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::CONTENT_SECURITY_POLICY,
+            axum::http::HeaderValue::from_static(
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'"
+            ),
+        ));
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("metsuke listening on {addr}");

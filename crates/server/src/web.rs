@@ -292,6 +292,10 @@ async fn index(headers: HeaderMap, State(state): State<WebState>) -> Response {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Metsuke — SDLC準拠検証ツール。GitHub連携でリポジトリのセキュリティ・コンプライアンスを自動検証。">
+<meta property="og:title" content="Metsuke — SDLC Process Inspector">
+<meta property="og:description" content="GitHubリポジトリのSDLC準拠を自動検証。SLSA、SOC2、セキュリティコントロールに対応。">
+<meta property="og:type" content="website">
 <title>Metsuke — SDLC Process Inspector</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
