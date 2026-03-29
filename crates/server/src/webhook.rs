@@ -98,18 +98,25 @@ async fn handle_webhook(
         }
     };
 
+    let delivery_id = headers
+        .get("x-github-delivery")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("unknown");
+
     match event {
         "pull_request" => {
+            tracing::info!(delivery_id, event, "webhook: dispatching event");
             tokio::spawn(handle_pull_request(state, payload));
         }
         "release" => {
+            tracing::info!(delivery_id, event, "webhook: dispatching event");
             tokio::spawn(handle_release(state, payload));
         }
         "ping" => {
-            tracing::info!("webhook: ping received");
+            tracing::info!(delivery_id, "webhook: ping received");
         }
         _ => {
-            tracing::debug!("webhook: ignoring event {event}");
+            tracing::debug!(delivery_id, event, "webhook: ignoring event");
         }
     }
 
@@ -119,6 +126,7 @@ async fn handle_webhook(
 async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
     let action = payload["action"].as_str().unwrap_or("");
     if !matches!(action, "opened" | "synchronize" | "reopened") {
+        tracing::debug!(action, "webhook: skipping pull_request action");
         return;
     }
 
@@ -147,8 +155,8 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
     };
 
     tracing::info!(
-        "webhook: verifying PR #{pr_number} on {owner}/{repo} (sha: {})",
-        &head_sha[..7.min(head_sha.len())]
+        %owner, %repo, pr_number, sha = &head_sha[..7.min(head_sha.len())],
+        "webhook: processing PR"
     );
 
     let token = match state
@@ -200,7 +208,7 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
     let result_json = serde_json::to_string_pretty(&result).unwrap_or_default();
     let (conclusion, title, summary) = format_check_result(&result_json, "PR");
 
-    if let Err(e) = state
+    match state
         .github_app
         .create_check_run(
             installation_id,
@@ -214,13 +222,19 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
         )
         .await
     {
-        tracing::error!("webhook: failed to create check run: {e:#}");
+        Ok(_) => {
+            tracing::info!(%owner, %repo, pr_number, %conclusion, "webhook: check run created")
+        }
+        Err(e) => {
+            tracing::error!(%owner, %repo, pr_number, "webhook: failed to create check run: {e:#}")
+        }
     }
 }
 
 async fn handle_release(state: WebhookState, payload: serde_json::Value) {
     let action = payload["action"].as_str().unwrap_or("");
     if action != "published" {
+        tracing::debug!(action, "webhook: skipping release action");
         return;
     }
 
@@ -244,7 +258,7 @@ async fn handle_release(state: WebhookState, payload: serde_json::Value) {
         }
     };
 
-    tracing::info!("webhook: verifying repo {owner}/{repo} at tag {tag_name}");
+    tracing::info!(%owner, %repo, %tag_name, "webhook: processing release");
 
     let token = match state
         .github_app
@@ -290,7 +304,7 @@ async fn handle_release(state: WebhookState, payload: serde_json::Value) {
     let result_json = serde_json::to_string_pretty(&result).unwrap_or_default();
     let (_conclusion, _title, summary) = format_check_result(&result_json, "Release");
 
-    tracing::info!("webhook: release verification for {owner}/{repo}@{tag_name}: {summary}");
+    tracing::info!(%owner, %repo, %tag_name, %summary, "webhook: release verification complete");
 }
 
 /// Parse verification result JSON and produce check run conclusion + summary.

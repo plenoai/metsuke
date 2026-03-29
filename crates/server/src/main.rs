@@ -24,6 +24,7 @@ use rmcp::transport::StreamableHttpService;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use server::MetsukeServer;
 use tower::ServiceBuilder;
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -90,7 +91,8 @@ async fn main() -> anyhow::Result<()> {
         .with_state(db.clone())
         .merge(oauth::router(db.clone(), github_app.clone(), &config))
         .merge(webhook::router(db.clone(), github_app.clone(), &config))
-        .merge(web::router(db, github_app, &config));
+        .merge(web::router(db, github_app, &config))
+        .layer(TraceLayer::new_for_http());
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("metsuke listening on {addr}");
