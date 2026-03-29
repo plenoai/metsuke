@@ -521,15 +521,13 @@ select:focus-visible {
 .findings-table tr.status-satisfied td:first-child { border-left: 3px double var(--accent-green); }
 
 /* Expandable rationale */
-.rationale-cell.collapsed,
-.findings-table .rationale.collapsed {
+.rationale-cell.collapsed {
   max-height: 3em;
   overflow: hidden;
   cursor: pointer;
   position: relative;
 }
-.rationale-cell.collapsed::after,
-.findings-table .rationale.collapsed::after {
+.rationale-cell.collapsed::after {
   content: '…';
   position: absolute;
   bottom: 0;
@@ -612,7 +610,6 @@ select:focus-visible {
   .pagination button { min-height: 48px; min-width: 48px; padding: 0.5rem 1rem; }
 
   /* Findings table rationale on mobile */
-  .findings-table .rationale,
   .rationale-cell {
     max-width: 55vw;
     word-break: break-word;
