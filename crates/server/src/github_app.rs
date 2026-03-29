@@ -8,6 +8,7 @@ pub struct GitHubApp {
     private_key: EncodingKey,
     client_id: String,
     client_secret: String,
+    http: reqwest::Client,
 }
 
 #[derive(Serialize)]
@@ -123,11 +124,17 @@ impl GitHubApp {
     ) -> Result<Self> {
         let private_key = EncodingKey::from_rsa_pem(private_key_pem.as_bytes())
             .context("Failed to parse GitHub App private key")?;
+        let http = reqwest::Client::builder()
+            .user_agent("metsuke")
+            .pool_max_idle_per_host(20)
+            .build()
+            .context("Failed to build HTTP client")?;
         Ok(Self {
             app_id,
             private_key,
             client_id,
             client_secret,
+            http,
         })
     }
 
@@ -150,14 +157,13 @@ impl GitHubApp {
 
     pub async fn create_installation_token(&self, installation_id: i64) -> Result<String> {
         let jwt = self.generate_jwt()?;
-        let client = reqwest::Client::new();
-        let resp: InstallationTokenResponse = client
+        let resp: InstallationTokenResponse = self
+            .http
             .post(format!(
                 "https://api.github.com/app/installations/{installation_id}/access_tokens"
             ))
             .header("Authorization", format!("Bearer {jwt}"))
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "metsuke")
             .send()
             .await?
             .error_for_status()
@@ -169,14 +175,12 @@ impl GitHubApp {
 
     pub async fn get_installation(&self, installation_id: i64) -> Result<Installation> {
         let jwt = self.generate_jwt()?;
-        let client = reqwest::Client::new();
-        client
+        self.http
             .get(format!(
                 "https://api.github.com/app/installations/{installation_id}"
             ))
             .header("Authorization", format!("Bearer {jwt}"))
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "metsuke")
             .send()
             .await?
             .error_for_status()?
@@ -186,8 +190,7 @@ impl GitHubApp {
     }
 
     pub async fn exchange_code(&self, code: &str) -> Result<OAuthTokenResponse> {
-        let client = reqwest::Client::new();
-        client
+        self.http
             .post("https://github.com/login/oauth/access_token")
             .header("Accept", "application/json")
             .form(&[
@@ -205,16 +208,15 @@ impl GitHubApp {
 
     pub async fn list_installation_repos(&self, installation_id: i64) -> Result<Vec<Repository>> {
         let token = self.create_installation_token(installation_id).await?;
-        let client = reqwest::Client::new();
         let mut repos = Vec::new();
         let mut page = 1u32;
         loop {
-            let resp: RepoListResponse = client
+            let resp: RepoListResponse = self
+                .http
                 .get("https://api.github.com/installation/repositories")
                 .query(&[("per_page", "100"), ("page", &page.to_string())])
                 .header("Authorization", format!("Bearer {token}"))
                 .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "metsuke")
                 .send()
                 .await?
                 .error_for_status()
@@ -232,17 +234,16 @@ impl GitHubApp {
     }
 
     /// List all GitHub App installations accessible to the authenticated user.
-    pub async fn list_user_installations(user_token: &str) -> Result<Vec<UserInstallation>> {
-        let client = reqwest::Client::new();
+    pub async fn list_user_installations(&self, user_token: &str) -> Result<Vec<UserInstallation>> {
         let mut installations = Vec::new();
         let mut page = 1u32;
         loop {
-            let resp: UserInstallationsResponse = client
+            let resp: UserInstallationsResponse = self
+                .http
                 .get("https://api.github.com/user/installations")
                 .query(&[("per_page", "100"), ("page", &page.to_string())])
                 .header("Authorization", format!("Bearer {user_token}"))
                 .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "metsuke")
                 .send()
                 .await?
                 .error_for_status()
@@ -266,13 +267,11 @@ impl GitHubApp {
         repo: &str,
     ) -> Result<Vec<PullRequest>> {
         let token = self.create_installation_token(installation_id).await?;
-        let client = reqwest::Client::new();
-        client
+        self.http
             .get(format!("https://api.github.com/repos/{owner}/{repo}/pulls"))
             .query(&[("state", "all"), ("per_page", "30"), ("sort", "updated")])
             .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "metsuke")
             .send()
             .await?
             .error_for_status()
@@ -289,15 +288,13 @@ impl GitHubApp {
         repo: &str,
     ) -> Result<Vec<Release>> {
         let token = self.create_installation_token(installation_id).await?;
-        let client = reqwest::Client::new();
-        client
+        self.http
             .get(format!(
                 "https://api.github.com/repos/{owner}/{repo}/releases"
             ))
             .query(&[("per_page", "30")])
             .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "metsuke")
             .send()
             .await?
             .error_for_status()
@@ -321,7 +318,6 @@ impl GitHubApp {
         summary: &str,
     ) -> Result<()> {
         let token = self.create_installation_token(installation_id).await?;
-        let client = reqwest::Client::new();
         let body = serde_json::json!({
             "name": name,
             "head_sha": head_sha,
@@ -332,13 +328,12 @@ impl GitHubApp {
                 "summary": summary,
             }
         });
-        client
+        self.http
             .post(format!(
                 "https://api.github.com/repos/{owner}/{repo}/check-runs"
             ))
             .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "metsuke")
             .json(&body)
             .send()
             .await?
@@ -347,12 +342,10 @@ impl GitHubApp {
         Ok(())
     }
 
-    pub async fn get_user(access_token: &str) -> Result<GitHubUser> {
-        let client = reqwest::Client::new();
-        client
+    pub async fn get_user(&self, access_token: &str) -> Result<GitHubUser> {
+        self.http
             .get("https://api.github.com/user")
             .header("Authorization", format!("Bearer {access_token}"))
-            .header("User-Agent", "metsuke")
             .send()
             .await?
             .error_for_status()?

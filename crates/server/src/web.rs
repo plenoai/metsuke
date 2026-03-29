@@ -552,7 +552,7 @@ async fn auth_callback(
         }
     };
 
-    let user = match GitHubApp::get_user(&token_resp.access_token).await {
+    let user = match state.github_app.get_user(&token_resp.access_token).await {
         Ok(u) => u,
         Err(e) => {
             tracing::error!("Failed to get user: {e:#}");
@@ -769,7 +769,7 @@ async fn sync_installations(state: &WebState, user_id: i64) {
         Ok(Some(t)) => t,
         _ => return,
     };
-    let user_installations = match GitHubApp::list_user_installations(&token).await {
+    let user_installations = match state.github_app.list_user_installations(&token).await {
         Ok(v) => v,
         Err(e) => {
             tracing::warn!("Failed to list user installations: {e:#}");

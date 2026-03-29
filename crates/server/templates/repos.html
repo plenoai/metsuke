@@ -107,6 +107,19 @@
 {% block scripts %}
 <script>
 const POLICY_OPTIONS = `{% for p in policy_options %}<option value="{{ p }}">{{ p }}</option>{% endfor %}`;
+const PAGE_SIZE = 50;
+
+let allRepos = [];
+let allCache = {};
+let filteredRepos = [];
+let currentPage = 1;
+let activeFilter = null;
+let activeOrg = '';
+let currentSort = 'activity';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function renderBadges(pass, fail, review) {
   let b = '';
@@ -116,22 +129,124 @@ function renderBadges(pass, fail, review) {
   return b;
 }
 
-
-function filterRepos() {
-  applyFilters();
+function repoStatus(r) {
+  const c = allCache[r.full_name];
+  if (!c) return 'unverified';
+  if (c.fail > 0) return 'fail';
+  if (c.review > 0) return 'review';
+  return 'pass';
 }
 
-function renderRepoList(repos, cacheArr) {
-  const cacheMap = {};
-  for (const c of (cacheArr || [])) {
-    cacheMap[`${c.owner}/${c.repo}`] = c;
+// ---------------------------------------------------------------------------
+// Data-driven filter / sort / paginate
+// ---------------------------------------------------------------------------
+
+function computeFiltered() {
+  const q = (document.getElementById('search-input')?.value || '').toLowerCase();
+  let list = allRepos;
+
+  if (activeOrg) {
+    list = list.filter(r => r.owner.toLowerCase() === activeOrg.toLowerCase());
+  }
+  if (activeFilter) {
+    list = list.filter(r => repoStatus(r) === activeFilter);
+  }
+  if (q) {
+    list = list.filter(r =>
+      r.full_name.toLowerCase().includes(q) ||
+      (r.description || '').toLowerCase().includes(q) ||
+      (r.language || '').toLowerCase().includes(q)
+    );
   }
 
-  const container = document.getElementById('repo-list');
-  document.getElementById('repos-title').textContent = `リポジトリ (${repos.length})`;
-  document.title = `Repos (${repos.length}) — Metsuke`;
+  const mode = currentSort;
+  list = [...list].sort((a, b) => {
+    const cA = allCache[a.full_name] || {};
+    const cB = allCache[b.full_name] || {};
+    if (mode === 'activity') return (b.pushed_at || '').localeCompare(a.pushed_at || '');
+    if (mode === 'fail-desc') return (cB.fail || 0) - (cA.fail || 0);
+    if (mode === 'fail-asc') return (cA.fail || 0) - (cB.fail || 0);
+    if (mode === 'unverified') return (cA.verified_at ? 1 : 0) - (cB.verified_at ? 1 : 0);
+    return a.full_name.toLowerCase().localeCompare(b.full_name.toLowerCase());
+  });
 
-  if (repos.length === 0) {
+  filteredRepos = list;
+}
+
+function totalPages() {
+  return Math.max(1, Math.ceil(filteredRepos.length / PAGE_SIZE));
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+
+function renderCard(r) {
+  const cached = allCache[r.full_name];
+  const cachedBadges = cached ? renderBadges(cached.pass, cached.fail, cached.review) : '<span class="badge badge-na">未検証</span>';
+  const cachedTime = cached ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${cached.verified_at}</span>` : '';
+  const desc = r.description ? `<div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">${esc(r.description)}</div>` : '';
+
+  return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}">
+    <div class="repo-info">
+      <div class="repo-name">
+        <a href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}">${esc(r.full_name)}</a>
+        <a class="gh-link" href="https://github.com/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}" target="_blank" rel="noopener" title="GitHub で開く" aria-label="${esc(r.full_name)} を GitHub で開く">
+          <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
+        </a>
+      </div>
+      ${desc}
+      <div class="repo-meta">
+        ${r.private ? '<span class="badge badge-private">private</span>' : ''}
+        ${r.language ? `<span>${esc(r.language)}</span>` : ''}
+        ${r.default_branch ? `<span>${esc(r.default_branch)}</span>` : ''}
+        ${cachedTime}
+      </div>
+    </div>
+    <div class="repo-actions">
+      <div class="result-summary" id="result-${r.full_name.replace('/', '-')}">${cachedBadges}</div>
+      <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/pulls" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="PR検証">PR</a>
+      <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/releases" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="リリース検証">Rel</a>
+      <select class="policy-select" id="policy-${r.full_name.replace('/', '-')}" aria-label="${esc(r.full_name)} のポリシー選択">${POLICY_OPTIONS}</select>
+      <button class="verify-btn" onclick="verifyRepo('${esc(r.owner)}', '${esc(r.name)}', this)">${cached ? '再検証' : '検証'}</button>
+    </div>
+  </div>`;
+}
+
+function renderPagination() {
+  const tp = totalPages();
+  if (tp <= 1) return '';
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(tp, currentPage + 2);
+  let html = '<div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:0.25rem;margin-top:1rem;font-family:var(--font-mono);font-size:0.75rem">';
+  if (currentPage > 1) html += `<button class="verify-btn" onclick="goToPage(${currentPage - 1})" style="padding:0.25rem 0.5rem">‹</button>`;
+  for (let i = start; i <= end; i++) {
+    if (i === currentPage) {
+      html += `<span style="padding:0.25rem 0.5rem;background:var(--accent-gold);color:var(--bg-deep);border-radius:4px;font-weight:700">${i}</span>`;
+    } else {
+      html += `<button class="verify-btn" onclick="goToPage(${i})" style="padding:0.25rem 0.5rem">${i}</button>`;
+    }
+  }
+  if (currentPage < tp) html += `<button class="verify-btn" onclick="goToPage(${currentPage + 1})" style="padding:0.25rem 0.5rem">›</button>`;
+  html += `<span style="margin-left:0.5rem;color:var(--text-secondary)">${PAGE_SIZE * (currentPage - 1) + 1}–${Math.min(PAGE_SIZE * currentPage, filteredRepos.length)} / ${filteredRepos.length}</span>`;
+  html += '</div>';
+  return html;
+}
+
+function renderPage() {
+  computeFiltered();
+  if (currentPage > totalPages()) currentPage = totalPages();
+
+  const container = document.getElementById('repo-list');
+
+  // Title
+  const total = allRepos.length;
+  const matched = filteredRepos.length;
+  const titleText = matched < total ? `リポジトリ (${matched} / ${total})` : `リポジトリ (${total})`;
+  document.getElementById('repos-title').textContent = titleText;
+  document.title = `Repos (${matched}) — Metsuke`;
+
+  if (total === 0) {
     container.innerHTML = `<div class="empty-state">
       <div style="margin-bottom:0.75rem">リポジトリが見つかりません</div>
       <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary);margin-bottom:1rem">
@@ -143,107 +258,121 @@ function renderRepoList(repos, cacheArr) {
     return;
   }
 
+  // Preserve search input value across re-renders
+  const prevQ = document.getElementById('search-input')?.value || '';
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageRepos = filteredRepos.slice(start, start + PAGE_SIZE);
+
   const searchBar = `<div style="margin-bottom:0.75rem">
-    <input type="search" id="search-input" class="policy-select" style="width:100%;padding:0.5rem 0.75rem;font-size:0.8rem" placeholder="リポジトリを検索…" oninput="filterRepos()" aria-label="リポジトリを検索">
+    <input type="search" id="search-input" class="policy-select" style="width:100%;padding:0.5rem 0.75rem;font-size:0.8rem" placeholder="リポジトリを検索…" oninput="onSearchInput()" aria-label="リポジトリを検索" value="${esc(prevQ)}">
   </div>`;
 
-  const cards = repos.map(r => {
-    const cached = cacheMap[r.full_name];
-    const cachedBadges = cached ? renderBadges(cached.pass, cached.fail, cached.review) : '<span class="badge badge-na">未検証</span>';
-    const cachedTime = cached ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${cached.verified_at}</span>` : '';
-    const desc = r.description ? `<div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">${esc(r.description)}</div>` : '';
+  container.innerHTML = searchBar
+    + renderPagination()
+    + '<div class="repo-grid">' + pageRepos.map(renderCard).join('') + '</div>'
+    + renderPagination();
 
-    return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}" data-name="${esc(r.full_name.toLowerCase())}" data-desc="${esc((r.description || '').toLowerCase())}" data-lang="${esc((r.language || '').toLowerCase())}" data-pushed="${esc(r.pushed_at || '')}" data-status="${cached ? (cached.fail > 0 ? 'fail' : (cached.review > 0 ? 'review' : 'pass')) : 'unverified'}">
-      <div class="repo-info">
-        <div class="repo-name">
-          <a href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}">${esc(r.full_name)}</a>
-          <a class="gh-link" href="https://github.com/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}" target="_blank" rel="noopener" title="GitHub で開く" aria-label="${esc(r.full_name)} を GitHub で開く">
-            <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
-          </a>
-        </div>
-        ${desc}
-        <div class="repo-meta">
-          ${r.private ? '<span class="badge badge-private">private</span>' : ''}
-          ${r.language ? `<span>${esc(r.language)}</span>` : ''}
-          ${r.default_branch ? `<span>${esc(r.default_branch)}</span>` : ''}
-          ${cachedTime}
-        </div>
-      </div>
-      <div class="repo-actions">
-        <div class="result-summary" id="result-${r.full_name.replace('/', '-')}">${cachedBadges}</div>
-        <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/pulls" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="PR検証">PR</a>
-        <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/releases" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="リリース検証">Rel</a>
-        <select class="policy-select" id="policy-${r.full_name.replace('/', '-')}" aria-label="${esc(r.full_name)} のポリシー選択">${POLICY_OPTIONS}</select>
-        <button class="verify-btn" onclick="verifyRepo('${esc(r.owner)}', '${esc(r.name)}', this)">${cached ? '再検証' : '検証'}</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  container.innerHTML = searchBar + '<div class="repo-grid">' + cards + '</div>';
-  allRepos = repos;
-  allCache = cacheMap;
-  if (repos.length > 0) {
+  // Toolbar
+  if (total > 0) {
     document.getElementById('verify-all-btn').style.display = '';
     document.getElementById('export-csv-btn').style.display = '';
   }
-  // Dashboard summary
+
+  // Dashboard summary (over filteredRepos, not just page)
   let failRepos = 0, reviewRepos = 0, passRepos = 0, unverifiedRepos = 0;
-  repos.forEach(r => {
-    const c = cacheMap[r.full_name];
-    if (!c) { unverifiedRepos++; return; }
-    if (c.fail > 0) failRepos++;
-    else if (c.review > 0) reviewRepos++;
-    else passRepos++;
+  filteredRepos.forEach(r => {
+    const s = repoStatus(r);
+    if (s === 'fail') failRepos++;
+    else if (s === 'review') reviewRepos++;
+    else if (s === 'pass') passRepos++;
+    else unverifiedRepos++;
   });
   const summaryEl = document.getElementById('dashboard-summary');
   summaryEl.style.display = '';
   summaryEl.innerHTML = `
-    <div class="summary-card summary-card-fail" role="button" tabindex="0" aria-pressed="false" onclick="filterByStatus('fail')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('fail')}" title="FAILのあるリポジトリのみ表示">
+    <div class="summary-card summary-card-fail${activeFilter === 'fail' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'fail'}" onclick="filterByStatus('fail')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('fail')}" title="FAILのあるリポジトリのみ表示">
       <div class="summary-card-count">${failRepos}</div>
       <div class="summary-card-label">FAIL</div>
     </div>
-    <div class="summary-card summary-card-review" role="button" tabindex="0" aria-pressed="false" onclick="filterByStatus('review')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('review')}" title="REVIEWのあるリポジトリのみ表示">
+    <div class="summary-card summary-card-review${activeFilter === 'review' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'review'}" onclick="filterByStatus('review')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('review')}" title="REVIEWのあるリポジトリのみ表示">
       <div class="summary-card-count">${reviewRepos}</div>
       <div class="summary-card-label">REVIEW</div>
     </div>
-    <div class="summary-card summary-card-pass" role="button" tabindex="0" aria-pressed="false" onclick="filterByStatus('pass')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('pass')}" title="PASSのリポジトリのみ表示">
+    <div class="summary-card summary-card-pass${activeFilter === 'pass' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'pass'}" onclick="filterByStatus('pass')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('pass')}" title="PASSのリポジトリのみ表示">
       <div class="summary-card-count">${passRepos}</div>
       <div class="summary-card-label">PASS</div>
     </div>
-    <div class="summary-card summary-card-unverified" role="button" tabindex="0" aria-pressed="false" onclick="filterByStatus('unverified')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('unverified')}" title="未検証のリポジトリのみ表示">
+    <div class="summary-card summary-card-unverified${activeFilter === 'unverified' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'unverified'}" onclick="filterByStatus('unverified')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('unverified')}" title="未検証のリポジトリのみ表示">
       <div class="summary-card-count">${unverifiedRepos}</div>
       <div class="summary-card-label">未検証</div>
     </div>
   `;
 
-  // Populate org filter
-  const orgs = [...new Set(repos.map(r => r.owner))].sort();
+  // Org filter
+  const orgs = [...new Set(allRepos.map(r => r.owner))].sort();
   const orgFilter = document.getElementById('org-filter');
   if (orgs.length > 1) {
-    orgFilter.innerHTML = '<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+    orgFilter.innerHTML = '<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}" ${activeOrg === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
     orgFilter.style.display = '';
   }
 }
 
+// ---------------------------------------------------------------------------
+// Event handlers
+// ---------------------------------------------------------------------------
+
+let searchTimer = null;
+function onSearchInput() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { currentPage = 1; renderPage(); }, 150);
+}
+
+function goToPage(p) {
+  currentPage = p;
+  renderPage();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function sortRepos(mode) {
+  currentSort = mode;
+  currentPage = 1;
+  renderPage();
+}
+
+function filterByStatus(status) {
+  activeFilter = activeFilter === status ? null : status;
+  currentPage = 1;
+  renderPage();
+}
+
+function filterByOrg(org) {
+  activeOrg = org;
+  currentPage = 1;
+  renderPage();
+}
+
+// ---------------------------------------------------------------------------
+// Data loading (SSE)
+// ---------------------------------------------------------------------------
+
+function initData(repos, cacheArr) {
+  allRepos = repos;
+  allCache = {};
+  for (const c of (cacheArr || [])) {
+    allCache[`${c.owner}/${c.repo}`] = c;
+  }
+  currentPage = 1;
+  renderPage();
+}
+
 async function loadRepos() {
-  const container = document.getElementById('repo-list');
   let cacheArr = [];
   try {
     cacheArr = await swrFetch('/api/verification-cache');
   } catch (_) { /* proceed without cache */ }
 
   const accumulated = [];
-  let rendered = false;
-
-  function mergeAndRender() {
-    accumulated.sort((a, b) => {
-      const ta = a.pushed_at || '';
-      const tb = b.pushed_at || '';
-      return tb.localeCompare(ta);
-    });
-    renderRepoList(accumulated, cacheArr);
-    rendered = true;
-  }
 
   try {
     await new Promise((resolve, reject) => {
@@ -251,27 +380,28 @@ async function loadRepos() {
       es.addEventListener('repos', (e) => {
         const batch = JSON.parse(e.data);
         accumulated.push(...batch);
-        mergeAndRender();
+        accumulated.sort((a, b) => (b.pushed_at || '').localeCompare(a.pushed_at || ''));
+        initData(accumulated, cacheArr);
       });
       es.addEventListener('done', () => {
         es.close();
-        if (!rendered) mergeAndRender();
+        if (accumulated.length === 0) initData([], cacheArr);
         resolve();
       });
       es.onerror = () => {
         es.close();
-        if (accumulated.length > 0) {
-          mergeAndRender();
-          resolve();
-        } else {
-          reject(new Error('SSE connection failed'));
-        }
+        if (accumulated.length > 0) { resolve(); }
+        else { reject(new Error('SSE connection failed')); }
       };
     });
   } catch (e) {
     renderLoadError('repo-list', 'リポジトリの取得に失敗しました。', 'loadRepos');
   }
 }
+
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
 
 async function verifyRepo(owner, repo, btn) {
   btn.disabled = true;
@@ -297,7 +427,6 @@ async function verifyRepo(owner, repo, btn) {
       }
     }
     resultEl.innerHTML = renderBadges(pass, fail, review);
-
     btn.textContent = '再検証';
   } catch (e) {
     resultEl.innerHTML = '<span class="badge badge-fail">ERROR</span>';
@@ -305,111 +434,6 @@ async function verifyRepo(owner, repo, btn) {
   }
   btn.disabled = false;
   btn.classList.remove('running');
-}
-
-let allRepos = [];
-let allCache = {};
-
-function sortRepos(mode) {
-  const grid = document.querySelector('.repo-grid');
-  if (!grid) return;
-  const cards = Array.from(grid.children);
-  cards.sort((a, b) => {
-    const nameA = a.dataset.name || '';
-    const nameB = b.dataset.name || '';
-    const cA = allCache[nameA.replace('-', '/')] || {};
-    const cB = allCache[nameB.replace('-', '/')] || {};
-    if (mode === 'activity') {
-      const pA = a.dataset.pushed || '';
-      const pB = b.dataset.pushed || '';
-      return pB.localeCompare(pA);
-    }
-    if (mode === 'fail-desc') return (cB.fail || 0) - (cA.fail || 0);
-    if (mode === 'fail-asc') return (cA.fail || 0) - (cB.fail || 0);
-    if (mode === 'unverified') {
-      const vA = cA.verified_at ? 1 : 0;
-      const vB = cB.verified_at ? 1 : 0;
-      return vA - vB;
-    }
-    return nameA.localeCompare(nameB);
-  });
-  cards.forEach(c => grid.appendChild(c));
-}
-
-let activeFilter = null;
-
-function filterByStatus(status) {
-  const summaryCards = document.querySelectorAll('.summary-card');
-
-  if (activeFilter === status) {
-    activeFilter = null;
-    summaryCards.forEach(c => { c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
-  } else {
-    activeFilter = status;
-    summaryCards.forEach(c => { c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
-    document.querySelector(`.summary-card-${status}`).classList.add('active');
-    document.querySelector(`.summary-card-${status}`).setAttribute('aria-pressed', 'true');
-  }
-  applyFilters();
-}
-
-let activeOrg = '';
-
-function filterByOrg(org) {
-  activeOrg = org;
-  applyFilters();
-}
-
-function applyFilters() {
-  // Clear stale keyboard focus when filters change
-  document.querySelectorAll('.kbd-focus').forEach(el => el.classList.remove('kbd-focus'));
-
-  const cards = document.querySelectorAll('.repo-card');
-  let visible = 0;
-  const q = (document.getElementById('search-input')?.value || '').toLowerCase();
-
-  cards.forEach(c => {
-    const name = c.dataset.name || '';
-    const status = c.dataset.status || '';
-    const desc = c.dataset.desc || '';
-    const lang = c.dataset.lang || '';
-
-    let show = true;
-    if (activeOrg && !name.startsWith(activeOrg.toLowerCase() + '/')) show = false;
-    if (activeFilter && status !== activeFilter) show = false;
-    if (q && !name.includes(q) && !desc.includes(q) && !lang.includes(q)) show = false;
-
-    c.style.display = show ? '' : 'none';
-    if (show) visible++;
-  });
-
-  document.getElementById('repos-title').textContent = `リポジトリ (${visible} / ${cards.length})`;
-  document.title = `Repos (${visible}/${cards.length}) — Metsuke`;
-
-  // Update dashboard summary for filtered subset
-  updateDashboardSummary();
-}
-
-function updateDashboardSummary() {
-  const cards = document.querySelectorAll('.repo-card');
-  let failRepos = 0, reviewRepos = 0, passRepos = 0, unverifiedRepos = 0;
-  cards.forEach(c => {
-    if (c.style.display === 'none') return;
-    const s = c.dataset.status;
-    if (s === 'fail') failRepos++;
-    else if (s === 'review') reviewRepos++;
-    else if (s === 'pass') passRepos++;
-    else unverifiedRepos++;
-  });
-  const el = document.getElementById('dashboard-summary');
-  if (!el) return;
-  const countEls = el.querySelectorAll('.summary-card-count');
-  if (countEls.length === 4) {
-    countEls[0].textContent = failRepos;
-    countEls[1].textContent = reviewRepos;
-    countEls[2].textContent = passRepos;
-    countEls[3].textContent = unverifiedRepos;
-  }
 }
 
 function exportCSV() {
@@ -445,7 +469,8 @@ function exportCSV() {
 }
 
 async function verifyAll() {
-  if (!confirm(`${allRepos.length} 個のリポジトリを一括検証します。よろしいですか？`)) return;
+  const targets = filteredRepos;
+  if (!confirm(`${targets.length} 個のリポジトリを一括検証します。よろしいですか？`)) return;
   const btn = document.getElementById('verify-all-btn');
   const progressWrap = document.getElementById('verify-all-progress');
   const progressText = document.getElementById('progress-text');
@@ -454,9 +479,9 @@ async function verifyAll() {
   btn.textContent = '検証中…';
   progressWrap.style.display = 'block';
   let done = 0;
-  const total = allRepos.length;
+  const total = targets.length;
   progressText.textContent = `0 / ${total}`;
-  for (const r of allRepos) {
+  for (const r of targets) {
     const verifyBtn = document.querySelector(`#repo-${r.full_name.replace('/', '-')} .verify-btn`);
     if (verifyBtn) {
       await verifyRepo(r.owner, r.name, verifyBtn);

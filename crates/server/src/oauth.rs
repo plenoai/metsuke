@@ -298,7 +298,7 @@ pub async fn handle_oauth_callback(
         }
     };
 
-    let user = match GitHubApp::get_user(&token_resp.access_token).await {
+    let user = match github_app.get_user(&token_resp.access_token).await {
         Ok(u) => u,
         Err(e) => {
             tracing::error!("Failed to get GitHub user: {e:#}");
