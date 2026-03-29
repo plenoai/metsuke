@@ -545,3 +545,85 @@ fn oauth_error_redirect(redirect_uri: &str, error: &str, state: Option<&str>) ->
     }
     Redirect::temporary(&url).into_response()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pkce_s256_valid_verifier() {
+        // RFC 7636 Appendix B example (adapted)
+        let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+        let digest = Sha256::digest(verifier.as_bytes());
+        let challenge = BASE64_URL_SAFE_NO_PAD.encode(digest);
+
+        assert!(verify_pkce_s256(&challenge, verifier));
+    }
+
+    #[test]
+    fn pkce_s256_wrong_verifier() {
+        let verifier = "correct-verifier";
+        let digest = Sha256::digest(verifier.as_bytes());
+        let challenge = BASE64_URL_SAFE_NO_PAD.encode(digest);
+
+        assert!(!verify_pkce_s256(&challenge, "wrong-verifier"));
+    }
+
+    #[test]
+    fn pkce_s256_empty_verifier() {
+        let digest = Sha256::digest(b"real-verifier");
+        let challenge = BASE64_URL_SAFE_NO_PAD.encode(digest);
+
+        assert!(!verify_pkce_s256(&challenge, ""));
+    }
+
+    #[test]
+    fn generate_random_token_is_unique_and_nonempty() {
+        let t1 = generate_random_token();
+        let t2 = generate_random_token();
+        assert!(!t1.is_empty());
+        assert_ne!(t1, t2);
+    }
+
+    #[test]
+    fn generate_random_token_is_base64url() {
+        let token = generate_random_token();
+        // base64url characters: A-Z, a-z, 0-9, -, _
+        assert!(token.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        // 32 bytes → 43 base64url chars (no padding)
+        assert_eq!(token.len(), 43);
+    }
+
+    #[test]
+    fn oauth_error_redirect_without_state() {
+        let resp = oauth_error_redirect("https://example.com/cb", "invalid_client", None);
+        // Should be a redirect (3xx)
+        assert!(resp.status().is_redirection());
+    }
+
+    #[test]
+    fn oauth_error_redirect_with_state() {
+        let resp = oauth_error_redirect(
+            "https://example.com/cb",
+            "invalid_client",
+            Some("my-state"),
+        );
+        assert!(resp.status().is_redirection());
+    }
+
+    #[test]
+    fn oauth_error_redirect_with_existing_query_params() {
+        let resp = oauth_error_redirect(
+            "https://example.com/cb?foo=bar",
+            "invalid_client",
+            None,
+        );
+        assert!(resp.status().is_redirection());
+    }
+
+    #[test]
+    fn token_error_returns_bad_request() {
+        let resp = token_error("invalid_grant", "bad code");
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+}
