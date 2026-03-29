@@ -7,6 +7,7 @@ use axum::Router;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::http::header::SET_COOKIE;
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{Html, IntoResponse, Json, Redirect, Response};
 use serde::{Deserialize, Serialize};
 
@@ -708,11 +709,58 @@ async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Respons
     };
 
     let cache_key = format!("repos:user:{user_id}");
-    let st = state.clone();
-    swr_respond(&state.cache, cache_key, "repos", move || async move {
-        Ok(fetch_repos(&st, user_id).await)
-    })
-    .await
+
+    // Cache hit → return all repos as a single SSE batch then close.
+    match state.cache.get(&cache_key).await {
+        CacheStatus::Fresh(v) => {
+            let stream = futures::stream::iter(vec![
+                Ok::<_, std::convert::Infallible>(
+                    Event::default().event("repos").json_data(&*v).unwrap(),
+                ),
+                Ok(Event::default().event("done").data("")),
+            ]);
+            return Sse::new(stream)
+                .keep_alive(KeepAlive::default())
+                .into_response();
+        }
+        CacheStatus::Stale(v) => {
+            // Return stale data immediately, revalidate in background.
+            let cache = state.cache.clone();
+            let ck = cache_key.clone();
+            let st = state.clone();
+            cache.mark_revalidating(&ck).await;
+            tokio::spawn(async move {
+                let fresh = fetch_repos_all(&st, user_id).await;
+                cache.set(ck, fresh).await;
+            });
+            let stream = futures::stream::iter(vec![
+                Ok::<_, std::convert::Infallible>(
+                    Event::default().event("repos").json_data(&*v).unwrap(),
+                ),
+                Ok(Event::default().event("done").data("")),
+            ]);
+            return Sse::new(stream)
+                .keep_alive(KeepAlive::default())
+                .into_response();
+        }
+        CacheStatus::Miss => { /* fall through to streaming fetch */ }
+    }
+
+    // Cache miss → stream repos incrementally as each installation completes.
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, std::convert::Infallible>>(32);
+
+    let cache = state.cache.clone();
+    let ck = cache_key.clone();
+    tokio::spawn(async move {
+        let all_repos = fetch_repos_streaming(&state, user_id, &tx).await;
+        cache.set(ck, &all_repos).await;
+        let _ = tx.send(Ok(Event::default().event("done").data(""))).await;
+    });
+
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+    Sse::new(stream)
+        .keep_alive(KeepAlive::default())
+        .into_response()
 }
 
 async fn sync_installations(state: &WebState, user_id: i64) {
@@ -743,7 +791,13 @@ async fn sync_installations(state: &WebState, user_id: i64) {
     }
 }
 
-async fn fetch_repos(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
+/// Fetch repos with streaming: sends each installation's repos via SSE as they complete.
+/// Returns the full collected list for caching.
+async fn fetch_repos_streaming(
+    state: &WebState,
+    user_id: i64,
+    tx: &tokio::sync::mpsc::Sender<Result<Event, std::convert::Infallible>>,
+) -> Vec<RepoWithOwner> {
     sync_installations(state, user_id).await;
 
     let db = state.db.clone();
@@ -751,16 +805,14 @@ async fn fetch_repos(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
         .await
         .unwrap_or_default();
 
-    let mut repos: Vec<RepoWithOwner> = Vec::new();
-    for (installation_id, account_login, _account_type) in &installations {
-        match state
-            .github_app
-            .list_installation_repos(*installation_id)
-            .await
-        {
-            Ok(repo_list) => {
-                for r in repo_list {
-                    repos.push(RepoWithOwner {
+    let mut join_set = tokio::task::JoinSet::new();
+    for (installation_id, account_login, _account_type) in installations {
+        let github_app = state.github_app.clone();
+        join_set.spawn(async move {
+            match github_app.list_installation_repos(installation_id).await {
+                Ok(repo_list) => repo_list
+                    .into_iter()
+                    .map(|r| RepoWithOwner {
                         owner: account_login.clone(),
                         name: r.name,
                         full_name: r.full_name,
@@ -770,20 +822,42 @@ async fn fetch_repos(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
                         default_branch: r.default_branch,
                         updated_at: r.updated_at,
                         pushed_at: r.pushed_at,
-                    });
+                    })
+                    .collect::<Vec<_>>(),
+                Err(e) => {
+                    tracing::warn!("Failed to list repos for {account_login}: {e:#}");
+                    Vec::new()
                 }
             }
-            Err(e) => {
-                tracing::warn!("Failed to list repos for {account_login}: {e:#}");
+        });
+    }
+
+    let mut all_repos: Vec<RepoWithOwner> = Vec::new();
+    while let Some(result) = join_set.join_next().await {
+        if let Ok(batch) = result {
+            if !batch.is_empty() {
+                let _ = tx
+                    .send(Ok(Event::default()
+                        .event("repos")
+                        .json_data(&batch)
+                        .unwrap()))
+                    .await;
+                all_repos.extend(batch);
             }
         }
     }
-    repos.sort_by(|a, b| {
+    all_repos.sort_by(|a, b| {
         let ta = a.pushed_at.as_deref().unwrap_or("");
         let tb = b.pushed_at.as_deref().unwrap_or("");
         tb.cmp(ta)
     });
-    repos
+    all_repos
+}
+
+/// Non-streaming variant for background SWR revalidation.
+async fn fetch_repos_all(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
+    let (tx, _rx) = tokio::sync::mpsc::channel(1);
+    fetch_repos_streaming(state, user_id, &tx).await
 }
 
 #[derive(Deserialize)]

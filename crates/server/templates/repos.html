@@ -226,12 +226,48 @@ function renderRepoList(repos, cacheArr) {
 }
 
 async function loadRepos() {
+  const container = document.getElementById('repo-list');
+  let cacheArr = [];
   try {
-    const [repos, cache] = await Promise.all([
-      swrFetch('/api/repos'),
-      swrFetch('/api/verification-cache'),
-    ]);
-    renderRepoList(repos, cache);
+    cacheArr = await swrFetch('/api/verification-cache');
+  } catch (_) { /* proceed without cache */ }
+
+  const accumulated = [];
+  let rendered = false;
+
+  function mergeAndRender() {
+    accumulated.sort((a, b) => {
+      const ta = a.pushed_at || '';
+      const tb = b.pushed_at || '';
+      return tb.localeCompare(ta);
+    });
+    renderRepoList(accumulated, cacheArr);
+    rendered = true;
+  }
+
+  try {
+    await new Promise((resolve, reject) => {
+      const es = new EventSource('/api/repos');
+      es.addEventListener('repos', (e) => {
+        const batch = JSON.parse(e.data);
+        accumulated.push(...batch);
+        mergeAndRender();
+      });
+      es.addEventListener('done', () => {
+        es.close();
+        if (!rendered) mergeAndRender();
+        resolve();
+      });
+      es.onerror = () => {
+        es.close();
+        if (accumulated.length > 0) {
+          mergeAndRender();
+          resolve();
+        } else {
+          reject(new Error('SSE connection failed'));
+        }
+      };
+    });
   } catch (e) {
     renderLoadError('repo-list', 'リポジトリの取得に失敗しました。', 'loadRepos');
   }
