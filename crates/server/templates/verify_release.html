@@ -11,81 +11,7 @@
   flex-wrap: wrap;
   margin-bottom: 1.5rem;
 }
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.form-group label {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  letter-spacing: 0.05em;
-}
-.form-group select, .form-group input {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-deep);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  min-width: 140px;
-  transition: border-color 0.2s ease;
-}
-.form-group select:focus, .form-group input:focus {
-  border-color: var(--accent-gold);
-}
-.form-group select:focus-visible, .form-group input:focus-visible {
-  outline: 2px solid var(--accent-gold);
-  outline-offset: 2px;
-}
-.findings-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-}
-.findings-table th {
-  text-align: left;
-  padding: 0.6rem 0.75rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--border);
-}
-.findings-table td {
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: top;
-}
-.findings-table tr:last-child td {
-  border-bottom: none;
-}
-.rationale-cell {
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-  line-height: 1.5;
-  max-width: 400px;
-}
-.summary-bar {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-}
-.summary-item {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
+.form-group select, .form-group input { min-width: 140px; }
 .release-list {
   display: flex;
   flex-direction: column;
@@ -188,10 +114,6 @@ const OWNER = '{{ owner }}';
 const REPO = '{{ repo }}';
 let allReleases = [];
 
-function esc(s) {
-  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
 function renderReleaseList(releases) {
   allReleases = releases;
 
@@ -270,10 +192,7 @@ async function verifyRelease() {
     const data = await resp.json();
     renderResult(data, baseTag, headTag);
   } catch (e) {
-    area.innerHTML = `<div class="card" style="border-color:var(--accent-vermillion)">
-      <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--accent-vermillion);margin-bottom:0.5rem">検証に失敗しました</div>
-      <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">${e.message}</div>
-    </div>`;
+    area.innerHTML = renderErrorCard(e.message);
   }
   btn.disabled = false;
   btn.textContent = '検証を実行';
@@ -291,18 +210,8 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
     const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-release?base_tag=${encodeURIComponent(baseTag)}&head_tag=${encodeURIComponent(headTag)}&policy=${encodeURIComponent(policy)}`, { method: 'POST' });
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
-    const findings = data.findings || [];
-    let pass = 0, fail = 0, review = 0;
-    for (const f of findings) {
-      if (f.status === 'satisfied') pass++;
-      else if (f.status === 'violated') fail++;
-      else if (f.status === 'indeterminate') review++;
-    }
-    let badges = '';
-    if (pass > 0) badges += `<span class="badge badge-pass" title="PASS">PASS ${pass}</span>`;
-    if (review > 0) badges += `<span class="badge badge-review" title="REVIEW">REV ${review}</span>`;
-    if (fail > 0) badges += `<span class="badge badge-fail" title="FAIL">FAIL ${fail}</span>`;
-    resultEl.innerHTML = badges;
+    const c = countFindings(data.findings);
+    resultEl.innerHTML = compactBadges(c.pass, c.fail, c.review);
     btn.textContent = '再検証';
   } catch (e) {
     resultEl.innerHTML = '<span class="badge badge-fail" title="ERROR">ERR</span>';
@@ -313,49 +222,8 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
 }
 
 function renderResult(data, baseTag, headTag) {
-  const area = document.getElementById('result-area');
-  const findings = data.findings || [];
-  let pass = 0, fail = 0, review = 0, na = 0;
-  for (const f of findings) {
-    if (f.status === 'satisfied') pass++;
-    else if (f.status === 'violated') fail++;
-    else if (f.status === 'indeterminate') review++;
-    else na++;
-  }
-
-  const rows = findings.map(f => {
-    let badge = '';
-    if (f.status === 'satisfied') badge = '<span class="badge badge-pass">PASS</span>';
-    else if (f.status === 'violated') badge = '<span class="badge badge-fail">FAIL</span>';
-    else if (f.status === 'indeterminate') badge = '<span class="badge badge-review">REVIEW</span>';
-    else badge = '<span class="badge badge-na">N/A</span>';
-    const longText = (f.rationale || '').length > 120;
-    return `<tr class="status-${f.status}">
-      <td>${esc(f.control_id)}</td>
-      <td>${badge}</td>
-      <td class="rationale-cell${longText ? ' collapsed' : ''}" ${longText ? 'role="button" tabindex="0" aria-expanded="false" onclick="this.classList.toggle(\'collapsed\');this.setAttribute(\'aria-expanded\',!this.classList.contains(\'collapsed\'))" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click()}"' : ''}>${esc(f.rationale)}</td>
-    </tr>`;
-  }).join('');
-
-  area.innerHTML = `
-    <div style="margin-top:1.5rem">
-      <div class="section-title">${esc(baseTag)} .. ${esc(headTag)} 検証結果</div>
-      <div class="summary-bar">
-        <div class="summary-item"><span class="badge badge-pass">PASS</span> ${pass}</div>
-        <div class="summary-item"><span class="badge badge-review">REVIEW</span> ${review}</div>
-        <div class="summary-item"><span class="badge badge-fail">FAIL</span> ${fail}</div>
-        ${na > 0 ? `<div class="summary-item"><span class="badge badge-na">N/A</span> ${na}</div>` : ''}
-      </div>
-      <div class="card" style="padding:0;overflow-x:auto">
-        <table class="findings-table">
-          <thead>
-            <tr><th scope="col">コントロール</th><th scope="col">ステータス</th><th scope="col">根拠</th></tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </div>
-  `;
+  document.getElementById('result-area').innerHTML =
+    renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`);
 }
 
 loadReleases();

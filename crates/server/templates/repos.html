@@ -76,6 +76,9 @@
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
     <div class="section-title" id="repos-title" style="margin-bottom:0">リポジトリ</div>
     <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap" id="toolbar" class="toolbar-hidden">
+      <select class="policy-select" id="org-filter" onchange="filterByOrg(this.value)" aria-label="組織フィルタ" style="display:none">
+        <option value="">全組織</option>
+      </select>
       <select class="policy-select" id="sort-select" onchange="sortRepos(this.value)" aria-label="ソート順">
         <option value="activity" selected>アクティビティ順</option>
         <option value="name">名前順</option>
@@ -119,23 +122,7 @@ function esc(s) {
 
 
 function filterRepos() {
-  const q = (document.getElementById('search-input')?.value || '').toLowerCase();
-  const cards = document.querySelectorAll('.repo-card');
-  let visible = 0;
-  cards.forEach(card => {
-    const name = card.dataset.name || '';
-    const desc = card.dataset.desc || '';
-    const lang = card.dataset.lang || '';
-    const match = name.includes(q) || desc.includes(q) || lang.includes(q);
-    card.style.display = match ? '' : 'none';
-    if (match) visible++;
-  });
-  const title = document.getElementById('repos-title');
-  if (q) {
-    title.textContent = `リポジトリ (${visible} / ${cards.length})`;
-  } else {
-    title.textContent = `リポジトリ (${cards.length})`;
-  }
+  applyFilters();
 }
 
 function renderRepoList(repos, cacheArr) {
@@ -222,6 +209,14 @@ function renderRepoList(repos, cacheArr) {
       <div class="summary-card-label">未検証</div>
     </div>
   `;
+
+  // Populate org filter
+  const orgs = [...new Set(repos.map(r => r.owner))].sort();
+  const orgFilter = document.getElementById('org-filter');
+  if (orgs.length > 1) {
+    orgFilter.innerHTML = '<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+    orgFilter.style.display = '';
+  }
 }
 
 async function loadRepos() {
@@ -303,35 +298,73 @@ function sortRepos(mode) {
 let activeFilter = null;
 
 function filterByStatus(status) {
-  const cards = document.querySelectorAll('.repo-card');
   const summaryCards = document.querySelectorAll('.summary-card');
 
   if (activeFilter === status) {
-    // Toggle off
     activeFilter = null;
-    cards.forEach(c => c.style.display = '');
-    summaryCards.forEach(c => c.classList.remove('active'));
-    summaryCards.forEach(c => c.setAttribute('aria-pressed', 'false'));
-    document.getElementById('repos-title').textContent = `リポジトリ (${cards.length})`;
-    return;
+    summaryCards.forEach(c => { c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
+  } else {
+    activeFilter = status;
+    summaryCards.forEach(c => { c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
+    document.querySelector(`.summary-card-${status}`).classList.add('active');
+    document.querySelector(`.summary-card-${status}`).setAttribute('aria-pressed', 'true');
   }
+  applyFilters();
+}
 
-  activeFilter = status;
-  summaryCards.forEach(c => c.classList.remove('active'));
-  summaryCards.forEach(c => c.setAttribute('aria-pressed', 'false'));
-  document.querySelector(`.summary-card-${status}`).classList.add('active');
-  document.querySelector(`.summary-card-${status}`).setAttribute('aria-pressed', 'true');
+let activeOrg = '';
 
+function filterByOrg(org) {
+  activeOrg = org;
+  applyFilters();
+}
+
+function applyFilters() {
+  const cards = document.querySelectorAll('.repo-card');
   let visible = 0;
+  const q = (document.getElementById('search-input')?.value || '').toLowerCase();
+
   cards.forEach(c => {
-    if (c.dataset.status === status) {
-      c.style.display = '';
-      visible++;
-    } else {
-      c.style.display = 'none';
-    }
+    const name = c.dataset.name || '';
+    const status = c.dataset.status || '';
+    const desc = c.dataset.desc || '';
+    const lang = c.dataset.lang || '';
+
+    let show = true;
+    if (activeOrg && !name.startsWith(activeOrg.toLowerCase() + '/')) show = false;
+    if (activeFilter && status !== activeFilter) show = false;
+    if (q && !name.includes(q) && !desc.includes(q) && !lang.includes(q)) show = false;
+
+    c.style.display = show ? '' : 'none';
+    if (show) visible++;
   });
+
   document.getElementById('repos-title').textContent = `リポジトリ (${visible} / ${cards.length})`;
+
+  // Update dashboard summary for filtered subset
+  updateDashboardSummary();
+}
+
+function updateDashboardSummary() {
+  const cards = document.querySelectorAll('.repo-card');
+  let failRepos = 0, reviewRepos = 0, passRepos = 0, unverifiedRepos = 0;
+  cards.forEach(c => {
+    if (c.style.display === 'none') return;
+    const s = c.dataset.status;
+    if (s === 'fail') failRepos++;
+    else if (s === 'review') reviewRepos++;
+    else if (s === 'pass') passRepos++;
+    else unverifiedRepos++;
+  });
+  const el = document.getElementById('dashboard-summary');
+  if (!el) return;
+  const countEls = el.querySelectorAll('.summary-card-count');
+  if (countEls.length === 4) {
+    countEls[0].textContent = failRepos;
+    countEls[1].textContent = reviewRepos;
+    countEls[2].textContent = passRepos;
+    countEls[3].textContent = unverifiedRepos;
+  }
 }
 
 function exportCSV() {

@@ -110,6 +110,7 @@
       <option value="pr">PR</option>
       <option value="repo">Repo</option>
     </select>
+    <input type="search" class="policy-select" id="filter-repo" placeholder="org/repo で検索…" onchange="resetAndLoad()" oninput="debounceLoad()" aria-label="リポジトリ検索" style="min-width:160px">
     <input type="date" class="policy-select" id="filter-from" onchange="resetAndLoad()" aria-label="開始日">
     <input type="date" class="policy-select" id="filter-to" onchange="resetAndLoad()" aria-label="終了日">
     <select class="policy-select" id="filter-preset" onchange="applyPreset(this.value)" aria-label="期間プリセット">
@@ -162,6 +163,15 @@ async function loadAudit() {
     const toDate = document.getElementById('filter-to').value;
     if (fromDate) url += `&from_date=${encodeURIComponent(fromDate)}`;
     if (toDate) url += `&to_date=${encodeURIComponent(toDate)}`;
+    const repoFilter = document.getElementById('filter-repo').value.trim();
+    if (repoFilter) {
+      const parts = repoFilter.split('/');
+      if (parts.length === 2) {
+        url += `&owner=${encodeURIComponent(parts[0])}&repo=${encodeURIComponent(parts[1])}`;
+      } else {
+        url += `&owner=${encodeURIComponent(repoFilter)}`;
+      }
+    }
     const resp = await fetch(url);
     const entries = resp.ok ? await resp.json() : [];
     allEntries = entries;
@@ -223,6 +233,15 @@ function exportAuditCSV() {
   const toDate = document.getElementById('filter-to').value;
   if (fromDate) url += `from_date=${encodeURIComponent(fromDate)}&`;
   if (toDate) url += `to_date=${encodeURIComponent(toDate)}&`;
+  const repoFilter = document.getElementById('filter-repo').value.trim();
+  if (repoFilter) {
+    const parts = repoFilter.split('/');
+    if (parts.length === 2) {
+      url += `owner=${encodeURIComponent(parts[0])}&repo=${encodeURIComponent(parts[1])}&`;
+    } else {
+      url += `owner=${encodeURIComponent(repoFilter)}&`;
+    }
+  }
   window.location = url;
   setTimeout(() => { btn.textContent = 'CSV出力'; btn.disabled = false; }, 1500);
 }
@@ -261,6 +280,12 @@ function applyPreset(val) {
     to.value = '';
   }
   resetAndLoad();
+}
+
+let debounceTimer = null;
+function debounceLoad() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => resetAndLoad(), 400);
 }
 
 loadAudit();

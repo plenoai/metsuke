@@ -2,54 +2,7 @@
 
 {% block title %}{{ owner }}/{{ repo }}{% endblock %}
 
-{% block head %}
-<style>
-.findings-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-}
-.findings-table th {
-  text-align: left;
-  font-size: 0.68rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-deep);
-}
-.findings-table td {
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: top;
-  color: var(--text-primary);
-}
-.findings-table tr:hover td {
-  background: var(--bg-elevated);
-}
-.findings-table .rationale {
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  max-width: 420px;
-  line-height: 1.5;
-}
-.summary-bar {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-  flex-wrap: wrap;
-}
-.summary-stat {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-</style>
-{% endblock %}
+{% block head %}{% endblock %}
 
 {% block content %}
   <div class="breadcrumb">
@@ -103,47 +56,10 @@ async function runVerify() {
     const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
-
-    const findings = data.findings || [];
     const profileName = data.profile_name || policy;
-
-    let pass = 0, fail = 0, review = 0, na = 0;
-    for (const f of findings) {
-      if (f.status === 'satisfied') pass++;
-      else if (f.status === 'violated') fail++;
-      else if (f.status === 'indeterminate') review++;
-      else if (f.status === 'not_applicable') na++;
-    }
-
-    function statusBadge(status) {
-      if (status === 'satisfied') return '<span class="badge badge-pass">PASS</span>';
-      if (status === 'violated') return '<span class="badge badge-fail">FAIL</span>';
-      if (status === 'indeterminate') return '<span class="badge badge-review">REVIEW</span>';
-      if (status === 'not_applicable') return '<span class="badge badge-na">N/A</span>';
-      return '<span class="badge">' + status + '</span>';
-    }
-
-    let html = `<div class="section-title">Results — ${profileName}</div>`;
-    html += '<div class="summary-bar">';
-    html += `<div class="summary-stat"><span class="badge badge-pass">PASS</span> ${pass}</div>`;
-    html += `<div class="summary-stat"><span class="badge badge-fail">FAIL</span> ${fail}</div>`;
-    html += `<div class="summary-stat"><span class="badge badge-review">REVIEW</span> ${review}</div>`;
-    html += `<div class="summary-stat"><span class="badge badge-na">N/A</span> ${na}</div>`;
-    html += '</div>';
-
-    html += '<div class="card" style="padding:0;overflow-x:auto">';
-    html += '<table class="findings-table" aria-label="検証結果"><thead><tr><th scope="col">コントロール</th><th scope="col">ステータス</th><th scope="col">根拠</th></tr></thead><tbody>';
-    for (const f of findings) {
-      const rationale = f.rationale || '';
-      const escaped = rationale.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      const longText = rationale.length > 120;
-      html += `<tr class="status-${f.status}"><td style="white-space:nowrap">${f.control_id}</td><td>${statusBadge(f.status)}</td><td class="rationale${longText ? ' collapsed' : ''}" ${longText ? `role="button" tabindex="0" aria-expanded="false" onclick="this.classList.toggle('collapsed');this.setAttribute('aria-expanded',!this.classList.contains('collapsed'))" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"` : ''}>${escaped}</td></tr>`;
-    }
-    html += '</tbody></table></div>';
-
-    area.innerHTML = html;
+    area.innerHTML = renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`);
   } catch (e) {
-    area.innerHTML = `<div class="card" style="color:var(--accent-vermillion)"><strong>検証エラー:</strong> ${e.message}</div>`;
+    area.innerHTML = renderErrorCard(e.message);
   }
 
   btn.disabled = false;
