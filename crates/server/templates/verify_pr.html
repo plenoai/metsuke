@@ -186,7 +186,10 @@ const REPO = '{{ repo }}';
 async function verifyPR() {
   const prNum = document.getElementById('pr-number').value;
   if (!prNum || prNum < 1) {
-    alert('PR番号を入力してください');
+    const input = document.getElementById('pr-number');
+    input.style.borderColor = 'var(--accent-vermillion)';
+    input.focus();
+    setTimeout(() => { input.style.borderColor = ''; }, 2000);
     return;
   }
   const policy = document.getElementById('pr-policy').value;
@@ -195,9 +198,8 @@ async function verifyPR() {
 
   btn.disabled = true;
   btn.textContent = '検証中…';
-  btn.style.borderColor = 'var(--accent-gold)';
-  btn.style.color = 'var(--accent-gold)';
-  area.innerHTML = '<div class="loading">検証を実行中</div>';
+  btn.classList.add('running');
+  area.innerHTML = '<div class="loading" role="status">検証を実行中</div>';
 
   try {
     const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-pr/${prNum}?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
@@ -212,8 +214,7 @@ async function verifyPR() {
   }
   btn.disabled = false;
   btn.textContent = '検証を実行';
-  btn.style.borderColor = '';
-  btn.style.color = '';
+  btn.classList.remove('running');
 }
 
 function esc(s) {
@@ -308,8 +309,7 @@ async function verifyPRById(num, btn) {
   const policy = document.getElementById('pr-policy').value;
   btn.disabled = true;
   btn.textContent = '検証中…';
-  btn.style.borderColor = 'var(--accent-gold)';
-  btn.style.color = 'var(--accent-gold)';
+  btn.classList.add('running');
   const resultEl = document.getElementById(`pr-result-${num}`);
 
   try {
@@ -334,8 +334,7 @@ async function verifyPRById(num, btn) {
     btn.textContent = '再試行';
   }
   btn.disabled = false;
-  btn.style.borderColor = '';
-  btn.style.color = '';
+  btn.classList.remove('running');
 }
 
 loadPRs();

@@ -165,7 +165,7 @@ function renderRepoList(repos, cacheArr) {
       <div class="repo-info">
         <div class="repo-name">
           <a href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}">${esc(r.full_name)}</a>
-          <a class="gh-link" href="https://github.com/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}" target="_blank" rel="noopener" title="GitHub で開く">
+          <a class="gh-link" href="https://github.com/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}" target="_blank" rel="noopener" title="GitHub で開く" aria-label="${esc(r.full_name)} を GitHub で開く">
             <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
           </a>
         </div>

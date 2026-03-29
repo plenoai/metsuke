@@ -252,7 +252,7 @@ body::before {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.verify-btn.running {
+.verify-btn.running, .btn.running {
   border-color: var(--accent-gold);
   color: var(--accent-gold);
 }
