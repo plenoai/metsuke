@@ -982,4 +982,104 @@ mod tests {
         assert_eq!(pr_entry.pass_count, 2);
         assert_eq!(pr_entry.target_ref, "ref2");
     }
+
+    #[test]
+    fn cleanup_expired_deletes_expired_authorization_codes() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        let uris = vec!["https://cb".to_string()];
+        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+
+        // Insert an already-expired authorization code
+        {
+            let conn = db.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, code_challenge, scope, expires_at)
+                 VALUES ('expired-code', 'cid', ?1, 'https://cb', 'ch', 'mcp', datetime('now', '-1 second'))",
+                [uid],
+            ).unwrap();
+        }
+        // Also create a valid code
+        db.create_authorization_code("valid-code", "cid", uid, "https://cb", "ch", "mcp").unwrap();
+
+        let deleted = db.cleanup_expired().unwrap();
+        assert!(deleted >= 1);
+
+        // Expired code was already expired so consume should return None regardless,
+        // but the row should be gone from the table
+        assert!(db.consume_authorization_code("expired-code").unwrap().is_none());
+        // Valid code still consumable
+        assert!(db.consume_authorization_code("valid-code").unwrap().is_some());
+    }
+
+    #[test]
+    fn cleanup_expired_deletes_fully_expired_tokens() {
+        let db = memory_db();
+        let uid = db.upsert_user(1, "user", None, None).unwrap();
+        let uris = vec!["https://cb".to_string()];
+        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+
+        // Insert a token where both access and refresh are expired
+        {
+            let conn = db.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO oauth_tokens (access_token, refresh_token, client_id, user_id, scope, expires_at, refresh_expires_at)
+                 VALUES ('at-expired', 'rt-expired', 'cid', ?1, 'mcp', datetime('now', '-1 hour'), datetime('now', '-1 second'))",
+                [uid],
+            ).unwrap();
+        }
+
+        // Insert a token where access expired but refresh is still valid (should NOT be deleted)
+        {
+            let conn = db.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO oauth_tokens (access_token, refresh_token, client_id, user_id, scope, expires_at, refresh_expires_at)
+                 VALUES ('at-refreshable', 'rt-valid', 'cid', ?1, 'mcp', datetime('now', '-1 second'), datetime('now', '+1 hour'))",
+                [uid],
+            ).unwrap();
+        }
+
+        let deleted = db.cleanup_expired().unwrap();
+        assert!(deleted >= 1, "should delete the fully expired token");
+
+        // Fully expired token gone
+        assert_eq!(db.validate_access_token("at-expired").unwrap(), None);
+        // Token with valid refresh still exists (refresh_oauth_token should find it)
+        let refreshed = db.refresh_oauth_token("rt-valid", "new-at", "new-rt", 3600, 86400).unwrap();
+        assert!(refreshed.is_some(), "token with valid refresh should survive cleanup");
+    }
+
+    #[test]
+    fn cleanup_expired_deletes_expired_oauth_states() {
+        let db = memory_db();
+        db.create_oauth_state("valid-state", "cid", "https://cb", "ch", "mcp").unwrap();
+
+        // Insert an expired state
+        {
+            let conn = db.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO oauth_states (state, client_id, redirect_uri, code_challenge, scope, expires_at)
+                 VALUES ('expired-state', 'cid', 'https://cb', 'ch', 'mcp', datetime('now', '-1 second'))",
+                [],
+            ).unwrap();
+        }
+
+        let deleted = db.cleanup_expired().unwrap();
+        assert!(deleted >= 1);
+
+        // Expired state gone
+        assert!(db.consume_oauth_state("expired-state").unwrap().is_none());
+        // Valid state still available
+        assert!(db.consume_oauth_state("valid-state").unwrap().is_some());
+    }
+
+    #[test]
+    fn oauth_client_redirect_uris_parses_json() {
+        let db = memory_db();
+        let uris = vec!["https://a.com/cb".to_string(), "https://b.com/cb".to_string()];
+        db.register_oauth_client("cid", None, None, &uris, "none").unwrap();
+
+        let client = db.get_oauth_client("cid").unwrap().unwrap();
+        assert_eq!(client.redirect_uris(), uris);
+    }
 }
