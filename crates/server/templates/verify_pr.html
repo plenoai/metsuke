@@ -151,7 +151,7 @@
     <div class="pr-form">
       <div class="form-group">
         <label for="pr-number">PR番号</label>
-        <input type="number" id="pr-number" min="1" placeholder="#123" autofocus>
+        <input type="number" id="pr-number" min="1" placeholder="#123" required autofocus>
       </div>
       <div class="form-group">
         <label for="pr-policy">ポリシー</label>
@@ -172,7 +172,7 @@
 
   <div id="pr-list-section" style="margin-top:1.5rem">
     <div class="section-title">Open Pull Requests</div>
-    <div id="pr-list"><div class="loading">PRを取得中</div></div>
+    <div id="pr-list" aria-live="polite"><div class="loading" role="status">PRを取得中</div></div>
   </div>
 
   <div id="result-area" aria-live="polite"></div>
