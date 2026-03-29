@@ -19,13 +19,25 @@ impl Database {
                 | OpenFlags::SQLITE_OPEN_NO_MUTEX
                 | uri_flag,
         )?;
-        writer.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+        writer.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA foreign_keys=ON;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA cache_size=-20000;
+             PRAGMA busy_timeout=5000;
+             PRAGMA mmap_size=268435456;",
+        )?;
 
         let reader = Connection::open_with_flags(
             path,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX | uri_flag,
         )?;
-        reader.execute_batch("PRAGMA foreign_keys=ON;")?;
+        reader.execute_batch(
+            "PRAGMA foreign_keys=ON;
+             PRAGMA cache_size=-20000;
+             PRAGMA busy_timeout=5000;
+             PRAGMA mmap_size=268435456;",
+        )?;
 
         let db = Self {
             writer: Mutex::new(writer),

@@ -100,6 +100,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(oauth::router(db.clone(), github_app.clone(), &config))
         .merge(webhook::router(db.clone(), github_app.clone(), &config))
         .merge(web::router(db, github_app, &config))
+        .layer(tower_http::compression::CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(SetResponseHeaderLayer::overriding(
             axum::http::header::X_FRAME_OPTIONS,
