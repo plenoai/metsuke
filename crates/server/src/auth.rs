@@ -114,3 +114,117 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http_body_util::BodyExt;
+    use tower::{ServiceBuilder, ServiceExt};
+
+    fn test_db() -> Arc<Database> {
+        Arc::new(Database::open(":memory:").unwrap())
+    }
+
+    #[test]
+    fn unauthorized_response_has_correct_status_and_headers() {
+        let resp = unauthorized_response("https://example.com/.well-known/oauth-protected-resource");
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let www_auth = resp.headers().get("WWW-Authenticate").unwrap().to_str().unwrap();
+        assert!(www_auth.contains("Bearer"));
+        assert!(www_auth.contains("resource_metadata="));
+        let ct = resp.headers().get("Content-Type").unwrap().to_str().unwrap();
+        assert_eq!(ct, "application/json");
+    }
+
+    fn echo_body(s: &str) -> BoxBody<Bytes, Infallible> {
+        Full::new(Bytes::from(s.to_string()))
+            .map_err(|never: Infallible| match never {})
+            .boxed()
+    }
+
+    /// Build a minimal echo service that returns 200 with the user_id from task-local
+    fn echo_service() -> impl Service<
+        Request<Body>,
+        Response = Response<BoxBody<Bytes, Infallible>>,
+        Error = Infallible,
+        Future = Pin<Box<dyn Future<Output = Result<Response<BoxBody<Bytes, Infallible>>, Infallible>> + Send>>,
+    > + Clone {
+        tower::service_fn(|_req: Request<Body>| {
+            Box::pin(async move {
+                let uid = REQUEST_USER_ID.try_with(|id| *id).unwrap_or(-1);
+                let body = echo_body(&uid.to_string());
+                Ok::<_, Infallible>(Response::builder().status(StatusCode::OK).body(body).unwrap())
+            }) as Pin<Box<dyn Future<Output = Result<Response<BoxBody<Bytes, Infallible>>, Infallible>> + Send>>
+        })
+    }
+
+    #[tokio::test]
+    async fn rejects_request_without_auth_header() {
+        let db = test_db();
+        let svc = ServiceBuilder::new()
+            .layer(OAuthAuthLayer::new(db, "https://example.com"))
+            .service(echo_service());
+
+        let req = Request::builder().uri("/test").body(Body::empty()).unwrap();
+        let resp = svc.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_token() {
+        let db = test_db();
+        let svc = ServiceBuilder::new()
+            .layer(OAuthAuthLayer::new(db, "https://example.com"))
+            .service(echo_service());
+
+        let req = Request::builder()
+            .uri("/test")
+            .header("Authorization", "Bearer invalid-token")
+            .body(Body::empty())
+            .unwrap();
+        let resp = svc.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn rejects_non_bearer_auth() {
+        let db = test_db();
+        let svc = ServiceBuilder::new()
+            .layer(OAuthAuthLayer::new(db, "https://example.com"))
+            .service(echo_service());
+
+        let req = Request::builder()
+            .uri("/test")
+            .header("Authorization", "Basic dXNlcjpwYXNz")
+            .body(Body::empty())
+            .unwrap();
+        let resp = svc.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn accepts_valid_token_and_sets_user_id() {
+        let db = test_db();
+        // Create user and token
+        let uid = db.upsert_user(1, "testuser", None, None).unwrap();
+        db.register_oauth_client("cid", None, None, &["https://cb".into()], "none").unwrap();
+        db.create_oauth_token("valid-access-token", "rt", "cid", uid, "mcp", 3600, 86400).unwrap();
+
+        let svc = ServiceBuilder::new()
+            .layer(OAuthAuthLayer::new(db, "https://example.com"))
+            .service(echo_service());
+
+        let req = Request::builder()
+            .uri("/test")
+            .header("Authorization", "Bearer valid-access-token")
+            .body(Body::empty())
+            .unwrap();
+        let resp = svc.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // Body should contain the user_id
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let body_str = String::from_utf8(body.to_vec()).unwrap();
+        assert_eq!(body_str, uid.to_string());
+    }
+}
