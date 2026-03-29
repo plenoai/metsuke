@@ -259,9 +259,7 @@ async fn handle_release(state: WebhookState, payload: serde_json::Value) {
     {
         Ok(r) => r,
         Err(e) => {
-            tracing::error!(
-                "webhook: verify_repo failed for {owner}/{repo}@{tag_name}: {e:#}"
-            );
+            tracing::error!("webhook: verify_repo failed for {owner}/{repo}@{tag_name}: {e:#}");
             return;
         }
     };
@@ -269,9 +267,7 @@ async fn handle_release(state: WebhookState, payload: serde_json::Value) {
     let result_json = serde_json::to_string_pretty(&result).unwrap_or_default();
     let (_conclusion, _title, summary) = format_check_result(&result_json, "Release");
 
-    tracing::info!(
-        "webhook: release verification for {owner}/{repo}@{tag_name}: {summary}"
-    );
+    tracing::info!("webhook: release verification for {owner}/{repo}@{tag_name}: {summary}");
 }
 
 /// Parse verification result JSON and produce check run conclusion + summary.
@@ -285,9 +281,7 @@ fn format_check_result(result_json: &str, scope: &str) -> (String, String, Strin
     let na = parsed["na_count"].as_u64().unwrap_or(0);
 
     let conclusion = if fail > 0 { "failure" } else { "success" };
-    let title = format!(
-        "{scope}: {pass} pass, {fail} fail, {review} review, {na} N/A"
-    );
+    let title = format!("{scope}: {pass} pass, {fail} fail, {review} review, {na} N/A");
 
     let mut summary = title.clone();
 
@@ -335,7 +329,10 @@ mod tests {
         let result = mac.finalize().into_bytes();
         let sig = format!(
             "sha256={}",
-            result.iter().map(|b| format!("{b:02x}")).collect::<String>()
+            result
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
         );
         assert!(verify_signature(secret, body, &sig));
     }
@@ -369,7 +366,10 @@ mod tests {
 
     #[test]
     fn test_hex_decode() {
-        assert_eq!(hex::decode("deadbeef").unwrap(), vec![0xde, 0xad, 0xbe, 0xef]);
+        assert_eq!(
+            hex::decode("deadbeef").unwrap(),
+            vec![0xde, 0xad, 0xbe, 0xef]
+        );
         assert!(hex::decode("xyz").is_err());
     }
 }
