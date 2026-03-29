@@ -421,6 +421,11 @@ select:focus-visible {
 .summary-card-review .summary-card-count { color: var(--accent-gold); }
 .summary-card-pass .summary-card-count { color: var(--accent-green); }
 .summary-card-unverified .summary-card-count { color: var(--text-secondary); }
+/* Status symbols for color-blind accessibility (purely via CSS, survives textContent updates) */
+.summary-card-fail .summary-card-count::before { content: '\2716 '; /* ✖ */ }
+.summary-card-review .summary-card-count::before { content: '\25C6 '; /* ◆ */ }
+.summary-card-pass .summary-card-count::before { content: '\2714 '; /* ✔ */ }
+.summary-card-unverified .summary-card-count::before { content: '\2012 '; /* ‒ */ }
 
 /* Findings table */
 .findings-table {
@@ -508,10 +513,12 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
-/* Findings table: status row coloring */
+/* Findings table: status row coloring
+   Uses distinct border styles for color-blind accessibility:
+   violated = solid (strong), indeterminate = dashed, satisfied = double */
 .findings-table tr.status-violated td:first-child { border-left: 3px solid var(--accent-vermillion); }
-.findings-table tr.status-indeterminate td:first-child { border-left: 3px solid var(--accent-gold); }
-.findings-table tr.status-satisfied td:first-child { border-left: 3px solid var(--accent-green); }
+.findings-table tr.status-indeterminate td:first-child { border-left: 3px dashed var(--accent-gold); }
+.findings-table tr.status-satisfied td:first-child { border-left: 3px double var(--accent-green); }
 
 /* Expandable rationale */
 .rationale-cell.collapsed,
