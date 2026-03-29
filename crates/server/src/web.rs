@@ -570,6 +570,9 @@ async fn auth_callback(
         }
     };
 
+    // Proactively sync repos in background so data is ready when user lands on /repos
+    spawn_sync_repos_job(&state, user_id);
+
     let mut resp = Redirect::to("/repos").into_response();
     resp.headers_mut().append(
         SET_COOKIE,
@@ -634,6 +637,9 @@ async fn install_callback(
         tracing::error!("Failed to save installation: {e:#}");
         return Html("Internal error".to_string()).into_response();
     }
+
+    // Proactively sync repos for the new installation
+    spawn_sync_repos_job(&state, user_id);
 
     Redirect::to("/settings").into_response()
 }
@@ -1021,6 +1027,11 @@ async fn api_verify_repo(
                     )
                 })
                 .await;
+                let _ = state.events_tx.send(JobEvent::VerificationComplete {
+                    user_id,
+                    owner: owner.clone(),
+                    repo: repo.clone(),
+                });
             }
             Json(r).into_response()
         }
@@ -1258,6 +1269,11 @@ async fn api_verify_release(
                     )
                 })
                 .await;
+                let _ = state.events_tx.send(JobEvent::VerificationComplete {
+                    user_id,
+                    owner: owner.clone(),
+                    repo: repo.clone(),
+                });
             }
             Json(r).into_response()
         }
@@ -1507,6 +1523,11 @@ async fn api_verify_pr(
                     )
                 })
                 .await;
+                let _ = state.events_tx.send(JobEvent::VerificationComplete {
+                    user_id,
+                    owner: owner.clone(),
+                    repo: repo.clone(),
+                });
             }
             Json(r).into_response()
         }
