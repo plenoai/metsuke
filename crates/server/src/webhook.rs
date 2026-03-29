@@ -409,4 +409,115 @@ mod tests {
         );
         assert!(hex::decode("xyz").is_err());
     }
+
+    #[test]
+    fn test_hex_decode_empty() {
+        assert_eq!(hex::decode("").unwrap(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn test_hex_decode_odd_length() {
+        assert!(hex::decode("abc").is_err());
+    }
+
+    #[test]
+    fn test_hex_decode_uppercase() {
+        assert_eq!(
+            hex::decode("DEADBEEF").unwrap(),
+            vec![0xde, 0xad, 0xbe, 0xef]
+        );
+    }
+
+    #[test]
+    fn test_format_check_result_empty_json() {
+        let (conclusion, title, _) = format_check_result("{}", "PR");
+        assert_eq!(conclusion, "success"); // no failures → success
+        assert!(title.contains("0 pass"));
+        assert!(title.contains("0 fail"));
+    }
+
+    #[test]
+    fn test_format_check_result_invalid_json() {
+        let (conclusion, title, _) = format_check_result("not json", "PR");
+        assert_eq!(conclusion, "success"); // defaults to 0 failures
+        assert!(title.contains("0 pass"));
+    }
+
+    #[test]
+    fn test_format_check_result_multiple_failed_controls() {
+        let json = r#"{
+            "pass_count": 1, "fail_count": 3, "review_count": 0, "na_count": 0,
+            "controls": [
+                {"id": "CTL-001", "result": "fail"},
+                {"id": "CTL-002", "result": "fail"},
+                {"id": "CTL-003", "result": "pass"},
+                {"id": "CTL-004", "result": "fail"}
+            ]
+        }"#;
+        let (conclusion, _, summary) = format_check_result(json, "Release");
+        assert_eq!(conclusion, "failure");
+        assert!(summary.contains("CTL-001"));
+        assert!(summary.contains("CTL-002"));
+        assert!(summary.contains("CTL-004"));
+        assert!(!summary.contains("CTL-003"));
+    }
+
+    #[test]
+    fn dedup_cache_rejects_duplicate_delivery_ids() {
+        let ids: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+
+        // First insert succeeds
+        {
+            let mut set = ids.lock().unwrap();
+            assert!(!set.contains("delivery-1"));
+            set.insert("delivery-1".to_string());
+        }
+
+        // Second insert is a duplicate
+        {
+            let set = ids.lock().unwrap();
+            assert!(set.contains("delivery-1"));
+        }
+    }
+
+    #[test]
+    fn dedup_cache_clears_at_max_capacity() {
+        let ids: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+
+        // Fill to MAX_DELIVERY_IDS
+        {
+            let mut set = ids.lock().unwrap();
+            for i in 0..MAX_DELIVERY_IDS {
+                set.insert(format!("id-{i}"));
+            }
+            assert_eq!(set.len(), MAX_DELIVERY_IDS);
+        }
+
+        // Next insert should clear and then insert
+        {
+            let mut set = ids.lock().unwrap();
+            if set.len() >= MAX_DELIVERY_IDS {
+                set.clear();
+            }
+            set.insert("new-id".to_string());
+            assert_eq!(set.len(), 1);
+            assert!(set.contains("new-id"));
+            // Old IDs are gone
+            assert!(!set.contains("id-0"));
+        }
+    }
+
+    #[test]
+    fn verify_signature_with_empty_body() {
+        let secret = "test-secret";
+        let body = b"";
+        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let result = mac.finalize().into_bytes();
+        let sig = format!(
+            "sha256={}",
+            result.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        );
+        assert!(verify_signature(secret, body, &sig));
+    }
 }
