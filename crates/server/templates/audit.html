@@ -207,7 +207,6 @@ async function loadAudit() {
     // Update page title with context
     const filterParts = [];
     if (type) filterParts.push(type);
-    const repoFilter = document.getElementById('filter-repo').value.trim();
     if (repoFilter) filterParts.push(repoFilter);
     document.title = filterParts.length > 0
       ? `監査ログ: ${filterParts.join(' ')} (${entries.length}件) — Metsuke`
