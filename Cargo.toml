@@ -26,6 +26,7 @@ rusqlite = { version = "0.33", features = ["bundled"] }
 jsonwebtoken = "9"
 uuid = { version = "1", features = ["v4"] }
 sha2 = "0.10"
+hmac = "0.12"
 base64 = "0.22"
 rand = "0.9"
 urlencoding = "2"

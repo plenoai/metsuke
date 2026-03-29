@@ -8,6 +8,7 @@ mod server;
 mod swr_cache;
 mod validation;
 mod web;
+mod webhook;
 
 use std::sync::Arc;
 
@@ -61,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
         .nest_service("/static", tower_http::services::ServeDir::new(&static_dir))
         .route("/health", axum::routing::get(|| async { "ok" }))
         .merge(oauth::router(db.clone(), github_app.clone(), &config))
+        .merge(webhook::router(db.clone(), github_app.clone(), &config))
         .merge(web::router(db, github_app, &config));
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;

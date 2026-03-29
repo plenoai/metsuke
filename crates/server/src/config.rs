@@ -10,6 +10,7 @@ pub struct AppConfig {
     pub github_app_private_key: String,
     pub database_url: String,
     pub base_url: String,
+    pub github_webhook_secret: Option<String>,
 }
 
 impl AppConfig {
@@ -33,6 +34,7 @@ impl AppConfig {
             std::env::var("DATABASE_URL").unwrap_or_else(|_| "/data/metsuke.db".into());
         let base_url =
             std::env::var("BASE_URL").unwrap_or_else(|_| "https://metsuke.fly.dev".into());
+        let github_webhook_secret = std::env::var("GITHUB_WEBHOOK_SECRET").ok();
 
         Ok(Self {
             host,
@@ -43,6 +45,7 @@ impl AppConfig {
             github_app_private_key,
             database_url,
             base_url,
+            github_webhook_secret,
         })
     }
 

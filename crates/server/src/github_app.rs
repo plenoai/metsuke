@@ -306,6 +306,46 @@ impl GitHubApp {
             .context("Failed to parse releases")
     }
 
+    /// Create a Check Run on a commit to report verification results.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_check_run(
+        &self,
+        installation_id: i64,
+        owner: &str,
+        repo: &str,
+        head_sha: &str,
+        name: &str,
+        conclusion: &str,
+        title: &str,
+        summary: &str,
+    ) -> Result<()> {
+        let token = self.create_installation_token(installation_id).await?;
+        let client = reqwest::Client::new();
+        let body = serde_json::json!({
+            "name": name,
+            "head_sha": head_sha,
+            "status": "completed",
+            "conclusion": conclusion,
+            "output": {
+                "title": title,
+                "summary": summary,
+            }
+        });
+        client
+            .post(format!(
+                "https://api.github.com/repos/{owner}/{repo}/check-runs"
+            ))
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "metsuke")
+            .json(&body)
+            .send()
+            .await?
+            .error_for_status()
+            .context("Failed to create check run")?;
+        Ok(())
+    }
+
     pub async fn get_user(access_token: &str) -> Result<GitHubUser> {
         let client = reqwest::Client::new();
         client
