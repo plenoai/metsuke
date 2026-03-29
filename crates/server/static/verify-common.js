@@ -66,7 +66,7 @@ function renderErrorCard(message) {
 function compactBadges(pass, fail, review) {
   let badges = '';
   if (pass > 0) badges += `<span class="badge badge-pass" title="PASS">PASS ${pass}</span>`;
-  if (review > 0) badges += `<span class="badge badge-review" title="REVIEW">REV ${review}</span>`;
+  if (review > 0) badges += `<span class="badge badge-review" title="REVIEW">REVIEW ${review}</span>`;
   if (fail > 0) badges += `<span class="badge badge-fail" title="FAIL">FAIL ${fail}</span>`;
   return badges;
 }

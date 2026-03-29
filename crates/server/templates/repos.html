@@ -20,7 +20,7 @@
   transition: border-color 0.2s ease;
 }
 .repo-card:hover {
-  border-color: var(--border);
+  border-color: var(--accent-gold);
 }
 .repo-info {
   flex: 1;
@@ -75,7 +75,7 @@
 {% block content %}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
     <div class="section-title" id="repos-title" style="margin-bottom:0">リポジトリ</div>
-    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap" id="toolbar" class="toolbar-hidden">
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap" id="toolbar">
       <select class="policy-select" id="org-filter" onchange="filterByOrg(this.value)" aria-label="組織フィルタ" style="display:none">
         <option value="">全組織</option>
       </select>
