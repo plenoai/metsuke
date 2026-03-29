@@ -75,7 +75,7 @@
     </div>
   </div>
 
-  <div id="result-area">
+  <div id="result-area" aria-live="polite">
     <div class="card" style="text-align:center;padding:2rem;color:var(--text-secondary);font-family:var(--font-mono);font-size:0.8rem">
       「リポジトリ検証」をクリックしてSDLCコンプライアンスを検証してください。<br>
       または「リリース検証」「PR検証」で個別に検証できます。
@@ -147,7 +147,7 @@ async function runVerify() {
   }
 
   btn.disabled = false;
-  btn.textContent = '検証を実行';
+  btn.textContent = '再検証';
   btn.style.borderColor = '';
   btn.style.color = '';
 }

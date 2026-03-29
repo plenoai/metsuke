@@ -113,7 +113,7 @@
     <button class="verify-btn" id="export-csv-btn" onclick="exportAuditCSV()">CSV出力</button>
   </div>
 
-  <div id="audit-content"><div class="loading">監査ログを取得中</div></div>
+  <div id="audit-content" aria-live="polite"><div class="loading" role="status">監査ログを取得中</div></div>
   <div id="audit-pagination" class="pagination"></div>
 {% endblock %}
 

@@ -157,7 +157,7 @@ function renderRepoList(repos, cacheArr) {
 
   const cards = repos.map(r => {
     const cached = cacheMap[r.full_name];
-    const cachedBadges = cached ? renderBadges(cached.pass, cached.fail, cached.review) : '';
+    const cachedBadges = cached ? renderBadges(cached.pass, cached.fail, cached.review) : '<span class="badge badge-na">未検証</span>';
     const cachedTime = cached ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${cached.verified_at}</span>` : '';
     const desc = r.description ? `<div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">${esc(r.description)}</div>` : '';
 
@@ -297,6 +297,7 @@ function exportCSV() {
 }
 
 async function verifyAll() {
+  if (!confirm(`${allRepos.length} 個のリポジトリを一括検証します。よろしいですか？`)) return;
   const btn = document.getElementById('verify-all-btn');
   const progressWrap = document.getElementById('verify-all-progress');
   const progressText = document.getElementById('progress-text');

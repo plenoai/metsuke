@@ -385,6 +385,9 @@ select:focus-visible {
   .header { flex-direction: column; align-items: flex-start; gap: 1rem; }
   .brand { font-size: 1.3rem; }
   .nav-links { gap: 0.5rem; }
-  .nav-link { font-size: 0.72rem; padding: 0.25rem 0.5rem; }
+  .nav-link { font-size: 0.72rem; padding: 0.4rem 0.6rem; min-height: 44px; display: inline-flex; align-items: center; }
   .user-badge { font-size: 0.75rem; }
+  .verify-btn { padding: 0.5rem 0.9rem; min-height: 44px; }
+  .policy-select { padding: 0.5rem; min-height: 44px; }
+  .btn { padding: 0.6rem 1rem; min-height: 44px; }
 }
