@@ -48,6 +48,18 @@ pub struct InstallationAccount {
 }
 
 #[derive(Deserialize)]
+struct UserInstallationsResponse {
+    total_count: i64,
+    installations: Vec<UserInstallation>,
+}
+
+#[derive(Deserialize)]
+pub struct UserInstallation {
+    pub id: i64,
+    pub account: InstallationAccount,
+}
+
+#[derive(Deserialize)]
 struct RepoListResponse {
     total_count: i64,
     repositories: Vec<Repository>,
@@ -63,6 +75,7 @@ pub struct Repository {
     pub default_branch: Option<String>,
     pub language: Option<String>,
     pub updated_at: Option<String>,
+    pub pushed_at: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -215,6 +228,34 @@ impl GitHubApp {
             page += 1;
         }
         Ok(repos)
+    }
+
+    /// List all GitHub App installations accessible to the authenticated user.
+    pub async fn list_user_installations(user_token: &str) -> Result<Vec<UserInstallation>> {
+        let client = reqwest::Client::new();
+        let mut installations = Vec::new();
+        let mut page = 1u32;
+        loop {
+            let resp: UserInstallationsResponse = client
+                .get("https://api.github.com/user/installations")
+                .query(&[("per_page", "100"), ("page", &page.to_string())])
+                .header("Authorization", format!("Bearer {user_token}"))
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "metsuke")
+                .send()
+                .await?
+                .error_for_status()
+                .context("Failed to list user installations")?
+                .json()
+                .await?;
+            let count = resp.installations.len();
+            installations.extend(resp.installations);
+            if count < 100 || installations.len() as i64 >= resp.total_count {
+                break;
+            }
+            page += 1;
+        }
+        Ok(installations)
     }
 
     pub async fn list_pull_requests(

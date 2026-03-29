@@ -77,6 +77,7 @@
     <div class="section-title" id="repos-title" style="margin-bottom:0">Repositories</div>
     <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap" id="toolbar" class="toolbar-hidden">
       <select class="policy-select" id="sort-select" onchange="sortRepos(this.value)" aria-label="ソート順">
+        <option value="activity" selected>アクティビティ順</option>
         <option value="name">名前順</option>
         <option value="fail-desc">FAIL多い順</option>
         <option value="fail-asc">FAIL少ない順</option>
@@ -151,7 +152,7 @@ function renderRepoList(repos, cacheArr) {
     const cachedTime = cached ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${cached.verified_at}</span>` : '';
     const desc = r.description ? `<div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">${esc(r.description)}</div>` : '';
 
-    return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}" data-name="${esc(r.full_name.toLowerCase())}" data-desc="${esc((r.description || '').toLowerCase())}" data-lang="${esc((r.language || '').toLowerCase())}">
+    return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}" data-name="${esc(r.full_name.toLowerCase())}" data-desc="${esc((r.description || '').toLowerCase())}" data-lang="${esc((r.language || '').toLowerCase())}" data-pushed="${esc(r.pushed_at || '')}">
       <div class="repo-info">
         <div class="repo-name">
           <a href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}">${esc(r.full_name)}</a>
@@ -243,6 +244,11 @@ function sortRepos(mode) {
     const nameB = b.dataset.name || '';
     const cA = allCache[nameA.replace('-', '/')] || {};
     const cB = allCache[nameB.replace('-', '/')] || {};
+    if (mode === 'activity') {
+      const pA = a.dataset.pushed || '';
+      const pB = b.dataset.pushed || '';
+      return pB.localeCompare(pA);
+    }
     if (mode === 'fail-desc') return (cB.fail || 0) - (cA.fail || 0);
     if (mode === 'fail-asc') return (cA.fail || 0) - (cB.fail || 0);
     if (mode === 'unverified') {

@@ -310,7 +310,12 @@ pub async fn handle_oauth_callback(
         }
     };
 
-    let user_id = match db.upsert_user(user.id, &user.login, user.avatar_url.as_deref()) {
+    let user_id = match db.upsert_user(
+        user.id,
+        &user.login,
+        user.avatar_url.as_deref(),
+        Some(&token_resp.access_token),
+    ) {
         Ok(id) => id,
         Err(e) => {
             tracing::error!("DB error: {e:#}");

@@ -512,10 +512,12 @@ async fn auth_callback(
         }
     };
 
-    let user_id = match state
-        .db
-        .upsert_user(user.id, &user.login, user.avatar_url.as_deref())
-    {
+    let user_id = match state.db.upsert_user(
+        user.id,
+        &user.login,
+        user.avatar_url.as_deref(),
+        Some(&token_resp.access_token),
+    ) {
         Ok(id) => id,
         Err(e) => {
             tracing::error!("DB error: {e:#}");
@@ -644,6 +646,7 @@ struct RepoWithOwner {
     language: Option<String>,
     default_branch: Option<String>,
     updated_at: Option<String>,
+    pushed_at: Option<String>,
 }
 
 async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Response {
@@ -665,7 +668,33 @@ async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Respons
     .await
 }
 
+async fn sync_installations(state: &WebState, user_id: i64) {
+    let token = match state.db.get_github_token(user_id) {
+        Ok(Some(t)) => t,
+        _ => return,
+    };
+    let user_installations = match GitHubApp::list_user_installations(&token).await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("Failed to list user installations: {e:#}");
+            return;
+        }
+    };
+    for inst in user_installations {
+        if let Err(e) = state.db.save_installation(
+            inst.id,
+            user_id,
+            &inst.account.login,
+            &inst.account.account_type,
+        ) {
+            tracing::warn!("Failed to sync installation {}: {e:#}", inst.account.login);
+        }
+    }
+}
+
 async fn fetch_repos(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
+    sync_installations(state, user_id).await;
+
     let installations = state
         .db
         .get_installations_for_user(user_id)
@@ -689,6 +718,7 @@ async fn fetch_repos(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
                         language: r.language,
                         default_branch: r.default_branch,
                         updated_at: r.updated_at,
+                        pushed_at: r.pushed_at,
                     });
                 }
             }
@@ -697,6 +727,11 @@ async fn fetch_repos(state: &WebState, user_id: i64) -> Vec<RepoWithOwner> {
             }
         }
     }
+    repos.sort_by(|a, b| {
+        let ta = a.pushed_at.as_deref().unwrap_or("");
+        let tb = b.pushed_at.as_deref().unwrap_or("");
+        tb.cmp(ta)
+    });
     repos
 }
 
