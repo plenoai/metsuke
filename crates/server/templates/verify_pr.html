@@ -100,7 +100,7 @@
   gap: 0.75rem;
 }
 .pr-item:hover {
-  border-color: #3a3d57;
+  border-color: var(--border);
 }
 .pr-item-info {
   flex: 1;
@@ -175,7 +175,7 @@
     <div id="pr-list"><div class="loading">PRを取得中</div></div>
   </div>
 
-  <div id="result-area"></div>
+  <div id="result-area" aria-live="polite"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -280,7 +280,7 @@ function renderPRList(prs) {
   container.innerHTML = '<div class="pr-list">' + prs.map(pr => `
     <div class="pr-item">
       <div class="pr-item-info">
-        <div class="pr-item-title">#${pr.number} ${esc(pr.title)}</div>
+        <div class="pr-item-title" style="cursor:pointer" onclick="document.getElementById('pr-number').value=${pr.number};document.getElementById('pr-number').focus()">#${pr.number} ${esc(pr.title)}</div>
         <div class="pr-item-meta">
           <span>${esc(pr.user.login)}</span>
           <span>${new Date(pr.updated_at).toLocaleDateString('ja-JP')}</span>

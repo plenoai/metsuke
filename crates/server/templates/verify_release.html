@@ -100,7 +100,7 @@
   gap: 0.75rem;
 }
 .release-item:hover {
-  border-color: #3a3d57;
+  border-color: var(--border);
 }
 .release-item-info {
   flex: 1;
@@ -176,7 +176,7 @@
     <div id="release-list"><div class="loading">リリースを取得中</div></div>
   </div>
 
-  <div id="result-area"></div>
+  <div id="result-area" aria-live="polite"></div>
 {% endblock %}
 
 {% block scripts %}

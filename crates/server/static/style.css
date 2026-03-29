@@ -163,7 +163,7 @@ body::before {
   transition: border-color 0.2s ease;
 }
 .card:hover {
-  border-color: #3a3d57;
+  border-color: var(--border);
 }
 
 /* Badges */
