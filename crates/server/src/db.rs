@@ -1,8 +1,8 @@
 use anyhow::Result;
 use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const READ_POOL_SIZE: usize = 4;
 
@@ -962,7 +962,6 @@ impl Database {
         )?;
         Ok((user_id, session_id))
     }
-
 }
 
 pub struct AuditEntry {

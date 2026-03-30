@@ -1099,10 +1099,9 @@ async fn api_list_releases(
     let db = state.db.clone();
     let o = owner.clone();
     let r = repo.clone();
-    let (releases, stale) =
-        run_blocking(move || db.get_releases_with_staleness(user_id, &o, &r))
-            .await
-            .unwrap_or_default();
+    let (releases, stale) = run_blocking(move || db.get_releases_with_staleness(user_id, &o, &r))
+        .await
+        .unwrap_or_default();
 
     if releases.is_empty() || stale {
         spawn_sync_releases_job(&state, user_id, owner, repo);
