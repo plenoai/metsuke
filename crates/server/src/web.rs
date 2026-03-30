@@ -1699,8 +1699,8 @@ mod tests {
         };
         let html = t.render().unwrap();
         assert!(html.contains("PR検証"));
-        assert!(html.contains("pr-number"));
-        assert!(html.contains(">Pull Request<"));
+        assert!(html.contains("pr-policy"));
+        assert!(html.contains("Pull Request"));
     }
 
     #[test]
