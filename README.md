@@ -20,7 +20,7 @@ Metsuke is a Remote MCP Server that provides SDLC compliance verification as too
 
 Remote MCP Server
 ```
-https://metsuke.fly.dev/mcp
+https://metsuke.plenoai.com/mcp
 ```
 
 Claude Code (`~/.claude/settings.json`)
@@ -29,7 +29,7 @@ Claude Code (`~/.claude/settings.json`)
   "mcpServers": {
     "metsuke": {
       "type": "url",
-      "url": "https://metsuke.fly.dev/mcp"
+      "url": "https://metsuke.plenoai.com/mcp"
     }
   }
 }
