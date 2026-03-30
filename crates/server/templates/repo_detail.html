@@ -29,6 +29,10 @@
   </div>
 
   <div id="result-area" aria-live="polite"></div>
+
+  <div id="readme-area" class="section" style="margin-top:1.5rem">
+    <div id="readme-loading" class="loading" role="status">README を読み込み中</div>
+  </div>
 {% endblock %}
 
 {% block scripts %}
@@ -63,5 +67,27 @@ async function runVerify() {
 }
 
 enhancePolicySelect(document.getElementById('policy-select'));
+
+(async function loadReadme() {
+  const area = document.getElementById('readme-area');
+  const loading = document.getElementById('readme-loading');
+  try {
+    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/readme`);
+    if (resp.status === 404) {
+      area.style.display = 'none';
+      return;
+    }
+    if (!resp.ok) throw new Error(await resp.text());
+    const html = await resp.text();
+    loading.remove();
+    const content = document.createElement('div');
+    content.className = 'markdown-body card';
+    content.innerHTML = html;
+    area.appendChild(content);
+  } catch (e) {
+    loading.remove();
+    area.style.display = 'none';
+  }
+})();
 </script>
 {% endblock %}

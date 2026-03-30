@@ -119,6 +119,10 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             "/api/repos/{owner}/{repo}/verify-pr/{pr_number}",
             axum::routing::post(api_verify_pr),
         )
+        .route(
+            "/api/repos/{owner}/{repo}/readme",
+            axum::routing::get(api_readme),
+        )
         .route("/api/events", axum::routing::get(api_events))
         .route("/api/audit-history", axum::routing::get(api_audit_history))
         .route(
@@ -1595,6 +1599,74 @@ async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Respon
     }
     .into_web_template()
     .into_response()
+}
+
+// ---------------------------------------------------------------------------
+// README API
+// ---------------------------------------------------------------------------
+
+async fn api_readme(
+    headers: HeaderMap,
+    Path((owner, repo)): Path<(String, String)>,
+    State(state): State<WebState>,
+) -> Response {
+    if let Some(r) = validate_repo_params(&owner, &repo) {
+        return r;
+    }
+
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let db = state.db.clone();
+    let token = match run_blocking(move || db.get_github_token(user_id)).await {
+        Ok(Some(t)) => t,
+        Ok(None) => {
+            return (axum::http::StatusCode::UNAUTHORIZED, "No GitHub token").into_response()
+        }
+        Err(e) => {
+            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, format!("{e}")).into_response()
+        }
+    };
+
+    let url = format!("https://api.github.com/repos/{owner}/{repo}/readme");
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Accept", "application/vnd.github.html+json")
+        .header("User-Agent", "metsuke")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
+        .await;
+
+    match resp {
+        Ok(r) if r.status().is_success() => {
+            let html = r.text().await.unwrap_or_default();
+            (
+                [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+                html,
+            )
+                .into_response()
+        }
+        Ok(r) if r.status().as_u16() == 404 => {
+            (axum::http::StatusCode::NOT_FOUND, "README not found").into_response()
+        }
+        Ok(r) => {
+            let status = r.status();
+            let body = r.text().await.unwrap_or_default();
+            (
+                axum::http::StatusCode::from_u16(status.as_u16())
+                    .unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
+                body,
+            )
+                .into_response()
+        }
+        Err(e) => {
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, format!("{e}")).into_response()
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

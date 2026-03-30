@@ -512,6 +512,28 @@ select:focus-visible {
   white-space: nowrap;
 }
 
+/* Markdown / README */
+.markdown-body { font-size: 0.85rem; line-height: 1.7; padding: 1.5rem; overflow-x: auto; }
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+  margin: 1.25em 0 0.5em; font-weight: 700; color: var(--text-primary);
+}
+.markdown-body h1 { font-size: 1.4rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.3em; }
+.markdown-body h2 { font-size: 1.15rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.25em; }
+.markdown-body h3 { font-size: 1rem; }
+.markdown-body p, .markdown-body ul, .markdown-body ol { margin: 0.6em 0; }
+.markdown-body ul, .markdown-body ol { padding-left: 1.5em; }
+.markdown-body li { margin: 0.25em 0; }
+.markdown-body code { font-family: var(--font-mono); font-size: 0.8rem; background: var(--bg-deep); padding: 0.15em 0.35em; border-radius: 3px; }
+.markdown-body pre { background: var(--bg-deep); padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.75em 0; }
+.markdown-body pre code { background: none; padding: 0; }
+.markdown-body a { color: var(--accent-gold); }
+.markdown-body img { max-width: 100%; border-radius: 4px; }
+.markdown-body table { border-collapse: collapse; width: 100%; margin: 0.75em 0; }
+.markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 0.4em 0.75em; text-align: left; }
+.markdown-body th { background: var(--bg-elevated); font-weight: 600; }
+.markdown-body blockquote { border-left: 3px solid var(--accent-gold); margin: 0.75em 0; padding: 0.25em 1em; color: var(--text-secondary); }
+.markdown-body hr { border: none; border-top: 1px solid var(--border-subtle); margin: 1.5em 0; }
+
 /* Responsive */
 @media (max-width: 600px) {
   .shell { padding: 1.5rem 1rem 3rem; }
