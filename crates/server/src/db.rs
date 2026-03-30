@@ -10,33 +10,28 @@ pub struct Database {
 
 impl Database {
     pub fn open(path: &str) -> Result<Self> {
-        let uri_flag = OpenFlags::SQLITE_OPEN_URI;
-
+        // Writer: default flags (READ_WRITE | CREATE) — NO_MUTEX is unnecessary
+        // because we serialise access via Mutex<Connection>.
         let writer = Connection::open_with_flags(
             path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE
-                | OpenFlags::SQLITE_OPEN_CREATE
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX
-                | uri_flag,
+            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
         )?;
         writer.execute_batch(
             "PRAGMA journal_mode=WAL;
              PRAGMA foreign_keys=ON;
              PRAGMA synchronous=NORMAL;
              PRAGMA cache_size=-20000;
-             PRAGMA busy_timeout=5000;
-             PRAGMA mmap_size=268435456;",
+             PRAGMA busy_timeout=5000;",
         )?;
 
         let reader = Connection::open_with_flags(
             path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX | uri_flag,
+            OpenFlags::SQLITE_OPEN_READ_ONLY,
         )?;
         reader.execute_batch(
             "PRAGMA foreign_keys=ON;
              PRAGMA cache_size=-20000;
-             PRAGMA busy_timeout=5000;
-             PRAGMA mmap_size=268435456;",
+             PRAGMA busy_timeout=5000;",
         )?;
 
         let db = Self {
