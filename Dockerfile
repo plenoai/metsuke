@@ -9,6 +9,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
+COPY --from=planner /app/Cargo.lock Cargo.lock
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 RUN git init && git config user.email "build@build" && git config user.name "build" && git commit --allow-empty -m "build"

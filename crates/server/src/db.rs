@@ -186,7 +186,17 @@ impl Database {
                 synced_at TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE(user_id, owner, repo, release_id)
             );
-            CREATE INDEX IF NOT EXISTS idx_cached_releases_repo ON cached_releases(user_id, owner, repo);",
+            CREATE INDEX IF NOT EXISTS idx_cached_releases_repo ON cached_releases(user_id, owner, repo);
+
+            CREATE TABLE IF NOT EXISTS oauth_states (
+                state TEXT PRIMARY KEY,
+                client_id TEXT NOT NULL,
+                redirect_uri TEXT NOT NULL,
+                code_challenge TEXT NOT NULL,
+                scope TEXT NOT NULL DEFAULT 'mcp',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                expires_at TEXT NOT NULL
+            );",
         )?;
 
         Ok(())
@@ -232,6 +242,7 @@ impl Database {
         }
     }
 
+    #[cfg(test)]
     pub fn create_session(&self, user_id: i64) -> Result<String> {
         let session_id = uuid::Uuid::new_v4().to_string();
         let conn = self.writer.lock().unwrap();
@@ -281,7 +292,7 @@ impl Database {
         installations: &[(i64, String, String)],
     ) -> Result<()> {
         let conn = self.writer.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "INSERT OR REPLACE INTO installations (installation_id, user_id, account_login, account_type)
              VALUES (?1, ?2, ?3, ?4)",
         )?;
@@ -308,7 +319,7 @@ impl Database {
 
     pub fn get_installations_for_user(&self, user_id: i64) -> Result<Vec<(i64, String, String)>> {
         let conn = self.reader();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT installation_id, account_login, account_type
              FROM installations WHERE user_id = ?1",
         )?;
@@ -515,17 +526,6 @@ impl Database {
         scope: &str,
     ) -> Result<()> {
         let conn = self.writer.lock().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS oauth_states (
-                state TEXT PRIMARY KEY,
-                client_id TEXT NOT NULL,
-                redirect_uri TEXT NOT NULL,
-                code_challenge TEXT NOT NULL,
-                scope TEXT NOT NULL DEFAULT 'mcp',
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                expires_at TEXT NOT NULL
-            );",
-        )?;
         conn.execute(
             "INSERT INTO oauth_states (state, client_id, redirect_uri, code_challenge, scope, expires_at)
              VALUES (?1, ?2, ?3, ?4, ?5, datetime('now', '+10 minutes'))",
@@ -698,7 +698,7 @@ impl Database {
         let mut conn = self.writer.lock().unwrap();
         let tx = conn.transaction()?;
         {
-            let mut stmt = tx.prepare(
+            let mut stmt = tx.prepare_cached(
                 "INSERT INTO repositories (user_id, owner, name, full_name, private, description, language, default_branch, pushed_at, synced_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))
                  ON CONFLICT(user_id, full_name) DO UPDATE SET
@@ -729,96 +729,6 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_repositories_for_user(&self, user_id: i64) -> Result<Vec<RepoRow>> {
-        let conn = self.reader();
-        let mut stmt = conn.prepare(
-            "SELECT r.owner, r.name, r.full_name, r.private, r.description, r.language,
-                    r.default_branch, r.pushed_at, r.synced_at,
-                    a.pass_count, a.fail_count, a.review_count, a.verified_at
-             FROM repositories r
-             LEFT JOIN (
-                 SELECT owner, repo, pass_count, fail_count, review_count, verified_at
-                 FROM audit_log WHERE user_id = ?1 AND verification_type = 'repo'
-                 AND id IN (SELECT MAX(id) FROM audit_log WHERE user_id = ?1 AND verification_type = 'repo' GROUP BY owner, repo)
-             ) a ON r.owner = a.owner AND r.name = a.repo
-             WHERE r.user_id = ?1
-             ORDER BY r.pushed_at DESC NULLS LAST",
-        )?;
-        let rows = stmt.query_map([user_id], |row| {
-            Ok(RepoRow {
-                owner: row.get(0)?,
-                name: row.get(1)?,
-                full_name: row.get(2)?,
-                private: row.get::<_, i32>(3)? != 0,
-                description: row.get(4)?,
-                language: row.get(5)?,
-                default_branch: row.get(6)?,
-                pushed_at: row.get(7)?,
-                synced_at: row.get(8)?,
-                pass_count: row.get(9)?,
-                fail_count: row.get(10)?,
-                review_count: row.get(11)?,
-                verified_at: row.get(12)?,
-            })
-        })?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-    }
-
-    pub fn get_repos_synced_at(&self, user_id: i64) -> Result<Option<String>> {
-        let conn = self.reader();
-        let result = conn.query_row(
-            "SELECT MIN(synced_at) FROM repositories WHERE user_id = ?1",
-            [user_id],
-            |row| row.get(0),
-        );
-        match result {
-            Ok(v) => Ok(v),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    pub fn is_repos_stale(&self, user_id: i64) -> Result<bool> {
-        let conn = self.reader();
-        let stale: bool = conn.query_row(
-            "SELECT CASE WHEN COUNT(*) = 0 THEN 1
-                    ELSE MIN(synced_at) < datetime('now', '-5 minutes')
-                    END
-             FROM repositories WHERE user_id = ?1",
-            [user_id],
-            |row| row.get(0),
-        )?;
-        Ok(stale)
-    }
-
-    pub fn is_pulls_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
-        let conn = self.reader();
-        let stale: bool = conn.query_row(
-            "SELECT CASE WHEN COUNT(*) = 0 THEN 1
-                    ELSE MIN(synced_at) < datetime('now', '-5 minutes')
-                    END
-             FROM cached_pulls WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
-            rusqlite::params![user_id, owner, repo],
-            |row| row.get(0),
-        )?;
-        Ok(stale)
-    }
-
-    pub fn is_releases_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
-        let conn = self.reader();
-        let stale: bool = conn.query_row(
-            "SELECT CASE WHEN COUNT(*) = 0 THEN 1
-                    ELSE MIN(synced_at) < datetime('now', '-5 minutes')
-                    END
-             FROM cached_releases WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
-            rusqlite::params![user_id, owner, repo],
-            |row| row.get(0),
-        )?;
-        Ok(stale)
-    }
-
-    // --- Cached Pulls ---
-
     pub fn upsert_cached_pulls(
         &self,
         user_id: i64,
@@ -833,7 +743,7 @@ impl Database {
                 "DELETE FROM cached_pulls WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
                 rusqlite::params![user_id, owner, repo],
             )?;
-            let mut stmt = tx.prepare(
+            let mut stmt = tx.prepare_cached(
                 "INSERT INTO cached_pulls (user_id, owner, repo, pr_number, title, state, author, created_at, updated_at, merged_at, draft, synced_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))",
             )?;
@@ -857,36 +767,6 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_cached_pulls(
-        &self,
-        user_id: i64,
-        owner: &str,
-        repo: &str,
-    ) -> Result<Vec<CachedPullRow>> {
-        let conn = self.reader();
-        let mut stmt = conn.prepare(
-            "SELECT pr_number, title, state, author, created_at, updated_at, merged_at, draft
-             FROM cached_pulls
-             WHERE user_id = ?1 AND owner = ?2 AND repo = ?3
-             ORDER BY updated_at DESC",
-        )?;
-        let rows = stmt.query_map(rusqlite::params![user_id, owner, repo], |row| {
-            Ok(CachedPullRow {
-                pr_number: row.get(0)?,
-                title: row.get(1)?,
-                state: row.get(2)?,
-                author: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
-                merged_at: row.get(6)?,
-                draft: row.get::<_, i32>(7)? != 0,
-            })
-        })?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-    }
-
-    // --- Cached Releases ---
-
     pub fn upsert_cached_releases(
         &self,
         user_id: i64,
@@ -901,7 +781,7 @@ impl Database {
                 "DELETE FROM cached_releases WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
                 rusqlite::params![user_id, owner, repo],
             )?;
-            let mut stmt = tx.prepare(
+            let mut stmt = tx.prepare_cached(
                 "INSERT INTO cached_releases (user_id, owner, repo, release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body, synced_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now'))",
             )?;
@@ -927,36 +807,6 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_cached_releases(
-        &self,
-        user_id: i64,
-        owner: &str,
-        repo: &str,
-    ) -> Result<Vec<CachedReleaseRow>> {
-        let conn = self.reader();
-        let mut stmt = conn.prepare(
-            "SELECT release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body
-             FROM cached_releases
-             WHERE user_id = ?1 AND owner = ?2 AND repo = ?3
-             ORDER BY created_at DESC",
-        )?;
-        let rows = stmt.query_map(rusqlite::params![user_id, owner, repo], |row| {
-            Ok(CachedReleaseRow {
-                release_id: row.get(0)?,
-                tag_name: row.get(1)?,
-                name: row.get(2)?,
-                draft: row.get::<_, i32>(3)? != 0,
-                prerelease: row.get::<_, i32>(4)? != 0,
-                created_at: row.get(5)?,
-                published_at: row.get(6)?,
-                author: row.get(7)?,
-                html_url: row.get(8)?,
-                body: row.get(9)?,
-            })
-        })?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-    }
-
     /// Combined: get repos + staleness check in a single reader lock acquisition.
     pub fn get_repos_with_staleness(&self, user_id: i64) -> Result<(Vec<RepoRow>, bool)> {
         let conn = self.reader();
@@ -968,7 +818,7 @@ impl Database {
             [user_id],
             |row| row.get(0),
         )?;
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT r.owner, r.name, r.full_name, r.private, r.description, r.language,
                     r.default_branch, r.pushed_at, r.synced_at,
                     a.pass_count, a.fail_count, a.review_count, a.verified_at
@@ -1018,7 +868,7 @@ impl Database {
             rusqlite::params![user_id, owner, repo],
             |row| row.get(0),
         )?;
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT pr_number, title, state, author, created_at, updated_at, merged_at, draft
              FROM cached_pulls
              WHERE user_id = ?1 AND owner = ?2 AND repo = ?3
@@ -1056,7 +906,7 @@ impl Database {
             rusqlite::params![user_id, owner, repo],
             |row| row.get(0),
         )?;
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body
              FROM cached_releases
              WHERE user_id = ?1 AND owner = ?2 AND repo = ?3
@@ -1113,37 +963,6 @@ impl Database {
         Ok((user_id, session_id))
     }
 
-    /// Latest verification per (owner, repo, type) for cache display on repos list
-    pub fn get_latest_verifications_for_user(&self, user_id: i64) -> Result<Vec<AuditEntry>> {
-        let conn = self.reader();
-        let mut stmt = conn.prepare(
-            "SELECT a.id, a.verification_type, a.owner, a.repo, a.target_ref, a.policy,
-                    a.pass_count, a.fail_count, a.review_count, a.na_count, a.verified_at
-             FROM audit_log a
-             INNER JOIN (
-                 SELECT MAX(id) as max_id FROM audit_log
-                 WHERE user_id = ?1
-                 GROUP BY owner, repo, verification_type
-             ) latest ON a.id = latest.max_id
-             ORDER BY a.verified_at DESC",
-        )?;
-        let rows = stmt.query_map([user_id], |row| {
-            Ok(AuditEntry {
-                id: row.get(0)?,
-                verification_type: row.get(1)?,
-                owner: row.get(2)?,
-                repo: row.get(3)?,
-                target_ref: row.get(4)?,
-                policy: row.get(5)?,
-                pass_count: row.get(6)?,
-                fail_count: row.get(7)?,
-                review_count: row.get(8)?,
-                na_count: row.get(9)?,
-                verified_at: row.get(10)?,
-            })
-        })?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-    }
 }
 
 pub struct AuditEntry {
@@ -1625,28 +1444,6 @@ mod tests {
             .get_audit_history(uid, None, None, None, None, None, 2, 4)
             .unwrap();
         assert_eq!(page3.len(), 1);
-    }
-
-    #[test]
-    fn get_latest_verifications_for_user() {
-        let db = memory_db();
-        let uid = db.upsert_user(1, "user", None, None).unwrap();
-
-        // Two PRs for same repo → only latest returned
-        db.append_audit_entry(uid, "pr", "o", "r", "ref1", "default", 1, 0, 0, 0, "{}")
-            .unwrap();
-        db.append_audit_entry(uid, "pr", "o", "r", "ref2", "default", 2, 0, 0, 0, "{}")
-            .unwrap();
-        // Different type for same repo → separate entry
-        db.append_audit_entry(uid, "release", "o", "r", "v1", "default", 3, 0, 0, 0, "{}")
-            .unwrap();
-
-        let latest = db.get_latest_verifications_for_user(uid).unwrap();
-        assert_eq!(latest.len(), 2);
-        // The PR entry should be the latest one (pass_count=2)
-        let pr_entry = latest.iter().find(|e| e.verification_type == "pr").unwrap();
-        assert_eq!(pr_entry.pass_count, 2);
-        assert_eq!(pr_entry.target_ref, "ref2");
     }
 
     #[test]
