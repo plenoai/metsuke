@@ -200,7 +200,7 @@ function renderPagination() {
   if (tp <= 1) return '';
   const start = Math.max(1, currentPage - 2);
   const end = Math.min(tp, currentPage + 2);
-  let html = '<div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:0.25rem;margin-top:1rem;font-family:var(--font-mono);font-size:0.75rem">';
+  let html = '<div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:0.25rem;margin-top:1rem;margin-bottom:1rem;font-family:var(--font-mono);font-size:0.75rem">';
   if (currentPage > 1) html += `<button class="verify-btn" onclick="goToPage(${currentPage - 1})" style="padding:0.25rem 0.5rem">‹</button>`;
   for (let i = start; i <= end; i++) {
     if (i === currentPage) {
