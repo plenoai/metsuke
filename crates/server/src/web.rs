@@ -1620,30 +1620,22 @@ async fn api_readme(
     };
 
     let db = state.db.clone();
-    let token = match run_blocking(move || db.get_github_token(user_id)).await {
-        Ok(Some(t)) => t,
-        Ok(None) => {
-            return (axum::http::StatusCode::UNAUTHORIZED, "No GitHub token").into_response();
-        }
-        Err(e) => {
-            return (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("{e}"),
-            )
-                .into_response();
-        }
-    };
+    let token = run_blocking(move || db.get_github_token(user_id))
+        .await
+        .ok()
+        .flatten();
 
     let url = format!("https://api.github.com/repos/{owner}/{repo}/readme");
     let client = reqwest::Client::new();
-    let resp = client
+    let mut req = client
         .get(&url)
-        .header("Authorization", format!("Bearer {token}"))
         .header("Accept", "application/vnd.github.html+json")
         .header("User-Agent", "metsuke")
-        .header("X-GitHub-Api-Version", "2022-11-28")
-        .send()
-        .await;
+        .header("X-GitHub-Api-Version", "2022-11-28");
+    if let Some(t) = token {
+        req = req.header("Authorization", format!("Bearer {t}"));
+    }
+    let resp = req.send().await;
 
     match resp {
         Ok(r) if r.status().is_success() => {
