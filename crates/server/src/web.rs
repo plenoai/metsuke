@@ -1623,10 +1623,14 @@ async fn api_readme(
     let token = match run_blocking(move || db.get_github_token(user_id)).await {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return (axum::http::StatusCode::UNAUTHORIZED, "No GitHub token").into_response()
+            return (axum::http::StatusCode::UNAUTHORIZED, "No GitHub token").into_response();
         }
         Err(e) => {
-            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, format!("{e}")).into_response()
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{e}"),
+            )
+                .into_response();
         }
     };
 
@@ -1663,9 +1667,11 @@ async fn api_readme(
             )
                 .into_response()
         }
-        Err(e) => {
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, format!("{e}")).into_response()
-        }
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{e}"),
+        )
+            .into_response(),
     }
 }
 
