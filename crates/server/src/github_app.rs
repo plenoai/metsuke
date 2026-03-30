@@ -155,10 +155,10 @@ impl GitHubApp {
         // Check cache (read lock)
         {
             let cache = self.jwt_cache.read().unwrap();
-            if let Some((ref token, created_at)) = *cache {
-                if created_at.elapsed() < JWT_TTL {
-                    return Ok(token.clone());
-                }
+            if let Some((ref token, created_at)) = *cache
+                && created_at.elapsed() < JWT_TTL
+            {
+                return Ok(token.clone());
             }
         }
 
@@ -189,10 +189,10 @@ impl GitHubApp {
         // Check cache (read lock)
         {
             let cache = self.token_cache.read().unwrap();
-            if let Some((token, created_at)) = cache.get(&installation_id) {
-                if created_at.elapsed() < TOKEN_TTL {
-                    return Ok(token.clone());
-                }
+            if let Some((token, created_at)) = cache.get(&installation_id)
+                && created_at.elapsed() < TOKEN_TTL
+            {
+                return Ok(token.clone());
             }
         }
 
@@ -282,7 +282,7 @@ impl GitHubApp {
         }
 
         // Calculate remaining pages and fetch in parallel
-        let total_pages = (total + 99) / 100;
+        let total_pages = total.div_ceil(100);
         let mut join_set = tokio::task::JoinSet::new();
 
         for page in 2..=total_pages {
@@ -339,7 +339,7 @@ impl GitHubApp {
         }
 
         // Fetch remaining pages in parallel
-        let total_pages = (total + 99) / 100;
+        let total_pages = total.div_ceil(100);
         let mut join_set = tokio::task::JoinSet::new();
 
         for page in 2..=total_pages {
