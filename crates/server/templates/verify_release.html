@@ -145,7 +145,7 @@ function renderReleaseList(releases) {
           ${name !== rel.tag_name ? `<span style="font-weight:400;color:var(--text-secondary);font-size:0.75rem;margin-left:0.5rem">${esc(name)}</span>` : ''}
         </div>
         <div class="release-item-meta">
-          <span>${esc(rel.author.login)}</span>
+          <span>${esc(rel.author)}</span>
           <span>${new Date(date).toLocaleDateString('ja-JP')}</span>
           ${rel.prerelease ? '<span class="release-prerelease">pre-release</span>' : ''}
           ${rel.draft ? '<span class="release-prerelease">draft</span>' : ''}
