@@ -543,26 +543,14 @@ async fn auth_callback(
     let avatar = user.avatar_url.clone();
     let access_token = token_resp.access_token.clone();
     let uid = user.id;
-    let user_id = match run_blocking(move || {
-        db.upsert_user(uid, &login, avatar.as_deref(), Some(&access_token))
+    let (user_id, session_id) = match run_blocking(move || {
+        db.upsert_user_and_create_session(uid, &login, avatar.as_deref(), Some(&access_token))
     })
     .await
     {
-        Ok(id) => id,
+        Ok(r) => r,
         Err(e) => {
             tracing::error!("DB error: {e:#}");
-            return error_page(
-                "内部エラー",
-                "予期しないエラーが発生しました。しばらく経ってから再度お試しください。",
-            );
-        }
-    };
-
-    let db = state.db.clone();
-    let session_id = match run_blocking(move || db.create_session(user_id)).await {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::error!("Session creation failed: {e:#}");
             return error_page(
                 "内部エラー",
                 "予期しないエラーが発生しました。しばらく経ってから再度お試しください。",
@@ -680,18 +668,11 @@ async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Respons
     };
 
     let db = state.db.clone();
-    let repos = run_blocking(move || db.get_repositories_for_user(user_id))
+    let (repos, stale) = run_blocking(move || db.get_repos_with_staleness(user_id))
         .await
         .unwrap_or_default();
 
-    let needs_sync = repos.is_empty() || {
-        let db = state.db.clone();
-        run_blocking(move || db.is_repos_stale(user_id))
-            .await
-            .unwrap_or(true)
-    };
-
-    if needs_sync {
+    if repos.is_empty() || stale {
         spawn_sync_repos_job(&state, user_id);
     }
 
@@ -1086,20 +1067,11 @@ async fn api_list_pulls(
     let db = state.db.clone();
     let o = owner.clone();
     let r = repo.clone();
-    let pulls = run_blocking(move || db.get_cached_pulls(user_id, &o, &r))
+    let (pulls, stale) = run_blocking(move || db.get_pulls_with_staleness(user_id, &o, &r))
         .await
         .unwrap_or_default();
 
-    let needs_sync = pulls.is_empty() || {
-        let db = state.db.clone();
-        let o = owner.clone();
-        let r = repo.clone();
-        run_blocking(move || db.is_pulls_stale(user_id, &o, &r))
-            .await
-            .unwrap_or(true)
-    };
-
-    if needs_sync {
+    if pulls.is_empty() || stale {
         spawn_sync_pulls_job(&state, user_id, owner, repo);
     }
 
@@ -1127,20 +1099,12 @@ async fn api_list_releases(
     let db = state.db.clone();
     let o = owner.clone();
     let r = repo.clone();
-    let releases = run_blocking(move || db.get_cached_releases(user_id, &o, &r))
-        .await
-        .unwrap_or_default();
-
-    let needs_sync = releases.is_empty() || {
-        let db = state.db.clone();
-        let o = owner.clone();
-        let r = repo.clone();
-        run_blocking(move || db.is_releases_stale(user_id, &o, &r))
+    let (releases, stale) =
+        run_blocking(move || db.get_releases_with_staleness(user_id, &o, &r))
             .await
-            .unwrap_or(true)
-    };
+            .unwrap_or_default();
 
-    if needs_sync {
+    if releases.is_empty() || stale {
         spawn_sync_releases_job(&state, user_id, owner, repo);
     }
 

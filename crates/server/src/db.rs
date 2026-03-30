@@ -1,17 +1,19 @@
 use anyhow::Result;
 use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+
+const READ_POOL_SIZE: usize = 4;
 
 pub struct Database {
     writer: Mutex<Connection>,
-    reader: Mutex<Connection>,
+    readers: Vec<Mutex<Connection>>,
+    next_reader: AtomicUsize,
 }
 
 impl Database {
     pub fn open(path: &str) -> Result<Self> {
-        // Writer: default flags (READ_WRITE | CREATE) — NO_MUTEX is unnecessary
-        // because we serialise access via Mutex<Connection>.
         let writer = Connection::open_with_flags(
             path,
             OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
@@ -24,22 +26,30 @@ impl Database {
              PRAGMA busy_timeout=5000;",
         )?;
 
-        let reader = Connection::open_with_flags(
-            path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY,
-        )?;
-        reader.execute_batch(
-            "PRAGMA foreign_keys=ON;
-             PRAGMA cache_size=-20000;
-             PRAGMA busy_timeout=5000;",
-        )?;
+        let mut readers = Vec::with_capacity(READ_POOL_SIZE);
+        for _ in 0..READ_POOL_SIZE {
+            let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+            conn.execute_batch(
+                "PRAGMA foreign_keys=ON;
+                 PRAGMA cache_size=-5000;
+                 PRAGMA busy_timeout=5000;",
+            )?;
+            readers.push(Mutex::new(conn));
+        }
 
         let db = Self {
             writer: Mutex::new(writer),
-            reader: Mutex::new(reader),
+            readers,
+            next_reader: AtomicUsize::new(0),
         };
         db.migrate()?;
         Ok(db)
+    }
+
+    /// Round-robin reader connection from the pool.
+    fn reader(&self) -> std::sync::MutexGuard<'_, Connection> {
+        let idx = self.next_reader.fetch_add(1, Ordering::Relaxed) % self.readers.len();
+        self.readers[idx].lock().unwrap()
     }
 
     fn migrate(&self) -> Result<()> {
@@ -209,7 +219,7 @@ impl Database {
     }
 
     pub fn get_github_token(&self, user_id: i64) -> Result<Option<String>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let result = conn.query_row(
             "SELECT github_token FROM users WHERE id = ?1",
             [user_id],
@@ -234,7 +244,7 @@ impl Database {
     }
 
     pub fn get_user_by_session(&self, session_id: &str) -> Result<Option<(i64, String)>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let result = conn.query_row(
             "SELECT u.id, u.github_login
              FROM sessions s JOIN users u ON s.user_id = u.id
@@ -282,7 +292,7 @@ impl Database {
     }
 
     pub fn get_installation_for_owner(&self, user_id: i64, owner: &str) -> Result<Option<i64>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let result = conn.query_row(
             "SELECT installation_id FROM installations
              WHERE user_id = ?1 AND account_login = ?2",
@@ -297,7 +307,7 @@ impl Database {
     }
 
     pub fn get_installations_for_user(&self, user_id: i64) -> Result<Vec<(i64, String, String)>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let mut stmt = conn.prepare(
             "SELECT installation_id, account_login, account_type
              FROM installations WHERE user_id = ?1",
@@ -333,7 +343,7 @@ impl Database {
     }
 
     pub fn get_oauth_client(&self, client_id: &str) -> Result<Option<OAuthClient>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let result = conn.query_row(
             "SELECT client_id, client_secret, client_name, redirect_uris, token_endpoint_auth_method FROM oauth_clients WHERE client_id = ?1",
             [client_id],
@@ -433,7 +443,7 @@ impl Database {
     }
 
     pub fn validate_access_token(&self, access_token: &str) -> Result<Option<i64>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let result = conn.query_row(
             "SELECT user_id FROM oauth_tokens WHERE access_token = ?1 AND expires_at > datetime('now')",
             [access_token],
@@ -588,7 +598,7 @@ impl Database {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<AuditEntry>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let mut sql = String::from(
             "SELECT id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, verified_at
              FROM audit_log WHERE user_id = ?1",
@@ -651,7 +661,7 @@ impl Database {
 
     /// Check database connectivity.
     pub fn ping(&self) -> Result<()> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         conn.execute_batch("SELECT 1")?;
         Ok(())
     }
@@ -720,7 +730,7 @@ impl Database {
     }
 
     pub fn get_repositories_for_user(&self, user_id: i64) -> Result<Vec<RepoRow>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let mut stmt = conn.prepare(
             "SELECT r.owner, r.name, r.full_name, r.private, r.description, r.language,
                     r.default_branch, r.pushed_at, r.synced_at,
@@ -755,7 +765,7 @@ impl Database {
     }
 
     pub fn get_repos_synced_at(&self, user_id: i64) -> Result<Option<String>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let result = conn.query_row(
             "SELECT MIN(synced_at) FROM repositories WHERE user_id = ?1",
             [user_id],
@@ -769,7 +779,7 @@ impl Database {
     }
 
     pub fn is_repos_stale(&self, user_id: i64) -> Result<bool> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let stale: bool = conn.query_row(
             "SELECT CASE WHEN COUNT(*) = 0 THEN 1
                     ELSE MIN(synced_at) < datetime('now', '-5 minutes')
@@ -782,7 +792,7 @@ impl Database {
     }
 
     pub fn is_pulls_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let stale: bool = conn.query_row(
             "SELECT CASE WHEN COUNT(*) = 0 THEN 1
                     ELSE MIN(synced_at) < datetime('now', '-5 minutes')
@@ -795,7 +805,7 @@ impl Database {
     }
 
     pub fn is_releases_stale(&self, user_id: i64, owner: &str, repo: &str) -> Result<bool> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let stale: bool = conn.query_row(
             "SELECT CASE WHEN COUNT(*) = 0 THEN 1
                     ELSE MIN(synced_at) < datetime('now', '-5 minutes')
@@ -853,7 +863,7 @@ impl Database {
         owner: &str,
         repo: &str,
     ) -> Result<Vec<CachedPullRow>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let mut stmt = conn.prepare(
             "SELECT pr_number, title, state, author, created_at, updated_at, merged_at, draft
              FROM cached_pulls
@@ -923,7 +933,7 @@ impl Database {
         owner: &str,
         repo: &str,
     ) -> Result<Vec<CachedReleaseRow>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let mut stmt = conn.prepare(
             "SELECT release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body
              FROM cached_releases
@@ -947,9 +957,165 @@ impl Database {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
+    /// Combined: get repos + staleness check in a single reader lock acquisition.
+    pub fn get_repos_with_staleness(&self, user_id: i64) -> Result<(Vec<RepoRow>, bool)> {
+        let conn = self.reader();
+        let stale: bool = conn.query_row(
+            "SELECT CASE WHEN COUNT(*) = 0 THEN 1
+                    ELSE MIN(synced_at) < datetime('now', '-5 minutes')
+                    END
+             FROM repositories WHERE user_id = ?1",
+            [user_id],
+            |row| row.get(0),
+        )?;
+        let mut stmt = conn.prepare(
+            "SELECT r.owner, r.name, r.full_name, r.private, r.description, r.language,
+                    r.default_branch, r.pushed_at, r.synced_at,
+                    a.pass_count, a.fail_count, a.review_count, a.verified_at
+             FROM repositories r
+             LEFT JOIN (
+                 SELECT owner, repo, pass_count, fail_count, review_count, verified_at
+                 FROM audit_log WHERE user_id = ?1 AND verification_type = 'repo'
+                 AND id IN (SELECT MAX(id) FROM audit_log WHERE user_id = ?1 AND verification_type = 'repo' GROUP BY owner, repo)
+             ) a ON r.owner = a.owner AND r.name = a.repo
+             WHERE r.user_id = ?1
+             ORDER BY r.pushed_at DESC NULLS LAST",
+        )?;
+        let rows = stmt.query_map([user_id], |row| {
+            Ok(RepoRow {
+                owner: row.get(0)?,
+                name: row.get(1)?,
+                full_name: row.get(2)?,
+                private: row.get::<_, i32>(3)? != 0,
+                description: row.get(4)?,
+                language: row.get(5)?,
+                default_branch: row.get(6)?,
+                pushed_at: row.get(7)?,
+                synced_at: row.get(8)?,
+                pass_count: row.get(9)?,
+                fail_count: row.get(10)?,
+                review_count: row.get(11)?,
+                verified_at: row.get(12)?,
+            })
+        })?;
+        let repos: Vec<RepoRow> = rows.collect::<Result<Vec<_>, _>>()?;
+        Ok((repos, stale))
+    }
+
+    /// Combined: get cached pulls + staleness check in a single reader lock.
+    pub fn get_pulls_with_staleness(
+        &self,
+        user_id: i64,
+        owner: &str,
+        repo: &str,
+    ) -> Result<(Vec<CachedPullRow>, bool)> {
+        let conn = self.reader();
+        let stale: bool = conn.query_row(
+            "SELECT CASE WHEN COUNT(*) = 0 THEN 1
+                    ELSE MIN(synced_at) < datetime('now', '-5 minutes')
+                    END
+             FROM cached_pulls WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+            rusqlite::params![user_id, owner, repo],
+            |row| row.get(0),
+        )?;
+        let mut stmt = conn.prepare(
+            "SELECT pr_number, title, state, author, created_at, updated_at, merged_at, draft
+             FROM cached_pulls
+             WHERE user_id = ?1 AND owner = ?2 AND repo = ?3
+             ORDER BY updated_at DESC",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![user_id, owner, repo], |row| {
+            Ok(CachedPullRow {
+                pr_number: row.get(0)?,
+                title: row.get(1)?,
+                state: row.get(2)?,
+                author: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+                merged_at: row.get(6)?,
+                draft: row.get::<_, i32>(7)? != 0,
+            })
+        })?;
+        let pulls: Vec<CachedPullRow> = rows.collect::<Result<Vec<_>, _>>()?;
+        Ok((pulls, stale))
+    }
+
+    /// Combined: get cached releases + staleness check in a single reader lock.
+    pub fn get_releases_with_staleness(
+        &self,
+        user_id: i64,
+        owner: &str,
+        repo: &str,
+    ) -> Result<(Vec<CachedReleaseRow>, bool)> {
+        let conn = self.reader();
+        let stale: bool = conn.query_row(
+            "SELECT CASE WHEN COUNT(*) = 0 THEN 1
+                    ELSE MIN(synced_at) < datetime('now', '-5 minutes')
+                    END
+             FROM cached_releases WHERE user_id = ?1 AND owner = ?2 AND repo = ?3",
+            rusqlite::params![user_id, owner, repo],
+            |row| row.get(0),
+        )?;
+        let mut stmt = conn.prepare(
+            "SELECT release_id, tag_name, name, draft, prerelease, created_at, published_at, author, html_url, body
+             FROM cached_releases
+             WHERE user_id = ?1 AND owner = ?2 AND repo = ?3
+             ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![user_id, owner, repo], |row| {
+            Ok(CachedReleaseRow {
+                release_id: row.get(0)?,
+                tag_name: row.get(1)?,
+                name: row.get(2)?,
+                draft: row.get::<_, i32>(3)? != 0,
+                prerelease: row.get::<_, i32>(4)? != 0,
+                created_at: row.get(5)?,
+                published_at: row.get(6)?,
+                author: row.get(7)?,
+                html_url: row.get(8)?,
+                body: row.get(9)?,
+            })
+        })?;
+        let releases: Vec<CachedReleaseRow> = rows.collect::<Result<Vec<_>, _>>()?;
+        Ok((releases, stale))
+    }
+
+    /// Combined: upsert user + create session in a single writer lock.
+    pub fn upsert_user_and_create_session(
+        &self,
+        github_id: i64,
+        login: &str,
+        avatar_url: Option<&str>,
+        github_token: Option<&str>,
+    ) -> Result<(i64, String)> {
+        let conn = self.writer.lock().unwrap();
+        conn.execute(
+            "INSERT INTO users (github_id, github_login, avatar_url, github_token)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(github_id) DO UPDATE SET
+                github_login = excluded.github_login,
+                avatar_url = excluded.avatar_url,
+                github_token = COALESCE(excluded.github_token, github_token),
+                updated_at = datetime('now')",
+            rusqlite::params![github_id, login, avatar_url, github_token],
+        )?;
+        let user_id: i64 = conn.query_row(
+            "SELECT id FROM users WHERE github_id = ?1",
+            [github_id],
+            |row| row.get(0),
+        )?;
+        let session_id = uuid::Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO sessions (id, user_id, expires_at)
+             VALUES (?1, ?2, datetime('now', '+30 days'))",
+            rusqlite::params![session_id, user_id],
+        )?;
+        Ok((user_id, session_id))
+    }
+
     /// Latest verification per (owner, repo, type) for cache display on repos list
     pub fn get_latest_verifications_for_user(&self, user_id: i64) -> Result<Vec<AuditEntry>> {
-        let conn = self.reader.lock().unwrap();
+        let conn = self.reader();
         let mut stmt = conn.prepare(
             "SELECT a.id, a.verification_type, a.owner, a.repo, a.target_ref, a.policy,
                     a.pass_count, a.fail_count, a.review_count, a.na_count, a.verified_at

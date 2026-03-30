@@ -317,28 +317,58 @@ impl GitHubApp {
 
     /// List all GitHub App installations accessible to the authenticated user.
     pub async fn list_user_installations(&self, user_token: &str) -> Result<Vec<UserInstallation>> {
-        let mut installations = Vec::new();
-        let mut page = 1u32;
-        loop {
-            let resp: UserInstallationsResponse = self
-                .http
-                .get("https://api.github.com/user/installations")
-                .query(&[("per_page", "100"), ("page", &page.to_string())])
-                .header("Authorization", format!("Bearer {user_token}"))
-                .header("Accept", "application/vnd.github+json")
-                .send()
-                .await?
-                .error_for_status()
-                .context("Failed to list user installations")?
-                .json()
-                .await?;
-            let count = resp.installations.len();
-            installations.extend(resp.installations);
-            if count < 100 || installations.len() as i64 >= resp.total_count {
-                break;
-            }
-            page += 1;
+        // Fetch first page to get total_count
+        let first_resp: UserInstallationsResponse = self
+            .http
+            .get("https://api.github.com/user/installations")
+            .query(&[("per_page", "100"), ("page", "1")])
+            .header("Authorization", format!("Bearer {user_token}"))
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await?
+            .error_for_status()
+            .context("Failed to list user installations")?
+            .json()
+            .await?;
+
+        let mut installations = first_resp.installations;
+        let total = first_resp.total_count as usize;
+
+        if installations.len() >= total {
+            return Ok(installations);
         }
+
+        // Fetch remaining pages in parallel
+        let total_pages = (total + 99) / 100;
+        let mut join_set = tokio::task::JoinSet::new();
+
+        for page in 2..=total_pages {
+            let http = self.http.clone();
+            let tok = user_token.to_string();
+            join_set.spawn(async move {
+                let resp: UserInstallationsResponse = http
+                    .get("https://api.github.com/user/installations")
+                    .query(&[("per_page", "100"), ("page", &page.to_string())])
+                    .header("Authorization", format!("Bearer {tok}"))
+                    .header("Accept", "application/vnd.github+json")
+                    .send()
+                    .await?
+                    .error_for_status()
+                    .context("Failed to list user installations")?
+                    .json()
+                    .await?;
+                Ok::<_, anyhow::Error>(resp.installations)
+            });
+        }
+
+        while let Some(result) = join_set.join_next().await {
+            match result {
+                Ok(Ok(batch)) => installations.extend(batch),
+                Ok(Err(e)) => tracing::warn!("Failed to fetch installations page: {e:#}"),
+                Err(e) => tracing::warn!("Installation page task panicked: {e}"),
+            }
+        }
+
         Ok(installations)
     }
 
