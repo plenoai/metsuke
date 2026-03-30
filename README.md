@@ -10,20 +10,20 @@ Metsuke is a Remote MCP Server that provides SDLC compliance verification as too
 
 ## Features
 
-- **3 MCP Tools**: `verify_pr`, `verify_release`, `verify_repo`
-- **28 SDLC Controls**: SLSA v1.2 (Source/Build/Dependencies) + SOC2 CC7/CC8
-- **9 Policy Presets**: default, oss, aiops, soc1, soc2, slsa-l1 through slsa-l4
-- **GitHub App**: [Install on your org](https://github.com/apps/pleno-metsuke)
-- **Agent Skills**: `/verify-pr`, `/verify-release`, `/verify-repo`
+- 28 SDLC Controls: SLSA v1.2 (Source/Build/Dependencies) + SOC2 CC7/CC8
+- 9 Policy Presets: default, oss, aiops, soc1, soc2, slsa-l1 through slsa-l4
+- GitHub App: [Install on your org](https://github.com/apps/pleno-metsuke)
+- MCP Tools
+- Agent Skills
 
 ## Connect
 
-**Remote MCP Server**:
+Remote MCP Server
 ```
 https://metsuke.fly.dev/mcp
 ```
 
-**Claude Code** (`~/.claude/settings.json`):
+Claude Code (`~/.claude/settings.json`)
 ```json
 {
   "mcpServers": {
@@ -35,7 +35,7 @@ https://metsuke.fly.dev/mcp
 }
 ```
 
-**Agent Skills**:
+Agent Skills
 ```bash
 npx skills add plenoai/metsuke
 ```
