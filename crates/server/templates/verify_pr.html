@@ -88,11 +88,19 @@
 
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
     <div class="section-title" style="margin-bottom:0">Pull Request</div>
-    <select class="policy-select" id="pr-policy" aria-label="ポリシー">
-      {% for p in policy_options %}
-      <option value="{{ p }}">{{ p }}</option>
-      {% endfor %}
-    </select>
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+      <select class="policy-select" id="pr-filter" onchange="applyFilter()" aria-label="状態フィルタ">
+        <option value="">all</option>
+        <option value="open" selected>open</option>
+        <option value="merged">merged</option>
+        <option value="closed">closed</option>
+      </select>
+      <select class="policy-select" id="pr-policy" aria-label="ポリシー">
+        {% for p in policy_options %}
+        <option value="{{ p }}">{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </div>
 
   <div id="pr-list" aria-live="polite"><div class="loading" role="status">PRを取得中</div></div>
@@ -104,17 +112,26 @@
 <script>
 const OWNER = '{{ owner }}';
 const REPO = '{{ repo }}';
+let allPRs = [];
+
+function prState(pr) {
+  if (pr.merged_at) return 'merged';
+  if (pr.state === 'closed') return 'closed';
+  return 'open';
+}
+
+function prStateBadge(pr) {
+  const s = prState(pr);
+  if (s === 'merged') return '<span class="pr-state pr-merged">merged</span>';
+  if (s === 'closed') return '<span class="pr-state pr-closed">closed</span>';
+  return '<span class="pr-state pr-open">open</span>';
+}
 
 function renderPRList(prs) {
   const container = document.getElementById('pr-list');
   if (prs.length === 0) {
     container.innerHTML = '<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">PRはありません</div>';
     return;
-  }
-  function prStateBadge(pr) {
-    if (pr.merged_at) return '<span class="pr-state pr-merged">merged</span>';
-    if (pr.state === 'closed') return '<span class="pr-state pr-closed">closed</span>';
-    return '<span class="pr-state pr-open">open</span>';
   }
   container.innerHTML = '<div class="pr-list">' + prs.map(pr => `
     <div class="pr-item">
@@ -135,10 +152,18 @@ function renderPRList(prs) {
   `).join('') + '</div>';
 }
 
+function applyFilter() {
+  const filter = document.getElementById('pr-filter').value;
+  let filtered = allPRs;
+  if (filter) filtered = allPRs.filter(pr => prState(pr) === filter);
+  filtered.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  renderPRList(filtered);
+}
+
 async function loadPRs() {
   try {
-    const prs = await swrFetch(`/api/repos/${OWNER}/${REPO}/pulls`);
-    renderPRList(prs);
+    allPRs = await swrFetch(`/api/repos/${OWNER}/${REPO}/pulls`);
+    applyFilter();
   } catch (e) {
     renderLoadError('pr-list', 'PRの取得に失敗しました。', 'loadPRs');
   }
