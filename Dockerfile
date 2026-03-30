@@ -19,9 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN useradd -m -u 1000 metsuke
 COPY --from=builder /app/target/release/metsuke /usr/local/bin/
 COPY --from=builder /app/crates/server/static /app/static
-RUN chown -R metsuke:metsuke /app
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && chown -R metsuke:metsuke /app
 ENV PORT=8080
 ENV STATIC_DIR=/app/static
 EXPOSE 8080
-USER metsuke
-CMD ["metsuke"]
+CMD ["entrypoint.sh"]
