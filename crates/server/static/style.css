@@ -361,52 +361,6 @@ select:focus-visible {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Dashboard summary strip */
-.dashboard-summary {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-.summary-card {
-  flex: 1;
-  min-width: 120px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-  font-family: var(--font-mono);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
-}
-.summary-card:hover {
-  border-color: var(--accent-gold);
-}
-.summary-card.active {
-  border-color: var(--accent-vermillion);
-}
-.summary-card-count {
-  font-size: 1.4rem;
-  font-weight: 800;
-  line-height: 1;
-  margin-bottom: 0.25rem;
-}
-.summary-card-label {
-  font-size: 0.65rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-.summary-card-fail .summary-card-count { color: var(--accent-vermillion); }
-.summary-card-review .summary-card-count { color: var(--accent-gold); }
-.summary-card-pass .summary-card-count { color: var(--accent-green); }
-.summary-card-unverified .summary-card-count { color: var(--text-secondary); }
-/* Status symbols for color-blind accessibility (purely via CSS, survives textContent updates) */
-.summary-card-fail .summary-card-count::before { content: '\2716 '; /* ✖ */ }
-.summary-card-review .summary-card-count::before { content: '\25C6 '; /* ◆ */ }
-.summary-card-pass .summary-card-count::before { content: '\2714 '; /* ✔ */ }
-.summary-card-unverified .summary-card-count::before { content: '\2012 '; /* ‒ */ }
 
 /* Findings table */
 .findings-table {
@@ -596,17 +550,6 @@ select:focus-visible {
     word-break: break-word;
   }
 
-  /* Dashboard summary cards stack */
-  .dashboard-summary {
-    gap: 0.35rem;
-  }
-  .summary-card {
-    min-width: 70px;
-    padding: 0.5rem 0.6rem;
-  }
-  .summary-card-count {
-    font-size: 1.1rem;
-  }
 }
 
 /* Print stylesheet */
@@ -655,14 +598,6 @@ select:focus-visible {
   .user-badge { color: #333; }
   .user-badge strong { color: #111; }
 
-  /* Dashboard summary: static */
-  .dashboard-summary { display: flex !important; }
-  .summary-card {
-    border: 1px solid #ccc;
-    border-radius: 0;
-    background: #fff;
-    cursor: default;
-  }
 
   /* Badges: high-contrast for print */
   .badge-pass {

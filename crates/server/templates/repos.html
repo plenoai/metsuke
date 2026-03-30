@@ -84,7 +84,6 @@
       <button class="btn" id="verify-all-btn" onclick="verifyAll()" style="font-size:0.72rem;display:none">全リポジトリを検証</button>
     </div>
   </div>
-  <div id="dashboard-summary" class="dashboard-summary" style="display:none" aria-label="検証サマリー"></div>
   <div id="verify-all-progress" style="display:none;margin-bottom:1rem" aria-live="polite">
     <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">
       <span id="progress-text" role="status">0 / 0</span>
@@ -106,7 +105,6 @@ const PAGE_SIZE = 50;
 let allRepos = [];
 let filteredRepos = [];
 let currentPage = 1;
-let activeFilter = null;
 let activeOrg = '';
 let currentSort = 'activity';
 
@@ -139,9 +137,6 @@ function computeFiltered() {
 
   if (activeOrg) {
     list = list.filter(r => r.owner.toLowerCase() === activeOrg.toLowerCase());
-  }
-  if (activeFilter) {
-    list = list.filter(r => repoStatus(r) === activeFilter);
   }
   if (q) {
     list = list.filter(r =>
@@ -257,31 +252,6 @@ function renderPage() {
     document.getElementById('export-csv-btn').style.display = '';
   }
 
-  // Dashboard summary
-  let failRepos = 0, reviewRepos = 0, passRepos = 0, unverifiedRepos = 0;
-  filteredRepos.forEach(r => {
-    const s = repoStatus(r);
-    if (s === 'fail') failRepos++;
-    else if (s === 'review') reviewRepos++;
-    else if (s === 'pass') passRepos++;
-    else unverifiedRepos++;
-  });
-  const summaryEl = document.getElementById('dashboard-summary');
-  summaryEl.style.display = '';
-  summaryEl.innerHTML = `
-    <div class="summary-card summary-card-fail${activeFilter === 'fail' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'fail'}" onclick="filterByStatus('fail')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('fail')}" title="FAILのあるリポジトリのみ表示">
-      <div class="summary-card-count">${failRepos}</div><div class="summary-card-label">FAIL</div>
-    </div>
-    <div class="summary-card summary-card-review${activeFilter === 'review' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'review'}" onclick="filterByStatus('review')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('review')}" title="REVIEWのあるリポジトリのみ表示">
-      <div class="summary-card-count">${reviewRepos}</div><div class="summary-card-label">REVIEW</div>
-    </div>
-    <div class="summary-card summary-card-pass${activeFilter === 'pass' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'pass'}" onclick="filterByStatus('pass')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('pass')}" title="PASSのリポジトリのみ表示">
-      <div class="summary-card-count">${passRepos}</div><div class="summary-card-label">PASS</div>
-    </div>
-    <div class="summary-card summary-card-unverified${activeFilter === 'unverified' ? ' active' : ''}" role="button" tabindex="0" aria-pressed="${activeFilter === 'unverified'}" onclick="filterByStatus('unverified')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterByStatus('unverified')}" title="未検証のリポジトリのみ表示">
-      <div class="summary-card-count">${unverifiedRepos}</div><div class="summary-card-label">未検証</div>
-    </div>
-  `;
 
   const orgs = [...new Set(allRepos.map(r => r.owner))].sort();
   const orgFilter = document.getElementById('org-filter');
@@ -313,11 +283,6 @@ function sortRepos(mode) {
   renderPage();
 }
 
-function filterByStatus(status) {
-  activeFilter = activeFilter === status ? null : status;
-  currentPage = 1;
-  renderPage();
-}
 
 function filterByOrg(org) {
   activeOrg = org;
