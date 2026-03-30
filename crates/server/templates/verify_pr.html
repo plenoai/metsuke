@@ -4,14 +4,6 @@
 
 {% block head %}
 <style>
-.pr-form {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  margin-bottom: 1.5rem;
-}
-.form-group input { width: 120px; }
 .pr-list {
   display: flex;
   flex-direction: column;
@@ -82,8 +74,6 @@
   border-radius: 3px;
 }
 @media (max-width: 600px) {
-  .pr-form { flex-direction: column; align-items: stretch; }
-  .form-group input { width: 100%; }
   .findings-table { font-size: 0.65rem; }
   .findings-table th, .findings-table td { padding: 0.4rem; }
   .pr-item { flex-direction: column; align-items: flex-start; }
@@ -96,36 +86,16 @@
     <a href="/repos">リポジトリ</a> / <a href="/repos/{{ owner }}/{{ repo }}">{{ owner }}/{{ repo }}</a> / PR検証
   </div>
 
-  <div class="section-title">Pull Request 検証</div>
-
-  <div class="card">
-    <div class="pr-form">
-      <div class="form-group">
-        <label for="pr-number">PR番号</label>
-        <input type="number" id="pr-number" min="1" placeholder="#123" required autofocus>
-      </div>
-      <div class="form-group">
-        <label for="pr-policy">ポリシー</label>
-        <select class="policy-select" id="pr-policy">
-          {% for p in policy_options %}
-          <option value="{{ p }}">{{ p }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <button class="btn" id="verify-btn" onclick="verifyPR()" style="font-size:0.8rem;align-self:flex-end">
-        検証を実行
-      </button>
-    </div>
-    <p style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">
-      PRのコミット署名、CIステータス、レビュー承認、依存関係変更などをSDLCコントロールに照合します。
-    </p>
-    <div id="policy-help" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);min-height:1.2em;margin-top:0.25rem"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
+    <div class="section-title" style="margin-bottom:0">Pull Request</div>
+    <select class="policy-select" id="pr-policy" aria-label="ポリシー">
+      {% for p in policy_options %}
+      <option value="{{ p }}">{{ p }}</option>
+      {% endfor %}
+    </select>
   </div>
 
-  <div id="pr-list-section" style="margin-top:1.5rem">
-    <div class="section-title">Pull Request</div>
-    <div id="pr-list" aria-live="polite"><div class="loading" role="status">PRを取得中</div></div>
-  </div>
+  <div id="pr-list" aria-live="polite"><div class="loading" role="status">PRを取得中</div></div>
 
   <div id="result-area" aria-live="polite"></div>
 {% endblock %}
@@ -134,47 +104,6 @@
 <script>
 const OWNER = '{{ owner }}';
 const REPO = '{{ repo }}';
-
-async function verifyPR() {
-  const prNum = document.getElementById('pr-number').value;
-  if (!prNum || prNum < 1) {
-    const input = document.getElementById('pr-number');
-    input.style.borderColor = 'var(--accent-vermillion)';
-    input.focus();
-    setTimeout(() => { input.style.borderColor = ''; }, 2000);
-    return;
-  }
-  const policy = document.getElementById('pr-policy').value;
-  const btn = document.getElementById('verify-btn');
-  const area = document.getElementById('result-area');
-
-  btn.disabled = true;
-  btn.textContent = '検証中…';
-  btn.classList.add('running');
-  area.innerHTML = '<div class="loading" role="status">検証を実行中</div>';
-
-  try {
-    const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${prNum}?policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
-    if (!resp.ok) throw new Error(await resp.text());
-    const data = await resp.json();
-    renderResult(data, prNum);
-  } catch (e) {
-    area.innerHTML = renderErrorCard(e.message);
-  }
-  btn.disabled = false;
-  btn.textContent = '検証を実行';
-  btn.classList.remove('running');
-}
-
-function renderResult(data, prNum) {
-  document.getElementById('result-area').innerHTML =
-    renderFindingsTable(data.findings, `PR #${prNum} 検証結果`);
-}
-
-// Auto-focus and handle Enter key
-document.getElementById('pr-number').addEventListener('keydown', e => {
-  if (e.key === 'Enter') verifyPR();
-});
 
 function renderPRList(prs) {
   const container = document.getElementById('pr-list');
@@ -228,6 +157,7 @@ async function verifyPRById(num, btn) {
     const data = await resp.json();
     const c = countFindings(data.findings);
     resultEl.innerHTML = compactBadges(c.pass, c.fail, c.review);
+    document.getElementById('result-area').innerHTML = renderFindingsTable(data.findings, `PR #${num} 検証結果`);
     btn.textContent = '再検証';
   } catch (e) {
     resultEl.innerHTML = '<span class="badge badge-fail" title="ERROR">ERR</span>';
@@ -238,6 +168,5 @@ async function verifyPRById(num, btn) {
 }
 
 loadPRs();
-enhancePolicySelect(document.getElementById('pr-policy'), 'policy-help');
 </script>
 {% endblock %}

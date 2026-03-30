@@ -59,12 +59,6 @@
   align-items: center;
   gap: 0.35rem;
 }
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
 @media (max-width: 600px) {
   .repo-card { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
   .repo-actions { margin-left: 0; }
@@ -181,8 +175,6 @@ function renderCard(r) {
   const hasVerification = r.verified_at != null;
   const badges = hasVerification ? renderBadges(r.pass_count || 0, r.fail_count || 0, r.review_count || 0) : '<span class="badge badge-na">未検証</span>';
   const verifiedTime = hasVerification ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${r.verified_at}</span>` : '';
-  const desc = r.description ? `<div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">${esc(r.description)}</div>` : '';
-
   return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}">
     <div class="repo-info">
       <div class="repo-name">
@@ -191,7 +183,6 @@ function renderCard(r) {
           <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
         </a>
       </div>
-      ${desc}
       <div class="repo-meta">
         ${r.private ? '<span class="badge badge-private">private</span>' : ''}
         ${r.language ? `<span>${esc(r.language)}</span>` : ''}
@@ -243,11 +234,7 @@ function renderPage() {
   if (total === 0) {
     container.innerHTML = `<div class="empty-state">
       <div style="margin-bottom:0.75rem">リポジトリが見つかりません</div>
-      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary);margin-bottom:1rem">
-        Metsukeがリポジトリにアクセスするには、GitHub Appのインストールが必要です。<br>
-        インストール後、このページにリポジトリが自動的に表示されます。
-      </div>
-      <a class="btn" href="/settings" style="text-decoration:none">設定画面でGitHub Appをインストール</a>
+      <a class="btn" href="/settings" style="text-decoration:none">GitHub Appをインストール</a>
     </div>`;
     return;
   }

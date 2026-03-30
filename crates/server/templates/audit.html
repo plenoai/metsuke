@@ -87,12 +87,6 @@
   opacity: 0.4;
   cursor: default;
 }
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
 @media (max-width: 600px) {
   .audit-table { font-size: 0.65rem; }
   .audit-table th, .audit-table td { padding: 0.4rem; }
@@ -176,11 +170,7 @@ async function loadAudit() {
     if (entries.length === 0 && currentOffset === 0) {
       container.innerHTML = `<div class="empty-state">
         <div style="margin-bottom:0.75rem">監査ログはまだありません</div>
-        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary);margin-bottom:1rem">
-          リポジトリ・PR・リリースの検証を実行すると、結果がここに記録されます。<br>
-          監査ログはコンプライアンス証跡として利用できます。
-        </div>
-        <a class="btn" href="/repos" style="text-decoration:none">リポジトリ一覧から検証を開始</a>
+        <a class="btn" href="/repos" style="text-decoration:none">リポジトリ一覧へ</a>
       </div>`;
       document.getElementById('audit-pagination').innerHTML = '';
       return;

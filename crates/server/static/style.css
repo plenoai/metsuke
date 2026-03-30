@@ -1,13 +1,13 @@
 /* Metsuke Design System — Shared Styles */
 
 :root {
-  --bg-deep: #0c0e1a;
-  --bg-surface: #141627;
-  --bg-elevated: #1c1f36;
-  --border: #2a2d47;
-  --border-subtle: #1f2139;
+  --bg-deep: #0a0a0c;
+  --bg-surface: #131315;
+  --bg-elevated: #1a1a1e;
+  --border: #262629;
+  --border-subtle: #1c1c1f;
   --text-primary: #e8e6e3;
-  --text-secondary: #9a9db0;
+  --text-secondary: #87878c;
   --accent-vermillion: #c73e3a;
   --accent-vermillion-glow: rgba(199, 62, 58, 0.12);
   --accent-gold: #c9a84c;
@@ -24,22 +24,10 @@ body {
   background: var(--bg-deep);
   color: var(--text-primary);
   min-height: 100vh;
-  position: relative;
-}
-body::before {
-  content: '';
-  position: fixed;
-  top: 0; right: 0; bottom: 0; left: 0;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='%232a2d47' stroke-width='0.5' opacity='0.3'/%3E%3C/svg%3E");
-  background-size: 60px 60px;
-  z-index: 0;
-  pointer-events: none;
 }
 
 /* Layout */
 .shell {
-  position: relative;
-  z-index: 1;
   max-width: 900px;
   margin: 0 auto;
   padding: 2.5rem 1.5rem 4rem;
@@ -160,10 +148,6 @@ body::before {
   border-radius: 10px;
   padding: 1.25rem 1.5rem;
   margin-bottom: 0.75rem;
-  transition: border-color 0.2s ease;
-}
-.card:hover {
-  border-color: var(--accent-gold);
 }
 
 /* Badges */
@@ -221,7 +205,6 @@ body::before {
 }
 .btn:hover {
   border-color: var(--accent-vermillion);
-  box-shadow: 0 0 16px var(--accent-vermillion-glow);
 }
 .btn svg {
   width: 16px;
@@ -246,7 +229,6 @@ body::before {
 }
 .verify-btn:hover {
   border-color: var(--accent-vermillion);
-  box-shadow: 0 0 12px var(--accent-vermillion-glow);
 }
 .verify-btn:disabled {
   opacity: 0.5;
@@ -403,7 +385,6 @@ select:focus-visible {
 }
 .summary-card.active {
   border-color: var(--accent-vermillion);
-  box-shadow: 0 0 12px var(--accent-vermillion-glow);
 }
 .summary-card-count {
   font-size: 1.4rem;
@@ -646,7 +627,6 @@ select:focus-visible {
     --accent-vermillion-glow: transparent;
     --accent-gold-dim: transparent;
   }
-  body::before { display: none; }
   body { background: #fff; color: #111; }
   .shell { max-width: 100%; padding: 0; }
 
@@ -683,7 +663,6 @@ select:focus-visible {
     background: #fff;
     cursor: default;
   }
-  .summary-card.active { box-shadow: none; }
 
   /* Badges: high-contrast for print */
   .badge-pass {

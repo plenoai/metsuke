@@ -95,10 +95,6 @@
         検証を実行
       </button>
     </div>
-    <p style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">
-      2つのリリースタグ間の変更をSDLCコントロールに照合し、コンプライアンスを検証します。
-    </p>
-    <div id="policy-help" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);min-height:1.2em;margin-top:0.25rem"></div>
   </div>
 
   <div id="release-list-section" style="margin-top:1.5rem">
@@ -213,6 +209,7 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
     const data = await resp.json();
     const c = countFindings(data.findings);
     resultEl.innerHTML = compactBadges(c.pass, c.fail, c.review);
+    document.getElementById('result-area').innerHTML = renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`);
     btn.textContent = '再検証';
   } catch (e) {
     resultEl.innerHTML = '<span class="badge badge-fail" title="ERROR">ERR</span>';
@@ -228,6 +225,5 @@ function renderResult(data, baseTag, headTag) {
 }
 
 loadReleases();
-enhancePolicySelect(document.getElementById('release-policy'), 'policy-help');
 </script>
 {% endblock %}
