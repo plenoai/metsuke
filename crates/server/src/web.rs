@@ -1642,13 +1642,13 @@ async fn api_get_latest_release_verifications(
         Ok(rows) => {
             let json: Vec<serde_json::Value> = rows
                 .into_iter()
-                .map(|(target_ref, pass, fail, review, na, _result_json)| {
+                .map(|s| {
                     serde_json::json!({
-                        "target_ref": target_ref,
-                        "pass": pass,
-                        "fail": fail,
-                        "review": review,
-                        "na": na,
+                        "target_ref": s.target_ref,
+                        "pass": s.pass_count,
+                        "fail": s.fail_count,
+                        "review": s.review_count,
+                        "na": s.na_count,
                     })
                 })
                 .collect();
