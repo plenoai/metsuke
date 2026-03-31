@@ -9,14 +9,22 @@
 <link rel="dns-prefetch" href="https://api.github.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.9.0/github-markdown-dark.min.css" integrity="sha256-stZ7c7Sigq09waiCsAyc8QtNzK791n40yaYy6ik09fs=" crossorigin="anonymous">
+<link rel="stylesheet" id="github-markdown-css" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.9.0/github-markdown-dark.min.css" integrity="sha256-stZ7c7Sigq09waiCsAyc8QtNzK791n40yaYy6ik09fs=" crossorigin="anonymous">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/themes.css">
 <script>
-// Apply saved theme before first paint to prevent flash
+// Apply saved theme + matching markdown CSS before first paint
 (function() {
   var t = localStorage.getItem('metsuke-theme');
-  if (t) document.documentElement.setAttribute('data-theme', t);
+  if (!t) return;
+  document.documentElement.setAttribute('data-theme', t);
+  if (t === 'github-light' || t === 'github-light-hc') {
+    var link = document.getElementById('github-markdown-css');
+    if (link) {
+      link.removeAttribute('integrity');
+      link.href = 'https://cdn.jsdelivr.net/npm/github-markdown-css@5.9.0/github-markdown-light.min.css';
+    }
+  }
 })();
 </script>
 {% block head %}{% endblock %}
@@ -80,7 +88,7 @@ async function swrFetch(url, { maxAge = 60000 } = {}) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('metsuke-theme', theme);
     // Swap github-markdown-css if needed
-    var link = document.querySelector('link[href*="github-markdown"]');
+    var link = document.getElementById('github-markdown-css');
     if (link) {
       var isLight = theme === 'github-light' || theme === 'github-light-hc';
       var newHref = isLight
