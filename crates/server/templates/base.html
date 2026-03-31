@@ -76,9 +76,6 @@ async function swrFetch(url, { maxAge = 60000 } = {}) {
   }
 }
 
-function safeHTML(el, html) {
-  el.setHTML(html);
-}
 </script>
 <script>
 // Theme switcher
@@ -175,7 +172,7 @@ function toggleShortcutHelp() {
   overlay.id = 'kbd-help-overlay';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-label', 'キーボードショートカット');
-  safeHTML(overlay, `
+  overlay.setHTML(`
     <div class="kbd-help-backdrop"></div>
     <div class="kbd-help-panel" tabindex="-1" role="document">
       <div style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;margin-bottom:0.75rem;color:var(--accent-gold)">キーボードショートカット</div>

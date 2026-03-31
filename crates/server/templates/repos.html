@@ -168,7 +168,7 @@ function renderPage() {
   document.title = `Repos (${matched}) — Metsuke`;
 
   if (total === 0) {
-    safeHTML(container, `<div class="empty-state">
+    container.setHTML(`<div class="empty-state">
       <div style="margin-bottom:0.75rem">リポジトリが見つかりません</div>
       <a class="btn" href="/settings" style="text-decoration:none">GitHub Appをインストール</a>
     </div>`);
@@ -183,7 +183,7 @@ function renderPage() {
     <input type="search" id="search-input" class="policy-select" style="width:100%;padding:0.5rem 0.75rem;font-size:0.8rem" placeholder="リポジトリを検索…" aria-label="リポジトリを検索" value="${esc(prevQ)}">
   </div>`;
 
-  safeHTML(container, searchBar
+  container.setHTML(searchBar
     + renderPagination()
     + '<div class="repo-grid">' + pageRepos.map(renderCard).join('') + '</div>'
     + renderPagination());
@@ -191,7 +191,7 @@ function renderPage() {
   const orgs = [...new Set(allRepos.map(r => r.owner))].sort();
   const orgFilter = document.getElementById('org-filter');
   if (orgs.length > 1) {
-    safeHTML(orgFilter, '<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}" ${activeOrg === o ? 'selected' : ''}>${esc(o)}</option>`).join(''));
+    orgFilter.setHTML('<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}" ${activeOrg === o ? 'selected' : ''}>${esc(o)}</option>`).join(''));
     orgFilter.style.display = '';
   }
 }

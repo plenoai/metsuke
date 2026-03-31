@@ -168,7 +168,7 @@ async function loadCachedFindings(num) {
     if (!resp.ok) return;
     const data = await resp.json();
     if (data.findings) {
-      safeHTML(findingsEl, renderFindingsTable(data.findings, `PR #${num} 検証結果`));
+      findingsEl.setHTML(renderFindingsTable(data.findings, `PR #${num} 検証結果`));
       const btn = document.getElementById(`pr-verify-btn-${num}`);
       if (btn) btn.textContent = '再検証';
     }
@@ -178,10 +178,10 @@ async function loadCachedFindings(num) {
 function renderPRList(prs) {
   const container = document.getElementById('pr-list');
   if (prs.length === 0) {
-    safeHTML(container, '<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">PRはありません</div>');
+    container.setHTML('<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">PRはありません</div>');
     return;
   }
-  safeHTML(container, '<div class="pr-list">' + prs.map(pr => {
+  container.setHTML('<div class="pr-list">' + prs.map(pr => {
     const isSelected = selectedPR === pr.pr_number;
     return `
     <div class="pr-item${isSelected ? ' selected' : ''}" data-action="toggle-pr" data-pr="${pr.pr_number}">
@@ -240,7 +240,7 @@ function applyAuditBadges() {
   for (const [num, e] of Object.entries(_auditCache)) {
     const el = document.getElementById(`pr-result-${num}`);
     if (el && !el.innerHTML) {
-      safeHTML(el, compactBadges(e.pass, e.fail, e.review));
+      el.setHTML(compactBadges(e.pass, e.fail, e.review));
     }
   }
 }
@@ -270,7 +270,7 @@ async function autoVerifyIfFew() {
       const c = countFindings(data.findings);
       _auditCache[pr.pr_number] = { pass: c.pass, fail: c.fail, review: c.review };
       const el = document.getElementById(`pr-result-${pr.pr_number}`);
-      if (el) safeHTML(el, compactBadges(c.pass, c.fail, c.review));
+      if (el) el.setHTML(compactBadges(c.pass, c.fail, c.review));
     } catch (_) {}
   }
 }
@@ -285,19 +285,19 @@ async function verifyPRById(num) {
   btn.disabled = true;
   btn.textContent = '検証中…';
   btn.classList.add('running');
-  safeHTML(findingsEl, '<div class="loading" role="status">検証を実行中</div>');
+  findingsEl.setHTML('<div class="loading" role="status">検証を実行中</div>');
 
   try {
     const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     const c = countFindings(data.findings);
-    if (resultEl) safeHTML(resultEl, compactBadges(c.pass, c.fail, c.review));
-    safeHTML(findingsEl, renderFindingsTable(data.findings, `PR #${num} 検証結果`));
+    if (resultEl) resultEl.setHTML(compactBadges(c.pass, c.fail, c.review));
+    findingsEl.setHTML(renderFindingsTable(data.findings, `PR #${num} 検証結果`));
     btn.textContent = '再検証';
   } catch (e) {
-    if (resultEl) safeHTML(resultEl, '<span class="badge badge-fail" title="ERROR">ERR</span>');
-    safeHTML(findingsEl, renderErrorCard(e.message));
+    if (resultEl) resultEl.setHTML('<span class="badge badge-fail" title="ERROR">ERR</span>');
+    findingsEl.setHTML(renderErrorCard(e.message));
     btn.textContent = '再試行';
   }
   btn.disabled = false;

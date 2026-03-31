@@ -145,7 +145,7 @@ function resultBadges(e) {
 async function loadAudit() {
   const type = document.getElementById('filter-type').value;
   const container = document.getElementById('audit-content');
-  safeHTML(container, '<div class="loading">監査ログを取得中</div>');
+  container.setHTML('<div class="loading">監査ログを取得中</div>');
 
   try {
     let url = `/api/audit-history?limit=${PAGE_SIZE}&offset=${currentOffset}`;
@@ -168,11 +168,11 @@ async function loadAudit() {
     allEntries = entries;
 
     if (entries.length === 0 && currentOffset === 0) {
-      safeHTML(container, `<div class="empty-state">
+      container.setHTML(`<div class="empty-state">
         <div style="margin-bottom:0.75rem">監査ログはまだありません</div>
         <a class="btn" href="/repos" style="text-decoration:none">リポジトリ一覧へ</a>
       </div>`);
-      safeHTML(document.getElementById('audit-pagination'), '');
+      document.getElementById('audit-pagination').setHTML('');
       return;
     }
 
@@ -185,7 +185,7 @@ async function loadAudit() {
       <td style="display:flex;gap:0.2rem">${resultBadges(e)}</td>
     </tr>`).join('');
 
-    safeHTML(container, `<div class="card" style="padding:0;overflow-x:auto">
+    container.setHTML(`<div class="card" style="padding:0;overflow-x:auto">
       <table class="audit-table">
         <thead>
           <tr><th scope="col">日時</th><th scope="col">タイプ</th><th scope="col">リポジトリ</th><th scope="col">対象</th><th scope="col">ポリシー</th><th scope="col">結果</th></tr>
@@ -204,7 +204,7 @@ async function loadAudit() {
 
     // Pagination
     const pag = document.getElementById('audit-pagination');
-    safeHTML(pag, `
+    pag.setHTML(`
       <button data-action="prev-page" ${currentOffset === 0 ? 'disabled' : ''}>前へ</button>
       <span style="color:var(--text-secondary);align-self:center">${currentOffset + 1}〜${currentOffset + entries.length} 件</span>
       <button data-action="next-page" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
