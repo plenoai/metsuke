@@ -60,10 +60,17 @@ function renderFindingsTable(findings, titleHtml) {
 
   const rows = (findings || []).map(f => {
     const longText = (f.rationale || '').length > 120;
+    if (longText) {
+      return `<tr class="status-${f.status}">
+      <td style="white-space:nowrap">${esc(f.control_id)}</td>
+      <td>${statusBadge(f.status)}</td>
+      <td class="rationale-cell collapsible collapsed" role="button" tabindex="0" aria-expanded="false" onclick="this.classList.toggle('collapsed');this.setAttribute('aria-expanded',!this.classList.contains('collapsed'))" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"><span class="rationale-text">${esc(f.rationale)}</span><span class="rationale-toggle"></span></td>
+    </tr>`;
+    }
     return `<tr class="status-${f.status}">
       <td style="white-space:nowrap">${esc(f.control_id)}</td>
       <td>${statusBadge(f.status)}</td>
-      <td class="rationale-cell${longText ? ' collapsed' : ''}" ${longText ? 'role="button" tabindex="0" aria-expanded="false" onclick="this.classList.toggle(\'collapsed\');this.setAttribute(\'aria-expanded\',!this.classList.contains(\'collapsed\'))" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click()}"' : ''}>${esc(f.rationale)}</td>
+      <td class="rationale-cell">${esc(f.rationale)}</td>
     </tr>`;
   }).join('');
 

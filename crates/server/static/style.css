@@ -443,19 +443,29 @@ select:focus-visible {
 .findings-table tr.status-satisfied td:first-child { border-left: 3px double var(--accent-green); }
 
 /* Expandable rationale */
-.rationale-cell.collapsed {
-  max-height: 3em;
-  overflow: hidden;
+.rationale-cell.collapsible {
   cursor: pointer;
   position: relative;
 }
-.rationale-cell.collapsed::after {
-  content: '…';
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  padding-left: 1em;
-  background: linear-gradient(to right, transparent, var(--bg-surface) 50%);
+.rationale-cell.collapsible .rationale-text {
+  display: block;
+}
+.rationale-cell.collapsed .rationale-text {
+  max-height: 2.8em;
+  overflow: hidden;
+}
+.rationale-cell.collapsible .rationale-toggle {
+  display: inline-block;
+  font-size: 0.6rem;
+  color: var(--accent-indigo);
+  margin-top: 0.25rem;
+  letter-spacing: 0.03em;
+}
+.rationale-cell.collapsed .rationale-toggle::before {
+  content: '\25B8 more';
+}
+.rationale-cell:not(.collapsed) .rationale-toggle::before {
+  content: '\25BE less';
 }
 
 /* Keyboard navigation focus */
@@ -653,9 +663,9 @@ select:focus-visible {
     print-color-adjust: exact;
   }
 
-  /* Expand collapsed rationale */
-  .rationale-cell.collapsed { max-height: none; overflow: visible; }
-  .rationale-cell.collapsed::after { display: none; }
+  /* Expand collapsed rationale for print */
+  .rationale-cell.collapsed .rationale-text { max-height: none; overflow: visible; }
+  .rationale-toggle { display: none !important; }
 
   /* Status row borders */
   .findings-table tr.status-violated td:first-child,
