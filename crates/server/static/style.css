@@ -534,6 +534,9 @@ select:focus-visible {
   max-width: 16px;
   fill: var(--text-secondary) !important;
   flex-shrink: 0;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
 }
 
 /* Override github-markdown-css background to blend with Metsuke card */
