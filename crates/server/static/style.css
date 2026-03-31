@@ -532,7 +532,7 @@ select:focus-visible {
   height: 16px !important;
   min-width: 16px;
   max-width: 16px;
-  fill: var(--text-secondary);
+  fill: var(--text-secondary) !important;
   flex-shrink: 0;
 }
 
