@@ -225,5 +225,17 @@ function renderResult(data, baseTag, headTag) {
 }
 
 loadReleases();
+
+// SSE: バックグラウンド同期完了時にリリース一覧を再取得
+const es = new EventSource('/api/events');
+es.addEventListener('job', async (e) => {
+  try {
+    const ev = JSON.parse(e.data);
+    if (ev.type === 'releases_synced' && ev.owner === OWNER && ev.repo === REPO) {
+      delete _swrCache[`/api/repos/${OWNER}/${REPO}/releases`];
+      loadReleases();
+    }
+  } catch (_) {}
+});
 </script>
 {% endblock %}

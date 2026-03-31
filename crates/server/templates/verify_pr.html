@@ -91,8 +91,8 @@
     <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
       <select class="policy-select" id="pr-filter" onchange="applyFilter()" aria-label="状態フィルタ">
         <option value="">all</option>
-        <option value="open" selected>open</option>
-        <option value="merged">merged</option>
+        <option value="open">open</option>
+        <option value="merged" selected>merged</option>
         <option value="closed">closed</option>
       </select>
       <select class="policy-select" id="pr-policy" aria-label="ポリシー">
@@ -193,5 +193,17 @@ async function verifyPRById(num, btn) {
 }
 
 loadPRs();
+
+// SSE: バックグラウンド同期完了時にPR一覧を再取得
+const es = new EventSource('/api/events');
+es.addEventListener('job', async (e) => {
+  try {
+    const ev = JSON.parse(e.data);
+    if (ev.type === 'pulls_synced' && ev.owner === OWNER && ev.repo === REPO) {
+      delete _swrCache[`/api/repos/${OWNER}/${REPO}/pulls`];
+      loadPRs();
+    }
+  } catch (_) {}
+});
 </script>
 {% endblock %}
