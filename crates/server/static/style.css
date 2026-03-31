@@ -1,20 +1,7 @@
 /* Metsuke Design System — Shared Styles */
 
+/* Color variables are defined in themes.css */
 :root {
-  --bg-deep: #0a0a0c;
-  --bg-surface: #131315;
-  --bg-elevated: #1a1a1e;
-  --border: #262629;
-  --border-subtle: #1c1c1f;
-  --text-primary: #e8e6e3;
-  --text-secondary: #87878c;
-  --accent-vermillion: #c73e3a;
-  --accent-vermillion-glow: rgba(199, 62, 58, 0.12);
-  --accent-gold: #c9a84c;
-  --accent-gold-dim: rgba(201, 168, 76, 0.1);
-  --accent-indigo: #4a5fd7;
-  --accent-green: #3a9a5c;
-  --accent-green-dim: rgba(58, 154, 92, 0.1);
   --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
 }
@@ -615,6 +602,7 @@ select:focus-visible {
   /* Hide interactive elements */
   .verify-btn, .policy-select, .btn,
   .logout-link, .nav-links,
+  .theme-switcher,
   #kbd-help-overlay, .skip-link,
   #verify-all-progress, #search-input,
   #org-filter, #sort-select,

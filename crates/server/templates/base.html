@@ -11,6 +11,14 @@
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.9.0/github-markdown-dark.min.css" integrity="sha256-stZ7c7Sigq09waiCsAyc8QtNzK791n40yaYy6ik09fs=" crossorigin="anonymous">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/themes.css">
+<script>
+// Apply saved theme before first paint to prevent flash
+(function() {
+  var t = localStorage.getItem('metsuke-theme');
+  if (t) document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -29,6 +37,16 @@
       </nav>
     </div>
     <div class="user-badge">
+      <div class="theme-switcher">
+        <select class="theme-select" id="theme-select" aria-label="カラーテーマ">
+          <option value="metsuke-dark">目付 Dark</option>
+          <option value="github-light">GitHub Light</option>
+          <option value="github-dark">GitHub Dark</option>
+          <option value="github-dimmed">GitHub Dimmed</option>
+          <option value="github-dark-hc">GitHub Dark HC</option>
+          <option value="github-light-hc">GitHub Light HC</option>
+        </select>
+      </div>
       <strong>{{ login }}</strong>
       <a class="logout-link" href="/auth/logout">ログアウト</a>
     </div>
@@ -59,6 +77,32 @@ async function swrFetch(url, { maxAge = 60000 } = {}) {
     throw e;
   }
 }
+</script>
+<script>
+// Theme switcher
+(function() {
+  var sel = document.getElementById('theme-select');
+  if (!sel) return;
+  var saved = localStorage.getItem('metsuke-theme') || 'metsuke-dark';
+  sel.value = saved;
+  sel.addEventListener('change', function() {
+    var theme = sel.value;
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('metsuke-theme', theme);
+    // Swap github-markdown-css if needed
+    var link = document.querySelector('link[href*="github-markdown"]');
+    if (link) {
+      var isLight = theme === 'github-light' || theme === 'github-light-hc';
+      var newHref = isLight
+        ? 'https://cdn.jsdelivr.net/npm/github-markdown-css@5.9.0/github-markdown-light.min.css'
+        : 'https://cdn.jsdelivr.net/npm/github-markdown-css@5.9.0/github-markdown-dark.min.css';
+      if (link.href !== newHref) {
+        link.removeAttribute('integrity');
+        link.href = newHref;
+      }
+    }
+  });
+})();
 </script>
 <script src="/static/verify-common.js"></script>
 <script>

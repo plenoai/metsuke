@@ -1,0 +1,210 @@
+/* Metsuke Color Themes — inspired by GitHub's Primer color system */
+
+/* ===== Default: Metsuke Dark (original) ===== */
+[data-theme="metsuke-dark"],
+:root {
+  --bg-deep: #0a0a0c;
+  --bg-surface: #131315;
+  --bg-elevated: #1a1a1e;
+  --border: #262629;
+  --border-subtle: #1c1c1f;
+  --text-primary: #e8e6e3;
+  --text-secondary: #87878c;
+  --accent-vermillion: #c73e3a;
+  --accent-vermillion-glow: rgba(199, 62, 58, 0.12);
+  --accent-gold: #c9a84c;
+  --accent-gold-dim: rgba(201, 168, 76, 0.1);
+  --accent-indigo: #4a5fd7;
+  --accent-green: #3a9a5c;
+  --accent-green-dim: rgba(58, 154, 92, 0.1);
+  --scrollbar-thumb: #333;
+  --scrollbar-track: var(--bg-deep);
+  --code-bg: #1a1a1e;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+/* ===== GitHub Light ===== */
+[data-theme="github-light"] {
+  --bg-deep: #ffffff;
+  --bg-surface: #f6f8fa;
+  --bg-elevated: #ffffff;
+  --border: #d1d9e0;
+  --border-subtle: #e8ecf0;
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --accent-vermillion: #cf222e;
+  --accent-vermillion-glow: rgba(207, 34, 46, 0.08);
+  --accent-gold: #9a6700;
+  --accent-gold-dim: rgba(154, 103, 0, 0.08);
+  --accent-indigo: #0969da;
+  --accent-green: #1a7f37;
+  --accent-green-dim: rgba(26, 127, 55, 0.08);
+  --scrollbar-thumb: #c8ccd1;
+  --scrollbar-track: #f6f8fa;
+  --code-bg: #f6f8fa;
+  --shadow-card: 0 1px 3px rgba(31, 35, 40, 0.08);
+  color-scheme: light;
+}
+
+/* ===== GitHub Dark ===== */
+[data-theme="github-dark"] {
+  --bg-deep: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1c2128;
+  --border: #30363d;
+  --border-subtle: #21262d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --accent-vermillion: #f85149;
+  --accent-vermillion-glow: rgba(248, 81, 73, 0.1);
+  --accent-gold: #d29922;
+  --accent-gold-dim: rgba(210, 153, 34, 0.1);
+  --accent-indigo: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-green-dim: rgba(63, 185, 80, 0.1);
+  --scrollbar-thumb: #484f58;
+  --scrollbar-track: #0d1117;
+  --code-bg: #161b22;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
+}
+
+/* ===== GitHub Dark Dimmed ===== */
+[data-theme="github-dimmed"] {
+  --bg-deep: #1c2128;
+  --bg-surface: #22272e;
+  --bg-elevated: #2d333b;
+  --border: #444c56;
+  --border-subtle: #373e47;
+  --text-primary: #adbac7;
+  --text-secondary: #768390;
+  --accent-vermillion: #e5534b;
+  --accent-vermillion-glow: rgba(229, 83, 75, 0.1);
+  --accent-gold: #c69026;
+  --accent-gold-dim: rgba(198, 144, 38, 0.1);
+  --accent-indigo: #539bf5;
+  --accent-green: #57ab5a;
+  --accent-green-dim: rgba(87, 171, 90, 0.1);
+  --scrollbar-thumb: #545d68;
+  --scrollbar-track: #1c2128;
+  --code-bg: #2d333b;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
+  color-scheme: dark;
+}
+
+/* ===== GitHub Dark High Contrast ===== */
+[data-theme="github-dark-hc"] {
+  --bg-deep: #010409;
+  --bg-surface: #0a0c10;
+  --bg-elevated: #151b23;
+  --border: #7a828e;
+  --border-subtle: #4c545c;
+  --text-primary: #ffffff;
+  --text-secondary: #b7bdc8;
+  --accent-vermillion: #ff6a69;
+  --accent-vermillion-glow: rgba(255, 106, 105, 0.15);
+  --accent-gold: #f0b72f;
+  --accent-gold-dim: rgba(240, 183, 47, 0.12);
+  --accent-indigo: #71b7ff;
+  --accent-green: #26d545;
+  --accent-green-dim: rgba(38, 213, 69, 0.12);
+  --scrollbar-thumb: #7a828e;
+  --scrollbar-track: #010409;
+  --code-bg: #151b23;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+/* ===== GitHub Light High Contrast ===== */
+[data-theme="github-light-hc"] {
+  --bg-deep: #ffffff;
+  --bg-surface: #f0f0f3;
+  --bg-elevated: #ffffff;
+  --border: #20252c;
+  --border-subtle: #818b98;
+  --text-primary: #0e1116;
+  --text-secondary: #3b424b;
+  --accent-vermillion: #a0111f;
+  --accent-vermillion-glow: rgba(160, 17, 31, 0.1);
+  --accent-gold: #7a4f01;
+  --accent-gold-dim: rgba(122, 79, 1, 0.08);
+  --accent-indigo: #0349b4;
+  --accent-green: #116329;
+  --accent-green-dim: rgba(17, 99, 41, 0.08);
+  --scrollbar-thumb: #818b98;
+  --scrollbar-track: #f0f0f3;
+  --code-bg: #f0f0f3;
+  --shadow-card: 0 1px 3px rgba(14, 17, 22, 0.1);
+  color-scheme: light;
+}
+
+/* ===== Theme-aware overrides ===== */
+
+/* Light theme: swap github-markdown-css dark → light */
+[data-theme="github-light"] .markdown-body,
+[data-theme="github-light-hc"] .markdown-body {
+  color: var(--text-primary) !important;
+}
+
+/* Scrollbar styling (webkit) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Card shadow */
+.card {
+  box-shadow: var(--shadow-card);
+}
+
+/* Theme switcher */
+.theme-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.theme-select {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 0.3rem 0.5rem;
+  padding-right: 1.5rem;
+  background: var(--bg-deep);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2387878c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.4rem center;
+}
+.theme-select:hover {
+  border-color: var(--accent-gold);
+}
+.theme-select:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
+}
+
+/* Responsive: theme switcher on mobile */
+@media (max-width: 600px) {
+  .theme-select {
+    min-height: 48px;
+    font-size: 16px;
+    padding: 0.55rem 0.6rem;
+    padding-right: 1.8rem;
+  }
+}
