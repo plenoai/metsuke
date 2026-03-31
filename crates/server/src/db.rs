@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use serde::Serialize;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -659,6 +659,27 @@ impl Database {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
+    /// Get the latest repo verification result_json for a specific repo.
+    pub fn get_latest_repo_verification(
+        &self,
+        user_id: i64,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Option<String>> {
+        let conn = self.reader();
+        let mut stmt = conn.prepare_cached(
+            "SELECT result_json FROM audit_log
+             WHERE user_id = ?1 AND verification_type = 'repo' AND owner = ?2 AND repo = ?3
+             ORDER BY id DESC LIMIT 1",
+        )?;
+        let result = stmt
+            .query_row(rusqlite::params![user_id, owner, repo], |row| {
+                row.get(0)
+            })
+            .optional()?;
+        Ok(result)
+    }
+
     /// Check database connectivity.
     pub fn ping(&self) -> Result<()> {
         let conn = self.reader();
@@ -820,14 +841,8 @@ impl Database {
         )?;
         let mut stmt = conn.prepare_cached(
             "SELECT r.owner, r.name, r.full_name, r.private, r.description, r.language,
-                    r.default_branch, r.pushed_at, r.synced_at,
-                    a.pass_count, a.fail_count, a.review_count, a.verified_at
+                    r.default_branch, r.pushed_at, r.synced_at
              FROM repositories r
-             LEFT JOIN (
-                 SELECT owner, repo, pass_count, fail_count, review_count, verified_at
-                 FROM audit_log WHERE user_id = ?1 AND verification_type = 'repo'
-                 AND id IN (SELECT MAX(id) FROM audit_log WHERE user_id = ?1 AND verification_type = 'repo' GROUP BY owner, repo)
-             ) a ON r.owner = a.owner AND r.name = a.repo
              WHERE r.user_id = ?1
              ORDER BY r.pushed_at DESC NULLS LAST",
         )?;
@@ -842,10 +857,6 @@ impl Database {
                 default_branch: row.get(6)?,
                 pushed_at: row.get(7)?,
                 synced_at: row.get(8)?,
-                pass_count: row.get(9)?,
-                fail_count: row.get(10)?,
-                review_count: row.get(11)?,
-                verified_at: row.get(12)?,
             })
         })?;
         let repos: Vec<RepoRow> = rows.collect::<Result<Vec<_>, _>>()?;
@@ -989,11 +1000,6 @@ pub struct RepoRow {
     pub default_branch: Option<String>,
     pub pushed_at: Option<String>,
     pub synced_at: String,
-    // From audit_log LEFT JOIN (latest repo verification)
-    pub pass_count: Option<i64>,
-    pub fail_count: Option<i64>,
-    pub review_count: Option<i64>,
-    pub verified_at: Option<String>,
 }
 
 #[derive(Serialize)]

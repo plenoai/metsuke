@@ -47,21 +47,8 @@
   gap: 0.75rem;
   flex-wrap: wrap;
 }
-.repo-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
-  margin-left: 1rem;
-}
-.result-summary {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
 @media (max-width: 600px) {
   .repo-card { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
-  .repo-actions { margin-left: 0; }
 }
 </style>
 {% endblock %}
@@ -76,20 +63,7 @@
       <select class="policy-select" id="sort-select" onchange="sortRepos(this.value)" aria-label="ソート順">
         <option value="activity" selected>アクティビティ順</option>
         <option value="name">名前順</option>
-        <option value="fail-desc">FAIL多い順</option>
-        <option value="fail-asc">FAIL少ない順</option>
-        <option value="unverified">未検証優先</option>
       </select>
-      <button class="verify-btn" id="export-csv-btn" onclick="exportCSV()" style="display:none">CSV出力</button>
-      <button class="btn" id="verify-all-btn" onclick="verifyAll()" style="font-size:0.72rem;display:none">全リポジトリを検証</button>
-    </div>
-  </div>
-  <div id="verify-all-progress" style="display:none;margin-bottom:1rem" aria-live="polite">
-    <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">
-      <span id="progress-text" role="status">0 / 0</span>
-      <div style="margin-top:0.5rem;height:4px;background:var(--bg-deep);border-radius:2px;overflow:hidden">
-        <div id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="検証進捗" style="height:100%;background:var(--accent-vermillion);width:0%;transition:width 0.3s ease"></div>
-      </div>
     </div>
   </div>
   <div id="repo-list" aria-live="polite">
@@ -99,7 +73,6 @@
 
 {% block scripts %}
 <script>
-const POLICY_OPTIONS = `{% for p in policy_options %}<option value="{{ p }}">{{ p }}</option>{% endfor %}`;
 const PAGE_SIZE = 50;
 
 let allRepos = [];
@@ -107,25 +80,6 @@ let filteredRepos = [];
 let currentPage = 1;
 let activeOrg = '';
 let currentSort = 'activity';
-
-// ---------------------------------------------------------------------------
-// Helpers — RepoRow has pass_count/fail_count/review_count/verified_at inline
-// ---------------------------------------------------------------------------
-
-function renderBadges(pass, fail, review) {
-  let b = '';
-  if (pass > 0) b += `<span class="badge badge-pass">PASS ${pass}</span>`;
-  if (review > 0) b += `<span class="badge badge-review">REVIEW ${review}</span>`;
-  if (fail > 0) b += `<span class="badge badge-fail">FAIL ${fail}</span>`;
-  return b;
-}
-
-function repoStatus(r) {
-  if (r.verified_at == null) return 'unverified';
-  if ((r.fail_count || 0) > 0) return 'fail';
-  if ((r.review_count || 0) > 0) return 'review';
-  return 'pass';
-}
 
 // ---------------------------------------------------------------------------
 // Data-driven filter / sort / paginate
@@ -149,9 +103,6 @@ function computeFiltered() {
   const mode = currentSort;
   list = [...list].sort((a, b) => {
     if (mode === 'activity') return (b.pushed_at || '').localeCompare(a.pushed_at || '');
-    if (mode === 'fail-desc') return (b.fail_count || 0) - (a.fail_count || 0);
-    if (mode === 'fail-asc') return (a.fail_count || 0) - (b.fail_count || 0);
-    if (mode === 'unverified') return (a.verified_at ? 1 : 0) - (b.verified_at ? 1 : 0);
     return a.full_name.toLowerCase().localeCompare(b.full_name.toLowerCase());
   });
 
@@ -167,9 +118,6 @@ function totalPages() {
 // ---------------------------------------------------------------------------
 
 function renderCard(r) {
-  const hasVerification = r.verified_at != null;
-  const badges = hasVerification ? renderBadges(r.pass_count || 0, r.fail_count || 0, r.review_count || 0) : '<span class="badge badge-na">未検証</span>';
-  const verifiedTime = hasVerification ? `<span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-secondary)" title="最終検証">${r.verified_at}</span>` : '';
   return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}">
     <div class="repo-info">
       <div class="repo-name">
@@ -182,15 +130,8 @@ function renderCard(r) {
         ${r.private ? '<span class="badge badge-private">private</span>' : ''}
         ${r.language ? `<span>${esc(r.language)}</span>` : ''}
         ${r.default_branch ? `<span>${esc(r.default_branch)}</span>` : ''}
-        ${verifiedTime}
+        ${r.pushed_at ? `<span>${esc(r.pushed_at)}</span>` : ''}
       </div>
-    </div>
-    <div class="repo-actions">
-      <div class="result-summary" id="result-${r.full_name.replace('/', '-')}">${badges}</div>
-      <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/pulls" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="PR検証">PR</a>
-      <a class="verify-btn" href="/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.name)}/releases" style="text-decoration:none;font-size:0.65rem;padding:0.3rem 0.5rem" title="リリース検証">Rel</a>
-      <select class="policy-select" id="policy-${r.full_name.replace('/', '-')}" aria-label="${esc(r.full_name)} のポリシー選択">${POLICY_OPTIONS}</select>
-      <button class="verify-btn" onclick="verifyRepo('${esc(r.owner)}', '${esc(r.name)}', this)">${hasVerification ? '再検証' : '検証'}</button>
     </div>
   </div>`;
 }
@@ -246,12 +187,6 @@ function renderPage() {
     + renderPagination()
     + '<div class="repo-grid">' + pageRepos.map(renderCard).join('') + '</div>'
     + renderPagination();
-
-  if (total > 0) {
-    document.getElementById('verify-all-btn').style.display = '';
-    document.getElementById('export-csv-btn').style.display = '';
-  }
-
 
   const orgs = [...new Set(allRepos.map(r => r.owner))].sort();
   const orgFilter = document.getElementById('org-filter');
@@ -313,7 +248,7 @@ async function loadRepos() {
   const es = new EventSource('/api/events');
   es.addEventListener('job', async (e) => {
     const event = JSON.parse(e.data);
-    if (event.type === 'repos_synced' || event.type === 'verification_complete') {
+    if (event.type === 'repos_synced') {
       try {
         allRepos = await fetchRepos();
         renderPage();
@@ -323,100 +258,6 @@ async function loadRepos() {
   es.onerror = () => {
     // Reconnect is automatic with EventSource; nothing to do
   };
-}
-
-// ---------------------------------------------------------------------------
-// Actions
-// ---------------------------------------------------------------------------
-
-async function verifyRepo(owner, repo, btn) {
-  btn.disabled = true;
-  btn.classList.add('running');
-  btn.textContent = '検証中…';
-  const resultEl = document.getElementById(`result-${owner}-${repo}`);
-  resultEl.innerHTML = '';
-
-  const policyEl = document.getElementById(`policy-${owner}-${repo}`);
-  const policy = policyEl ? policyEl.value : 'default';
-
-  try {
-    const resp = await fetch(`/api/repos/${owner}/${repo}/verify?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
-    if (!resp.ok) throw new Error(await resp.text());
-    const data = await resp.json();
-
-    let pass = 0, fail = 0, review = 0;
-    if (data.findings) {
-      for (const f of data.findings) {
-        if (f.status === 'satisfied') pass++;
-        else if (f.status === 'violated') fail++;
-        else if (f.status === 'indeterminate') review++;
-      }
-    }
-    resultEl.innerHTML = renderBadges(pass, fail, review);
-    btn.textContent = '再検証';
-  } catch (e) {
-    resultEl.innerHTML = '<span class="badge badge-fail">ERROR</span>';
-    btn.textContent = '再試行';
-  }
-  btn.disabled = false;
-  btn.classList.remove('running');
-}
-
-function exportCSV() {
-  const btn = document.getElementById('export-csv-btn');
-  const origText = btn.textContent;
-  btn.textContent = '出力中…';
-  btn.disabled = true;
-  const rows = [['リポジトリ','言語','公開範囲','PASS','FAIL','REVIEW','検証日時']];
-  allRepos.forEach(r => {
-    rows.push([
-      r.full_name,
-      r.language || '',
-      r.private ? '非公開' : '公開',
-      r.pass_count || 0,
-      r.fail_count || 0,
-      r.review_count || 0,
-      r.verified_at || '未検証',
-    ]);
-  });
-  const csv = '\uFEFF' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `metsuke-verification-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  btn.textContent = origText;
-  btn.disabled = false;
-}
-
-async function verifyAll() {
-  const targets = filteredRepos;
-  if (!confirm(`${targets.length} 個のリポジトリを一括検証します。よろしいですか？`)) return;
-  const btn = document.getElementById('verify-all-btn');
-  const progressWrap = document.getElementById('verify-all-progress');
-  const progressText = document.getElementById('progress-text');
-  const progressBar = document.getElementById('progress-bar');
-  btn.disabled = true;
-  btn.textContent = '検証中…';
-  progressWrap.style.display = 'block';
-  let done = 0;
-  const total = targets.length;
-  progressText.textContent = `0 / ${total}`;
-  for (const r of targets) {
-    const verifyBtn = document.querySelector(`#repo-${r.full_name.replace('/', '-')} .verify-btn`);
-    if (verifyBtn) {
-      await verifyRepo(r.owner, r.name, verifyBtn);
-    }
-    done++;
-    const pct = (done / total * 100).toFixed(1);
-    progressText.textContent = `${done} / ${total}`;
-    progressBar.style.width = `${pct}%`;
-    progressBar.setAttribute('aria-valuenow', Math.round(pct));
-  }
-  btn.disabled = false;
-  btn.textContent = '全リポジトリを検証';
 }
 
 loadRepos();

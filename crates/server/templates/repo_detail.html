@@ -70,6 +70,19 @@ async function runVerify() {
 
 enhancePolicySelect(document.getElementById('policy-select'));
 
+// Load previous verification result
+(async function loadPreviousResult() {
+  const area = document.getElementById('result-area');
+  try {
+    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify`);
+    if (resp.status === 404) return; // no previous result
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const profileName = data.profile_name || 'default';
+    area.innerHTML = renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`);
+  } catch (_) { /* silently ignore */ }
+})();
+
 (async function loadReadme() {
   const area = document.getElementById('readme-area');
   const loading = document.getElementById('readme-loading');

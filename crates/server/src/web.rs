@@ -105,7 +105,8 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         .route("/api/repos", axum::routing::get(api_repos))
         .route(
             "/api/repos/{owner}/{repo}/verify",
-            axum::routing::post(api_verify_repo),
+            axum::routing::get(api_get_latest_verification)
+                .post(api_verify_repo),
         )
         .route(
             "/api/repos/{owner}/{repo}/releases",
@@ -161,7 +162,6 @@ struct SettingsTemplate {
 struct ReposTemplate {
     login: String,
     active_page: &'static str,
-    policy_options: &'static [&'static str],
 }
 
 #[derive(Template)]
@@ -780,10 +780,6 @@ fn spawn_sync_repos_job(state: &WebState, user_id: i64) {
                             default_branch: r.default_branch,
                             pushed_at: r.pushed_at,
                             synced_at: String::new(), // set by DB
-                            pass_count: None,
-                            fail_count: None,
-                            review_count: None,
-                            verified_at: None,
                         })
                         .collect::<Vec<_>>(),
                     Err(e) => {
@@ -921,6 +917,38 @@ fn spawn_sync_releases_job(state: &WebState, user_id: i64, owner: String, repo: 
 #[derive(Deserialize)]
 struct VerifyQuery {
     policy: Option<String>,
+}
+
+async fn api_get_latest_verification(
+    headers: HeaderMap,
+    Path((owner, repo)): Path<(String, String)>,
+    State(state): State<WebState>,
+) -> Response {
+    if let Some(r) = validate_repo_params(&owner, &repo) {
+        return r;
+    }
+
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let db = state.db.clone();
+    let owner_c = owner.clone();
+    let repo_c = repo.clone();
+    match run_blocking(move || db.get_latest_repo_verification(user_id, &owner_c, &repo_c)).await {
+        Ok(Some(json)) => (
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            json,
+        )
+            .into_response(),
+        Ok(None) => (axum::http::StatusCode::NOT_FOUND, "No verification found").into_response(),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{e}"),
+        )
+            .into_response(),
+    }
 }
 
 async fn api_verify_repo(
@@ -1600,7 +1628,6 @@ async fn repos_page(headers: HeaderMap, State(state): State<WebState>) -> Respon
     ReposTemplate {
         login,
         active_page: "repos",
-        policy_options: POLICY_OPTIONS,
     }
     .into_web_template()
     .into_response()
@@ -1742,12 +1769,10 @@ mod tests {
         let t = ReposTemplate {
             login: "testuser".into(),
             active_page: "repos",
-            policy_options: POLICY_OPTIONS,
         };
         let html = t.render().unwrap();
         assert!(html.contains("Repositories"));
         assert!(html.contains("testuser"));
-        assert!(html.contains("slsa-l4"));
     }
 
     #[test]
@@ -1823,7 +1848,6 @@ mod tests {
         let repos = ReposTemplate {
             login: "u".into(),
             active_page: "repos",
-            policy_options: POLICY_OPTIONS,
         };
         let html = repos.render().unwrap();
         assert!(html.contains(r#"nav-link active" href="/repos"#));
