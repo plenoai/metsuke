@@ -76,13 +76,8 @@ async function swrFetch(url, { maxAge = 60000 } = {}) {
   }
 }
 
-// Safe HTML setter: uses setHTML (Sanitizer API) if available, otherwise innerHTML.
 function safeHTML(el, html) {
-  if (el.setHTML) {
-    el.setHTML(html);
-  } else {
-    el.innerHTML = html;
-  }
+  el.setHTML(html);
 }
 </script>
 <script>
