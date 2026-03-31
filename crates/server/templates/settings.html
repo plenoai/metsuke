@@ -157,7 +157,7 @@
     }
   }
 }</pre>
-        <button class="copy-btn" onclick="copyText('config', this)" aria-label="設定をコピー">COPY</button>
+        <button class="copy-btn" id="copy-config-btn" aria-label="設定をコピー">COPY</button>
       </div>
     </div>
   </div>
@@ -173,5 +173,6 @@ function copyText(id, btn) {
     setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 1500);
   });
 }
+document.getElementById('copy-config-btn').addEventListener('click', function() { copyText('config', this); });
 </script>
 {% endblock %}

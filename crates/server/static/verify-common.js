@@ -64,7 +64,7 @@ function renderFindingsTable(findings, titleHtml) {
       return `<tr class="status-${f.status}">
       <td style="white-space:nowrap">${esc(f.control_id)}</td>
       <td>${statusBadge(f.status)}</td>
-      <td class="rationale-cell collapsible collapsed" role="button" tabindex="0" aria-expanded="false" onclick="this.classList.toggle('collapsed');this.setAttribute('aria-expanded',!this.classList.contains('collapsed'))" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"><span class="rationale-text">${esc(f.rationale)}</span><span class="rationale-toggle"></span></td>
+      <td class="rationale-cell collapsible collapsed" role="button" tabindex="0" aria-expanded="false" data-action="toggle-rationale"><span class="rationale-text">${esc(f.rationale)}</span><span class="rationale-toggle"></span></td>
     </tr>`;
     }
     return `<tr class="status-${f.status}">
@@ -141,8 +141,35 @@ function classifyError(err, resp) {
 function renderLoadError(containerId, message, retryFnName) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  el.innerHTML = `<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;gap:0.75rem">
+  safeHTML(el, `<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;gap:0.75rem">
     <div>${esc(message)}</div>
-    <button class="verify-btn" onclick="this.disabled=true;this.textContent='再取得中…';${retryFnName}()">再取得</button>
-  </div>`;
+    <button class="verify-btn" data-action="retry" data-retry-fn="${retryFnName}">再取得</button>
+  </div>`);
 }
+
+// Global event delegation for shared actions
+document.addEventListener('click', function(e) {
+  const toggle = e.target.closest('[data-action="toggle-rationale"]');
+  if (toggle) {
+    toggle.classList.toggle('collapsed');
+    toggle.setAttribute('aria-expanded', !toggle.classList.contains('collapsed'));
+    return;
+  }
+  const retry = e.target.closest('[data-action="retry"]');
+  if (retry) {
+    retry.disabled = true;
+    retry.textContent = '再取得中…';
+    const fn = window[retry.dataset.retryFn];
+    if (fn) fn();
+  }
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    const toggle = e.target.closest('[data-action="toggle-rationale"]');
+    if (toggle) {
+      e.preventDefault();
+      toggle.click();
+    }
+  }
+});

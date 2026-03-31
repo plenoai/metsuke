@@ -57,10 +57,10 @@
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
     <div class="section-title" id="repos-title" style="margin-bottom:0">リポジトリ</div>
     <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap" id="toolbar">
-      <select class="policy-select" id="org-filter" onchange="filterByOrg(this.value)" aria-label="組織フィルタ" style="display:none">
+      <select class="policy-select" id="org-filter" aria-label="組織フィルタ" style="display:none">
         <option value="">全組織</option>
       </select>
-      <select class="policy-select" id="sort-select" onchange="sortRepos(this.value)" aria-label="ソート順">
+      <select class="policy-select" id="sort-select" aria-label="ソート順">
         <option value="activity" selected>アクティビティ順</option>
         <option value="name">名前順</option>
       </select>
@@ -142,15 +142,15 @@ function renderPagination() {
   const start = Math.max(1, currentPage - 2);
   const end = Math.min(tp, currentPage + 2);
   let html = '<div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:0.25rem;margin-top:1rem;margin-bottom:1rem;font-family:var(--font-mono);font-size:0.75rem">';
-  if (currentPage > 1) html += `<button class="verify-btn" onclick="goToPage(${currentPage - 1})" style="padding:0.25rem 0.5rem">‹</button>`;
+  if (currentPage > 1) html += `<button class="verify-btn" data-action="page" data-page="${currentPage - 1}" style="padding:0.25rem 0.5rem">‹</button>`;
   for (let i = start; i <= end; i++) {
     if (i === currentPage) {
       html += `<span style="padding:0.25rem 0.5rem;background:var(--accent-gold);color:var(--bg-deep);border-radius:4px;font-weight:700">${i}</span>`;
     } else {
-      html += `<button class="verify-btn" onclick="goToPage(${i})" style="padding:0.25rem 0.5rem">${i}</button>`;
+      html += `<button class="verify-btn" data-action="page" data-page="${i}" style="padding:0.25rem 0.5rem">${i}</button>`;
     }
   }
-  if (currentPage < tp) html += `<button class="verify-btn" onclick="goToPage(${currentPage + 1})" style="padding:0.25rem 0.5rem">›</button>`;
+  if (currentPage < tp) html += `<button class="verify-btn" data-action="page" data-page="${currentPage + 1}" style="padding:0.25rem 0.5rem">›</button>`;
   html += `<span style="margin-left:0.5rem;color:var(--text-secondary)">${PAGE_SIZE * (currentPage - 1) + 1}–${Math.min(PAGE_SIZE * currentPage, filteredRepos.length)} / ${filteredRepos.length}</span>`;
   html += '</div>';
   return html;
@@ -168,10 +168,10 @@ function renderPage() {
   document.title = `Repos (${matched}) — Metsuke`;
 
   if (total === 0) {
-    container.innerHTML = `<div class="empty-state">
+    safeHTML(container, `<div class="empty-state">
       <div style="margin-bottom:0.75rem">リポジトリが見つかりません</div>
       <a class="btn" href="/settings" style="text-decoration:none">GitHub Appをインストール</a>
-    </div>`;
+    </div>`);
     return;
   }
 
@@ -180,18 +180,18 @@ function renderPage() {
   const pageRepos = filteredRepos.slice(start, start + PAGE_SIZE);
 
   const searchBar = `<div style="margin-bottom:0.75rem">
-    <input type="search" id="search-input" class="policy-select" style="width:100%;padding:0.5rem 0.75rem;font-size:0.8rem" placeholder="リポジトリを検索…" oninput="onSearchInput()" aria-label="リポジトリを検索" value="${esc(prevQ)}">
+    <input type="search" id="search-input" class="policy-select" style="width:100%;padding:0.5rem 0.75rem;font-size:0.8rem" placeholder="リポジトリを検索…" aria-label="リポジトリを検索" value="${esc(prevQ)}">
   </div>`;
 
-  container.innerHTML = searchBar
+  safeHTML(container, searchBar
     + renderPagination()
     + '<div class="repo-grid">' + pageRepos.map(renderCard).join('') + '</div>'
-    + renderPagination();
+    + renderPagination());
 
   const orgs = [...new Set(allRepos.map(r => r.owner))].sort();
   const orgFilter = document.getElementById('org-filter');
   if (orgs.length > 1) {
-    orgFilter.innerHTML = '<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}" ${activeOrg === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
+    safeHTML(orgFilter, '<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}" ${activeOrg === o ? 'selected' : ''}>${esc(o)}</option>`).join(''));
     orgFilter.style.display = '';
   }
 }
@@ -259,6 +259,17 @@ async function loadRepos() {
     // Reconnect is automatic with EventSource; nothing to do
   };
 }
+
+// Event delegation
+document.getElementById('org-filter').addEventListener('change', function() { filterByOrg(this.value); });
+document.getElementById('sort-select').addEventListener('change', function() { sortRepos(this.value); });
+document.getElementById('repos-container').addEventListener('click', function(e) {
+  const pageBtn = e.target.closest('[data-action="page"]');
+  if (pageBtn) goToPage(Number(pageBtn.dataset.page));
+});
+document.getElementById('repos-container').addEventListener('input', function(e) {
+  if (e.target.id === 'search-input') onSearchInput();
+});
 
 loadRepos();
 </script>

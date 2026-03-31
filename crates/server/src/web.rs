@@ -116,6 +116,14 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             axum::routing::post(api_verify_release),
         )
         .route(
+            "/api/repos/{owner}/{repo}/verify-release/latest",
+            axum::routing::get(api_get_latest_release_verifications),
+        )
+        .route(
+            "/api/repos/{owner}/{repo}/verify-release/latest/{target_ref}",
+            axum::routing::get(api_get_latest_release_verification_by_ref),
+        )
+        .route(
             "/api/repos/{owner}/{repo}/pulls",
             axum::routing::get(api_list_pulls),
         )
@@ -1567,6 +1575,81 @@ async fn api_get_latest_pr_verification(
         )
             .into_response(),
         Ok(None) => (axum::http::StatusCode::NOT_FOUND, "No verification found").into_response(),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{e}"),
+        )
+            .into_response(),
+    }
+}
+
+async fn api_get_latest_release_verification_by_ref(
+    headers: HeaderMap,
+    Path((owner, repo, target_ref)): Path<(String, String, String)>,
+    State(state): State<WebState>,
+) -> Response {
+    if let Some(r) = validate_repo_params(&owner, &repo) {
+        return r;
+    }
+
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let db = state.db.clone();
+    match run_blocking(move || {
+        db.get_latest_verification_by_ref(user_id, &owner, &repo, &target_ref)
+    })
+    .await
+    {
+        Ok(Some(json)) => (
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            json,
+        )
+            .into_response(),
+        Ok(None) => (axum::http::StatusCode::NOT_FOUND, "No verification found").into_response(),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{e}"),
+        )
+            .into_response(),
+    }
+}
+
+async fn api_get_latest_release_verifications(
+    headers: HeaderMap,
+    Path((owner, repo)): Path<(String, String)>,
+    State(state): State<WebState>,
+) -> Response {
+    if let Some(r) = validate_repo_params(&owner, &repo) {
+        return r;
+    }
+
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let db = state.db.clone();
+    match run_blocking(move || db.get_latest_verifications_by_type(user_id, "release", &owner, &repo))
+        .await
+    {
+        Ok(rows) => {
+            let json: Vec<serde_json::Value> = rows
+                .into_iter()
+                .map(|(target_ref, pass, fail, review, na, _result_json)| {
+                    serde_json::json!({
+                        "target_ref": target_ref,
+                        "pass": pass,
+                        "fail": fail,
+                        "review": review,
+                        "na": na,
+                    })
+                })
+                .collect();
+            Json(json).into_response()
+        }
         Err(e) => (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             format!("{e}"),

@@ -678,6 +678,43 @@ impl Database {
         Ok(result)
     }
 
+    /// Get latest verification results for all target_refs of a given type in a repo.
+    /// Returns Vec<(target_ref, pass, fail, review, na, result_json)>.
+    pub fn get_latest_verifications_by_type(
+        &self,
+        user_id: i64,
+        verification_type: &str,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<(String, i64, i64, i64, i64, String)>> {
+        let conn = self.reader();
+        let mut stmt = conn.prepare_cached(
+            "SELECT target_ref, pass_count, fail_count, review_count, na_count, result_json
+             FROM audit_log a
+             WHERE a.user_id = ?1 AND a.verification_type = ?2 AND a.owner = ?3 AND a.repo = ?4
+               AND a.id = (SELECT MAX(b.id) FROM audit_log b
+                           WHERE b.user_id = a.user_id AND b.verification_type = a.verification_type
+                             AND b.owner = a.owner AND b.repo = a.repo AND b.target_ref = a.target_ref)
+             ORDER BY a.id DESC",
+        )?;
+        let rows = stmt
+            .query_map(
+                rusqlite::params![user_id, verification_type, owner, repo],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, String>(5)?,
+                    ))
+                },
+            )?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     pub fn get_latest_verification_by_ref(
         &self,
         user_id: i64,

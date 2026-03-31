@@ -75,6 +75,15 @@ async function swrFetch(url, { maxAge = 60000 } = {}) {
     throw e;
   }
 }
+
+// Safe HTML setter: uses setHTML (Sanitizer API) if available, otherwise innerHTML.
+function safeHTML(el, html) {
+  if (el.setHTML) {
+    el.setHTML(html);
+  } else {
+    el.innerHTML = html;
+  }
+}
 </script>
 <script>
 // Theme switcher
@@ -171,7 +180,7 @@ function toggleShortcutHelp() {
   overlay.id = 'kbd-help-overlay';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-label', 'キーボードショートカット');
-  overlay.innerHTML = `
+  safeHTML(overlay, `
     <div class="kbd-help-backdrop"></div>
     <div class="kbd-help-panel" tabindex="-1" role="document">
       <div style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;margin-bottom:0.75rem;color:var(--accent-gold)">キーボードショートカット</div>
@@ -185,7 +194,7 @@ function toggleShortcutHelp() {
         <tr><td class="kbd-key">?</td><td>このヘルプを表示</td></tr>
       </table>
       <button class="verify-btn kbd-help-close" style="margin-top:0.75rem;font-size:0.6rem">閉じる (Esc)</button>
-    </div>`;
+    </div>`);
   document.body.appendChild(overlay);
   // Save and restore focus on close
   const _prevFocus = document.activeElement;

@@ -98,23 +98,23 @@
   <div class="section-title">監査ログ</div>
 
   <div class="audit-toolbar">
-    <select class="policy-select" id="filter-type" onchange="resetAndLoad()" aria-label="タイプフィルタ">
+    <select class="policy-select" id="filter-type" aria-label="タイプフィルタ">
       <option value="">全タイプ</option>
       <option value="release">Release</option>
       <option value="pr">PR</option>
       <option value="repo">Repo</option>
     </select>
-    <input type="search" class="policy-select" id="filter-repo" placeholder="org/repo で検索…" onchange="resetAndLoad()" oninput="debounceLoad()" aria-label="リポジトリ検索" style="min-width:160px">
-    <input type="date" class="policy-select" id="filter-from" onchange="resetAndLoad()" aria-label="開始日">
-    <input type="date" class="policy-select" id="filter-to" onchange="resetAndLoad()" aria-label="終了日">
-    <select class="policy-select" id="filter-preset" onchange="applyPreset(this.value)" aria-label="期間プリセット">
+    <input type="search" class="policy-select" id="filter-repo" placeholder="org/repo で検索…" aria-label="リポジトリ検索" style="min-width:160px">
+    <input type="date" class="policy-select" id="filter-from" aria-label="開始日">
+    <input type="date" class="policy-select" id="filter-to" aria-label="終了日">
+    <select class="policy-select" id="filter-preset" aria-label="期間プリセット">
       <option value="">期間指定…</option>
       <option value="this-quarter">今四半期</option>
       <option value="last-quarter">前四半期</option>
       <option value="ytd">年初来</option>
       <option value="last-12m">過去12ヶ月</option>
     </select>
-    <button class="verify-btn" id="export-csv-btn" onclick="exportAuditCSV()">CSV出力</button>
+    <button class="verify-btn" id="export-csv-btn">CSV出力</button>
   </div>
 
   <div id="audit-content" aria-live="polite"><div class="loading" role="status">監査ログを取得中</div></div>
@@ -145,7 +145,7 @@ function resultBadges(e) {
 async function loadAudit() {
   const type = document.getElementById('filter-type').value;
   const container = document.getElementById('audit-content');
-  container.innerHTML = '<div class="loading">監査ログを取得中</div>';
+  safeHTML(container, '<div class="loading">監査ログを取得中</div>');
 
   try {
     let url = `/api/audit-history?limit=${PAGE_SIZE}&offset=${currentOffset}`;
@@ -168,11 +168,11 @@ async function loadAudit() {
     allEntries = entries;
 
     if (entries.length === 0 && currentOffset === 0) {
-      container.innerHTML = `<div class="empty-state">
+      safeHTML(container, `<div class="empty-state">
         <div style="margin-bottom:0.75rem">監査ログはまだありません</div>
         <a class="btn" href="/repos" style="text-decoration:none">リポジトリ一覧へ</a>
-      </div>`;
-      document.getElementById('audit-pagination').innerHTML = '';
+      </div>`);
+      safeHTML(document.getElementById('audit-pagination'), '');
       return;
     }
 
@@ -185,14 +185,14 @@ async function loadAudit() {
       <td style="display:flex;gap:0.2rem">${resultBadges(e)}</td>
     </tr>`).join('');
 
-    container.innerHTML = `<div class="card" style="padding:0;overflow-x:auto">
+    safeHTML(container, `<div class="card" style="padding:0;overflow-x:auto">
       <table class="audit-table">
         <thead>
           <tr><th scope="col">日時</th><th scope="col">タイプ</th><th scope="col">リポジトリ</th><th scope="col">対象</th><th scope="col">ポリシー</th><th scope="col">結果</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
-    </div>`;
+    </div>`);
 
     // Update page title with context
     const filterParts = [];
@@ -204,11 +204,11 @@ async function loadAudit() {
 
     // Pagination
     const pag = document.getElementById('audit-pagination');
-    pag.innerHTML = `
-      <button onclick="prevPage()" ${currentOffset === 0 ? 'disabled' : ''}>前へ</button>
+    safeHTML(pag, `
+      <button data-action="prev-page" ${currentOffset === 0 ? 'disabled' : ''}>前へ</button>
       <span style="color:var(--text-secondary);align-self:center">${currentOffset + 1}〜${currentOffset + entries.length} 件</span>
-      <button onclick="nextPage()" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
-    `;
+      <button data-action="next-page" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
+    `);
   } catch (e) {
     renderLoadError('audit-content', '監査ログの取得に失敗しました。', 'loadAudit');
   }
@@ -289,6 +289,21 @@ function debounceLoad() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => resetAndLoad(), 400);
 }
+
+// Event listeners
+document.getElementById('filter-type').addEventListener('change', resetAndLoad);
+document.getElementById('filter-repo').addEventListener('change', resetAndLoad);
+document.getElementById('filter-repo').addEventListener('input', debounceLoad);
+document.getElementById('filter-from').addEventListener('change', resetAndLoad);
+document.getElementById('filter-to').addEventListener('change', resetAndLoad);
+document.getElementById('filter-preset').addEventListener('change', function() { applyPreset(this.value); });
+document.getElementById('export-csv-btn').addEventListener('click', exportAuditCSV);
+document.getElementById('audit-pagination').addEventListener('click', function(e) {
+  const prev = e.target.closest('[data-action="prev-page"]');
+  if (prev && !prev.disabled) prevPage();
+  const next = e.target.closest('[data-action="next-page"]');
+  if (next && !next.disabled) nextPage();
+});
 
 loadAudit();
 </script>
