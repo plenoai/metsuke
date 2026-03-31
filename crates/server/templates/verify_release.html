@@ -117,19 +117,19 @@ function renderReleaseList(releases) {
   const baseSelect = document.getElementById('base-tag');
   const headSelect = document.getElementById('head-tag');
   if (releases.length < 2) {
-    baseSelect.setHTML('<option value="">タグが不足しています</option>');
-    headSelect.setHTML('<option value="">タグが不足しています</option>');
+    baseSelect.setHTML('<option value="">タグが不足しています</option>', _sanitizer);
+    headSelect.setHTML('<option value="">タグが不足しています</option>', _sanitizer);
   } else {
     const opts = releases.map(r => `<option value="${esc(r.tag_name)}">${esc(r.tag_name)}</option>`).join('');
-    baseSelect.setHTML(opts);
-    headSelect.setHTML(opts);
+    baseSelect.setHTML(opts, _sanitizer);
+    headSelect.setHTML(opts, _sanitizer);
     baseSelect.value = releases[1].tag_name;
     headSelect.value = releases[0].tag_name;
   }
 
   const container = document.getElementById('release-list');
   if (releases.length === 0) {
-    container.setHTML('<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">リリースはありません</div>');
+    container.setHTML('<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">リリースはありません</div>', _sanitizer);
     return;
   }
   container.setHTML('<div class="release-list">' + releases.map((rel, i) => {
@@ -154,7 +154,7 @@ function renderReleaseList(releases) {
         ${prevTag ? `<button class="verify-btn" data-action="verify-release" data-base="${esc(prevTag)}" data-head="${esc(rel.tag_name)}" data-idx="${i}">検証</button>` : '<span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-secondary)">初回リリース</span>'}
       </div>
     </div>`;
-  }).join('') + '</div>');
+  }).join('') + '</div>', _sanitizer);
 }
 
 let _releaseAuditCache = {};
@@ -178,7 +178,7 @@ function applyReleaseAuditBadges() {
     if (!cached) continue;
     const el = document.getElementById(`release-result-${i}`);
     if (el && !el.innerHTML) {
-      el.setHTML(compactBadges(cached.pass, cached.fail, cached.review));
+      el.setHTML(compactBadges(cached.pass, cached.fail, cached.review), _sanitizer);
     }
   }
 }
@@ -198,7 +198,7 @@ async function verifyRelease() {
   const baseTag = document.getElementById('base-tag').value;
   const headTag = document.getElementById('head-tag').value;
   if (!baseTag || !headTag) return;
-  if (baseTag === headTag) { document.getElementById('result-area').setHTML('<div class="card" style="color:var(--accent-vermillion)">Base TagとHead Tagは異なる値を選択してください</div>'); return; }
+  if (baseTag === headTag) { document.getElementById('result-area').setHTML('<div class="card" style="color:var(--accent-vermillion)">Base TagとHead Tagは異なる値を選択してください</div>', _sanitizer); return; }
 
   const policy = document.getElementById('release-policy').value;
   const btn = document.getElementById('verify-btn');
@@ -207,15 +207,15 @@ async function verifyRelease() {
   btn.disabled = true;
   btn.textContent = '検証中…';
   btn.classList.add('running');
-  area.setHTML('<div class="loading" role="status">検証を実行中</div>');
+  area.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
 
   try {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-release?base_tag=${encodeURIComponent(baseTag)}&head_tag=${encodeURIComponent(headTag)}&policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
-    area.setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`));
+    area.setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`), _sanitizer);
   } catch (e) {
-    area.setHTML(renderErrorCard(e.message));
+    area.setHTML(renderErrorCard(e.message), _sanitizer);
   }
   btn.disabled = false;
   btn.textContent = '検証を実行';
@@ -234,11 +234,11 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     const c = countFindings(data.findings);
-    resultEl.setHTML(compactBadges(c.pass, c.fail, c.review));
-    document.getElementById('result-area').setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`));
+    resultEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
+    document.getElementById('result-area').setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`), _sanitizer);
     btn.textContent = '再検証';
   } catch (e) {
-    resultEl.setHTML('<span class="badge badge-fail" title="ERROR">ERR</span>');
+    resultEl.setHTML('<span class="badge badge-fail" title="ERROR">ERR</span>', _sanitizer);
     btn.textContent = '再試行';
   }
   btn.disabled = false;

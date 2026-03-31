@@ -145,7 +145,7 @@ function resultBadges(e) {
 async function loadAudit() {
   const type = document.getElementById('filter-type').value;
   const container = document.getElementById('audit-content');
-  container.setHTML('<div class="loading">監査ログを取得中</div>');
+  container.setHTML('<div class="loading">監査ログを取得中</div>', _sanitizer);
 
   try {
     let url = `/api/audit-history?limit=${PAGE_SIZE}&offset=${currentOffset}`;
@@ -171,8 +171,8 @@ async function loadAudit() {
       container.setHTML(`<div class="empty-state">
         <div style="margin-bottom:0.75rem">監査ログはまだありません</div>
         <a class="btn" href="/repos" style="text-decoration:none">リポジトリ一覧へ</a>
-      </div>`);
-      document.getElementById('audit-pagination').setHTML('');
+      </div>`, _sanitizer);
+      document.getElementById('audit-pagination').setHTML('', _sanitizer);
       return;
     }
 
@@ -192,7 +192,7 @@ async function loadAudit() {
         </thead>
         <tbody>${rows}</tbody>
       </table>
-    </div>`);
+    </div>`, _sanitizer);
 
     // Update page title with context
     const filterParts = [];
@@ -208,7 +208,7 @@ async function loadAudit() {
       <button data-action="prev-page" ${currentOffset === 0 ? 'disabled' : ''}>前へ</button>
       <span style="color:var(--text-secondary);align-self:center">${currentOffset + 1}〜${currentOffset + entries.length} 件</span>
       <button data-action="next-page" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
-    `);
+    `, _sanitizer);
   } catch (e) {
     renderLoadError('audit-content', '監査ログの取得に失敗しました。', 'loadAudit');
   }

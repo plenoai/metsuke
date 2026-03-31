@@ -144,7 +144,7 @@ function renderLoadError(containerId, message, retryFnName) {
   el.setHTML(`<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;gap:0.75rem">
     <div>${esc(message)}</div>
     <button class="verify-btn" data-action="retry" data-retry-fn="${retryFnName}">再取得</button>
-  </div>`);
+  </div>`, _sanitizer);
 }
 
 // Global event delegation for shared actions

@@ -171,7 +171,7 @@ function renderPage() {
     container.setHTML(`<div class="empty-state">
       <div style="margin-bottom:0.75rem">リポジトリが見つかりません</div>
       <a class="btn" href="/settings" style="text-decoration:none">GitHub Appをインストール</a>
-    </div>`);
+    </div>`, _sanitizer);
     return;
   }
 
@@ -186,12 +186,12 @@ function renderPage() {
   container.setHTML(searchBar
     + renderPagination()
     + '<div class="repo-grid">' + pageRepos.map(renderCard).join('') + '</div>'
-    + renderPagination());
+    + renderPagination(), _sanitizer);
 
   const orgs = [...new Set(allRepos.map(r => r.owner))].sort();
   const orgFilter = document.getElementById('org-filter');
   if (orgs.length > 1) {
-    orgFilter.setHTML('<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}" ${activeOrg === o ? 'selected' : ''}>${esc(o)}</option>`).join(''));
+    orgFilter.setHTML('<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}" ${activeOrg === o ? 'selected' : ''}>${esc(o)}</option>`).join(''), _sanitizer);
     orgFilter.style.display = '';
   }
 }
