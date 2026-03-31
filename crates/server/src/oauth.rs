@@ -18,6 +18,7 @@ struct OAuthState {
     db: Arc<Database>,
     github_app: Arc<GitHubApp>,
     base_url: String,
+    github_web_base_url: String,
 }
 
 const ACCESS_TOKEN_TTL: i64 = 3600; // 1 hour
@@ -26,8 +27,9 @@ const REFRESH_TOKEN_TTL: i64 = 30 * 24 * 3600; // 30 days
 pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig) -> Router {
     let state = OAuthState {
         db,
-        github_app,
+        github_app: github_app.clone(),
         base_url: config.base_url.clone(),
+        github_web_base_url: github_app.web_base_url().to_string(),
     };
 
     Router::new()
@@ -247,7 +249,8 @@ async fn authorize(
     // Redirect to GitHub OAuth (reuse registered callback URL)
     let github_redirect = format!("{}/auth/callback", state.base_url);
     let url = format!(
-        "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=read:user&state={}",
+        "{}/login/oauth/authorize?client_id={}&redirect_uri={}&scope=read:user&state={}",
+        state.github_web_base_url,
         state.github_app.client_id(),
         urlencoding::encode(&github_redirect),
         urlencoding::encode(&combined_state),

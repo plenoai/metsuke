@@ -14,6 +14,10 @@ pub struct GitHubApp {
     http: reqwest::Client,
     jwt_cache: Arc<std::sync::RwLock<Option<(String, std::time::Instant)>>>,
     token_cache: Arc<std::sync::RwLock<HashMap<i64, (String, std::time::Instant)>>>,
+    /// Base URL for GitHub API calls (e.g. "https://api.github.com" or "https://ghes.example.com/api/v3").
+    api_base_url: String,
+    /// Base URL for GitHub web (e.g. "https://github.com" or "https://ghes.example.com").
+    web_base_url: String,
 }
 
 #[derive(Serialize)]
@@ -127,6 +131,24 @@ impl GitHubApp {
         client_id: String,
         client_secret: String,
     ) -> Result<Self> {
+        Self::with_hosts(
+            app_id,
+            private_key_pem,
+            client_id,
+            client_secret,
+            "api.github.com",
+            "github.com",
+        )
+    }
+
+    pub fn with_hosts(
+        app_id: u64,
+        private_key_pem: &str,
+        client_id: String,
+        client_secret: String,
+        api_host: &str,
+        web_host: &str,
+    ) -> Result<Self> {
         let private_key = EncodingKey::from_rsa_pem(private_key_pem.as_bytes())
             .context("Failed to parse GitHub App private key")?;
         let http = reqwest::Client::builder()
@@ -142,7 +164,26 @@ impl GitHubApp {
             http,
             jwt_cache: Arc::new(std::sync::RwLock::new(None)),
             token_cache: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            api_base_url: format!("https://{api_host}"),
+            web_base_url: format!("https://{web_host}"),
         })
+    }
+
+    /// The GitHub API base URL (e.g. "https://api.github.com").
+    pub fn api_base_url(&self) -> &str {
+        &self.api_base_url
+    }
+
+    /// The GitHub web base URL (e.g. "https://github.com").
+    pub fn web_base_url(&self) -> &str {
+        &self.web_base_url
+    }
+
+    /// The GitHub API host (e.g. "api.github.com"), without scheme.
+    pub fn api_host(&self) -> &str {
+        self.api_base_url
+            .strip_prefix("https://")
+            .unwrap_or(&self.api_base_url)
     }
 
     pub fn client_id(&self) -> &str {
@@ -201,7 +242,8 @@ impl GitHubApp {
         let resp: InstallationTokenResponse = self
             .http
             .post(format!(
-                "https://api.github.com/app/installations/{installation_id}/access_tokens"
+                "{}/app/installations/{installation_id}/access_tokens",
+                self.api_base_url
             ))
             .header("Authorization", format!("Bearer {jwt}"))
             .header("Accept", "application/vnd.github+json")
@@ -228,7 +270,8 @@ impl GitHubApp {
         let jwt = self.generate_jwt()?;
         self.http
             .get(format!(
-                "https://api.github.com/app/installations/{installation_id}"
+                "{}/app/installations/{installation_id}",
+                self.api_base_url
             ))
             .header("Authorization", format!("Bearer {jwt}"))
             .header("Accept", "application/vnd.github+json")
@@ -242,7 +285,7 @@ impl GitHubApp {
 
     pub async fn exchange_code(&self, code: &str) -> Result<OAuthTokenResponse> {
         self.http
-            .post("https://github.com/login/oauth/access_token")
+            .post(format!("{}/login/oauth/access_token", self.web_base_url))
             .header("Accept", "application/json")
             .form(&[
                 ("client_id", self.client_id.as_str()),
@@ -259,11 +302,12 @@ impl GitHubApp {
 
     pub async fn list_installation_repos(&self, installation_id: i64) -> Result<Vec<Repository>> {
         let token = self.create_installation_token(installation_id).await?;
+        let repos_url = format!("{}/installation/repositories", self.api_base_url);
 
         // Fetch first page to get total_count
         let first_resp: RepoListResponse = self
             .http
-            .get("https://api.github.com/installation/repositories")
+            .get(&repos_url)
             .query(&[("per_page", "100"), ("page", "1")])
             .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
@@ -288,9 +332,10 @@ impl GitHubApp {
         for page in 2..=total_pages {
             let http = self.http.clone();
             let tok = token.clone();
+            let url = repos_url.clone();
             join_set.spawn(async move {
                 let resp: RepoListResponse = http
-                    .get("https://api.github.com/installation/repositories")
+                    .get(&url)
                     .query(&[("per_page", "100"), ("page", &page.to_string())])
                     .header("Authorization", format!("Bearer {tok}"))
                     .header("Accept", "application/vnd.github+json")
@@ -317,10 +362,12 @@ impl GitHubApp {
 
     /// List all GitHub App installations accessible to the authenticated user.
     pub async fn list_user_installations(&self, user_token: &str) -> Result<Vec<UserInstallation>> {
+        let installs_url = format!("{}/user/installations", self.api_base_url);
+
         // Fetch first page to get total_count
         let first_resp: UserInstallationsResponse = self
             .http
-            .get("https://api.github.com/user/installations")
+            .get(&installs_url)
             .query(&[("per_page", "100"), ("page", "1")])
             .header("Authorization", format!("Bearer {user_token}"))
             .header("Accept", "application/vnd.github+json")
@@ -345,9 +392,10 @@ impl GitHubApp {
         for page in 2..=total_pages {
             let http = self.http.clone();
             let tok = user_token.to_string();
+            let url = installs_url.clone();
             join_set.spawn(async move {
                 let resp: UserInstallationsResponse = http
-                    .get("https://api.github.com/user/installations")
+                    .get(&url)
                     .query(&[("per_page", "100"), ("page", &page.to_string())])
                     .header("Authorization", format!("Bearer {tok}"))
                     .header("Accept", "application/vnd.github+json")
@@ -380,7 +428,7 @@ impl GitHubApp {
     ) -> Result<Vec<PullRequest>> {
         let token = self.create_installation_token(installation_id).await?;
         self.http
-            .get(format!("https://api.github.com/repos/{owner}/{repo}/pulls"))
+            .get(format!("{}/repos/{owner}/{repo}/pulls", self.api_base_url))
             .query(&[("state", "all"), ("per_page", "30"), ("sort", "updated")])
             .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
@@ -402,7 +450,8 @@ impl GitHubApp {
         let token = self.create_installation_token(installation_id).await?;
         self.http
             .get(format!(
-                "https://api.github.com/repos/{owner}/{repo}/releases"
+                "{}/repos/{owner}/{repo}/releases",
+                self.api_base_url
             ))
             .query(&[("per_page", "30")])
             .header("Authorization", format!("Bearer {token}"))
@@ -442,7 +491,8 @@ impl GitHubApp {
         });
         self.http
             .post(format!(
-                "https://api.github.com/repos/{owner}/{repo}/check-runs"
+                "{}/repos/{owner}/{repo}/check-runs",
+                self.api_base_url
             ))
             .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
@@ -456,7 +506,7 @@ impl GitHubApp {
 
     pub async fn get_user(&self, access_token: &str) -> Result<GitHubUser> {
         self.http
-            .get("https://api.github.com/user")
+            .get(format!("{}/user", self.api_base_url))
             .header("Authorization", format!("Bearer {access_token}"))
             .send()
             .await?

@@ -44,6 +44,25 @@ npx skills add plenoai/metsuke
 
 Install: https://github.com/apps/pleno-metsuke
 
+## Self-Hosted Deployment
+
+For enterprises requiring on-premises or private cloud deployment (GHES, air-gapped networks):
+
+```bash
+docker compose up -d
+```
+
+See [docs/self-hosted-guide.md](docs/self-hosted-guide.md) for full instructions including GHES configuration, TLS setup, and backup procedures.
+
+## Security
+
+See [docs/security-whitepaper.md](docs/security-whitepaper.md) for:
+- Architecture and data flow
+- OAuth 2.1 authentication details
+- Data handling and retention policies
+- Webhook security
+- Compliance considerations (SOC2, GDPR, ISMAP)
+
 ## Build
 
 ```bash

@@ -11,6 +11,12 @@ pub struct AppConfig {
     pub database_url: String,
     pub base_url: String,
     pub github_webhook_secret: Option<String>,
+    /// GitHub API hostname (e.g. "api.github.com" or "ghes.example.com/api/v3").
+    /// Falls back to deriving from `GH_HOST` if set, otherwise defaults to "api.github.com".
+    pub github_api_host: String,
+    /// GitHub web hostname (e.g. "github.com" or "ghes.example.com").
+    /// Falls back to `GH_HOST` if set, otherwise defaults to "github.com".
+    pub github_web_host: String,
 }
 
 impl AppConfig {
@@ -41,6 +47,19 @@ impl AppConfig {
         let base_url = get("BASE_URL").unwrap_or_else(|| "https://metsuke.fly.dev".into());
         let github_webhook_secret = get("GITHUB_WEBHOOK_SECRET");
 
+        // GHES support: resolve API / web hostnames.
+        // Priority: explicit env vars > GH_HOST derivation > defaults.
+        let gh_host = get("GH_HOST");
+        let github_api_host = get("GITHUB_API_HOST").unwrap_or_else(|| {
+            match &gh_host {
+                Some(h) if h != "github.com" => format!("{h}/api/v3"),
+                _ => "api.github.com".into(),
+            }
+        });
+        let github_web_host = get("GITHUB_WEB_HOST")
+            .or_else(|| gh_host.clone())
+            .unwrap_or_else(|| "github.com".into());
+
         Ok(Self {
             host,
             port,
@@ -51,6 +70,8 @@ impl AppConfig {
             database_url,
             base_url,
             github_webhook_secret,
+            github_api_host,
+            github_web_host,
         })
     }
 
@@ -90,6 +111,39 @@ mod tests {
         assert_eq!(cfg.base_url, "https://metsuke.fly.dev");
         assert_eq!(cfg.github_webhook_secret, None);
         assert_eq!(cfg.github_app_id, 12345);
+        assert_eq!(cfg.github_api_host, "api.github.com");
+        assert_eq!(cfg.github_web_host, "github.com");
+    }
+
+    #[test]
+    fn from_getter_gh_host_derives_api_and_web() {
+        let mut vars = required_vars();
+        vars.push(("GH_HOST", "ghes.example.com"));
+        let cfg = AppConfig::from_getter(env_map(&vars)).unwrap();
+        assert_eq!(cfg.github_api_host, "ghes.example.com/api/v3");
+        assert_eq!(cfg.github_web_host, "ghes.example.com");
+    }
+
+    #[test]
+    fn from_getter_gh_host_github_com_uses_defaults() {
+        let mut vars = required_vars();
+        vars.push(("GH_HOST", "github.com"));
+        let cfg = AppConfig::from_getter(env_map(&vars)).unwrap();
+        assert_eq!(cfg.github_api_host, "api.github.com");
+        assert_eq!(cfg.github_web_host, "github.com");
+    }
+
+    #[test]
+    fn from_getter_explicit_hosts_override_gh_host() {
+        let mut vars = required_vars();
+        vars.extend([
+            ("GH_HOST", "ghes.example.com"),
+            ("GITHUB_API_HOST", "custom-api.example.com"),
+            ("GITHUB_WEB_HOST", "custom-web.example.com"),
+        ]);
+        let cfg = AppConfig::from_getter(env_map(&vars)).unwrap();
+        assert_eq!(cfg.github_api_host, "custom-api.example.com");
+        assert_eq!(cfg.github_web_host, "custom-web.example.com");
     }
 
     #[test]

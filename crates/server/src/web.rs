@@ -63,15 +63,19 @@ struct WebState {
     github_app: Arc<GitHubApp>,
     base_url: String,
     events_tx: tokio::sync::broadcast::Sender<JobEvent>,
+    github_web_base_url: String,
+    github_api_host: String,
 }
 
 pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig) -> Router {
     let (events_tx, _) = tokio::sync::broadcast::channel::<JobEvent>(256);
     let state = WebState {
         db,
-        github_app,
+        github_app: github_app.clone(),
         base_url: config.base_url.clone(),
         events_tx,
+        github_web_base_url: github_app.web_base_url().to_string(),
+        github_api_host: config.github_api_host.clone(),
     };
 
     Router::new()
@@ -468,7 +472,8 @@ async fn login(State(state): State<WebState>) -> Response {
     let redirect_uri = format!("{}/auth/callback", state.base_url);
     let csrf_state = uuid::Uuid::new_v4().to_string();
     let url = format!(
-        "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=read:user&state=web:{}",
+        "{}/login/oauth/authorize?client_id={}&redirect_uri={}&scope=read:user&state=web:{}",
+        state.github_web_base_url,
         state.github_app.client_id(),
         redirect_uri,
         csrf_state,

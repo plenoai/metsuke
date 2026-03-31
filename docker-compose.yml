@@ -1,0 +1,40 @@
+services:
+  metsuke:
+    build: .
+    # image: ghcr.io/plenoai/metsuke:latest  # Use pre-built image instead of build
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - metsuke_data:/data
+    environment:
+      # Required
+      GITHUB_APP_ID: ${GITHUB_APP_ID}
+      GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID}
+      GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY}
+
+      # Required for self-hosted — set to your externally reachable URL
+      BASE_URL: ${BASE_URL:-http://localhost:8080}
+
+      # Recommended
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+
+      # Defaults (override if needed)
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      DATABASE_URL: "/data/metsuke.db"
+
+      ## --- GHES (GitHub Enterprise Server) ---
+      ## Uncomment and set these for on-premises GitHub Enterprise Server.
+      ## GITHUB_API_URL: "https://github.example.com/api/v3"
+      ## GITHUB_URL: "https://github.example.com"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  metsuke_data:
