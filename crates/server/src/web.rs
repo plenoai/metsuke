@@ -1630,7 +1630,10 @@ async fn api_readme(
         .ok()
         .flatten();
 
-    let url = format!("https://{}/repos/{owner}/{repo}/readme", state.github_api_host);
+    let url = format!(
+        "https://{}/repos/{owner}/{repo}/readme",
+        state.github_api_host
+    );
     let client = reqwest::Client::new();
     let mut req = client
         .get(&url)

@@ -50,11 +50,9 @@ impl AppConfig {
         // GHES support: resolve API / web hostnames.
         // Priority: explicit env vars > GH_HOST derivation > defaults.
         let gh_host = get("GH_HOST");
-        let github_api_host = get("GITHUB_API_HOST").unwrap_or_else(|| {
-            match &gh_host {
-                Some(h) if h != "github.com" => format!("{h}/api/v3"),
-                _ => "api.github.com".into(),
-            }
+        let github_api_host = get("GITHUB_API_HOST").unwrap_or_else(|| match &gh_host {
+            Some(h) if h != "github.com" => format!("{h}/api/v3"),
+            _ => "api.github.com".into(),
         });
         let github_web_host = get("GITHUB_WEB_HOST")
             .or_else(|| gh_host.clone())
