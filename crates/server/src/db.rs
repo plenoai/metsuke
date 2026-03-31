@@ -729,10 +729,9 @@ impl Database {
              ORDER BY id DESC LIMIT 1",
         )?;
         let result = stmt
-            .query_row(
-                rusqlite::params![user_id, owner, repo, target_ref],
-                |row| row.get(0),
-            )
+            .query_row(rusqlite::params![user_id, owner, repo, target_ref], |row| {
+                row.get(0)
+            })
             .optional()?;
         Ok(result)
     }

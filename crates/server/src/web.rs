@@ -1566,8 +1566,10 @@ async fn api_get_latest_pr_verification(
 
     let db = state.db.clone();
     let target_ref = format!("#{pr_number}");
-    match run_blocking(move || db.get_latest_verification_by_ref(user_id, &owner, &repo, &target_ref))
-        .await
+    match run_blocking(move || {
+        db.get_latest_verification_by_ref(user_id, &owner, &repo, &target_ref)
+    })
+    .await
     {
         Ok(Some(json)) => (
             [(axum::http::header::CONTENT_TYPE, "application/json")],
@@ -1632,8 +1634,10 @@ async fn api_get_latest_release_verifications(
     };
 
     let db = state.db.clone();
-    match run_blocking(move || db.get_latest_verifications_by_type(user_id, "release", &owner, &repo))
-        .await
+    match run_blocking(move || {
+        db.get_latest_verifications_by_type(user_id, "release", &owner, &repo)
+    })
+    .await
     {
         Ok(rows) => {
             let json: Vec<serde_json::Value> = rows
