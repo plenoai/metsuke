@@ -136,6 +136,7 @@ const OWNER = '{{ owner }}';
 const REPO = '{{ repo }}';
 let allPRs = [];
 let selectedPR = null;
+let _findingsCache = {}; // PR番号 → findings HTML
 
 function prState(pr) {
   if (pr.merged_at) return 'merged';
@@ -185,9 +186,9 @@ function renderPRList(prs) {
     ${isSelected ? `<div class="pr-detail" id="pr-detail-${pr.pr_number}">
       <div class="pr-detail-header">
         <a href="https://github.com/${OWNER}/${REPO}/pull/${pr.pr_number}" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">GitHub で開く ↗</a>
-        <button class="verify-btn" id="pr-verify-btn-${pr.pr_number}" onclick="event.stopPropagation();verifyPRById(${pr.pr_number})">検証</button>
+        <button class="verify-btn" id="pr-verify-btn-${pr.pr_number}" onclick="event.stopPropagation();verifyPRById(${pr.pr_number})">${_findingsCache[pr.pr_number] ? '再検証' : '検証'}</button>
       </div>
-      <div id="pr-findings-${pr.pr_number}"></div>
+      <div id="pr-findings-${pr.pr_number}">${_findingsCache[pr.pr_number] || ''}</div>
     </div>` : ''}`;
   }).join('') + '</div>';
 }
@@ -211,7 +212,7 @@ function applyFilter() {
 let _auditCache = {};
 async function loadAuditResults() {
   try {
-    const entries = await swrFetch(`/api/audit/history?type=pr&owner=${OWNER}&repo=${REPO}&limit=100`);
+    const entries = await swrFetch(`/api/audit-history?type=pr&owner=${OWNER}&repo=${REPO}&limit=100`);
     _auditCache = {};
     for (const e of entries) {
       const num = e.target_ref.replace('#', '');
@@ -277,7 +278,9 @@ async function verifyPRById(num) {
     const data = await resp.json();
     const c = countFindings(data.findings);
     if (resultEl) resultEl.innerHTML = compactBadges(c.pass, c.fail, c.review);
-    findingsEl.innerHTML = renderFindingsTable(data.findings, `PR #${num} 検証結果`);
+    const html = renderFindingsTable(data.findings, `PR #${num} 検証結果`);
+    _findingsCache[num] = html;
+    findingsEl.innerHTML = html;
     btn.textContent = '再検証';
   } catch (e) {
     if (resultEl) resultEl.innerHTML = '<span class="badge badge-fail" title="ERROR">ERR</span>';
