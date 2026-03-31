@@ -528,8 +528,10 @@ select:focus-visible {
   font-family: var(--font-mono);
 }
 .readme-header svg {
-  width: 16px;
-  height: 16px;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
+  max-width: 16px;
   fill: var(--text-secondary);
   flex-shrink: 0;
 }
