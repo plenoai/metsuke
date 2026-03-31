@@ -136,7 +136,6 @@ const OWNER = '{{ owner }}';
 const REPO = '{{ repo }}';
 let allPRs = [];
 let selectedPR = null;
-let _findingsCache = {}; // PR番号 → findings HTML
 
 function prState(pr) {
   if (pr.merged_at) return 'merged';
@@ -158,6 +157,22 @@ function togglePR(num) {
     selectedPR = num;
   }
   renderCurrentList();
+  if (selectedPR !== null) loadCachedFindings(selectedPR);
+}
+
+async function loadCachedFindings(num) {
+  const findingsEl = document.getElementById(`pr-findings-${num}`);
+  if (!findingsEl) return;
+  try {
+    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}/latest`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data.findings) {
+      findingsEl.innerHTML = renderFindingsTable(data.findings, `PR #${num} 検証結果`);
+      const btn = document.getElementById(`pr-verify-btn-${num}`);
+      if (btn) btn.textContent = '再検証';
+    }
+  } catch (_) {}
 }
 
 function renderPRList(prs) {
@@ -186,9 +201,9 @@ function renderPRList(prs) {
     ${isSelected ? `<div class="pr-detail" id="pr-detail-${pr.pr_number}">
       <div class="pr-detail-header">
         <a href="https://github.com/${OWNER}/${REPO}/pull/${pr.pr_number}" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">GitHub で開く ↗</a>
-        <button class="verify-btn" id="pr-verify-btn-${pr.pr_number}" onclick="event.stopPropagation();verifyPRById(${pr.pr_number})">${_findingsCache[pr.pr_number] ? '再検証' : '検証'}</button>
+        <button class="verify-btn" id="pr-verify-btn-${pr.pr_number}" onclick="event.stopPropagation();verifyPRById(${pr.pr_number})">検証</button>
       </div>
-      <div id="pr-findings-${pr.pr_number}">${_findingsCache[pr.pr_number] || ''}</div>
+      <div id="pr-findings-${pr.pr_number}"></div>
     </div>` : ''}`;
   }).join('') + '</div>';
 }
@@ -278,9 +293,7 @@ async function verifyPRById(num) {
     const data = await resp.json();
     const c = countFindings(data.findings);
     if (resultEl) resultEl.innerHTML = compactBadges(c.pass, c.fail, c.review);
-    const html = renderFindingsTable(data.findings, `PR #${num} 検証結果`);
-    _findingsCache[num] = html;
-    findingsEl.innerHTML = html;
+    findingsEl.innerHTML = renderFindingsTable(data.findings, `PR #${num} 検証結果`);
     btn.textContent = '再検証';
   } catch (e) {
     if (resultEl) resultEl.innerHTML = '<span class="badge badge-fail" title="ERROR">ERR</span>';

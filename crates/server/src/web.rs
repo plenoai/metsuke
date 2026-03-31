@@ -124,6 +124,10 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             axum::routing::post(api_verify_pr),
         )
         .route(
+            "/api/repos/{owner}/{repo}/verify-pr/{pr_number}/latest",
+            axum::routing::get(api_get_latest_pr_verification),
+        )
+        .route(
             "/api/repos/{owner}/{repo}/readme",
             axum::routing::get(api_readme),
         )
@@ -1530,6 +1534,39 @@ async fn api_verify_pr(
             }
             Json(r).into_response()
         }
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{e}"),
+        )
+            .into_response(),
+    }
+}
+
+async fn api_get_latest_pr_verification(
+    headers: HeaderMap,
+    Path((owner, repo, pr_number)): Path<(String, String, u32)>,
+    State(state): State<WebState>,
+) -> Response {
+    if let Some(r) = validate_repo_params(&owner, &repo) {
+        return r;
+    }
+
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let db = state.db.clone();
+    let target_ref = format!("#{pr_number}");
+    match run_blocking(move || db.get_latest_verification_by_ref(user_id, &owner, &repo, &target_ref))
+        .await
+    {
+        Ok(Some(json)) => (
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            json,
+        )
+            .into_response(),
+        Ok(None) => (axum::http::StatusCode::NOT_FOUND, "No verification found").into_response(),
         Err(e) => (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             format!("{e}"),

@@ -678,6 +678,28 @@ impl Database {
         Ok(result)
     }
 
+    pub fn get_latest_verification_by_ref(
+        &self,
+        user_id: i64,
+        owner: &str,
+        repo: &str,
+        target_ref: &str,
+    ) -> Result<Option<String>> {
+        let conn = self.reader();
+        let mut stmt = conn.prepare_cached(
+            "SELECT result_json FROM audit_log
+             WHERE user_id = ?1 AND owner = ?2 AND repo = ?3 AND target_ref = ?4
+             ORDER BY id DESC LIMIT 1",
+        )?;
+        let result = stmt
+            .query_row(
+                rusqlite::params![user_id, owner, repo, target_ref],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(result)
+    }
+
     /// Check database connectivity.
     pub fn ping(&self) -> Result<()> {
         let conn = self.reader();
