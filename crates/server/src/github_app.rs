@@ -524,18 +524,40 @@ J9/Y+qX1+dFvHem00HtuVTs2mItUXlLIOAlgtrWHl0pIzYSARxM=
 -----END RSA PRIVATE KEY-----";
 
     fn test_app() -> GitHubApp {
-        GitHubApp::with_hosts(12345, TEST_RSA_KEY, "Iv1.test".into(), "secret".into(), "api.github.com", "github.com").unwrap()
+        GitHubApp::with_hosts(
+            12345,
+            TEST_RSA_KEY,
+            "Iv1.test".into(),
+            "secret".into(),
+            "api.github.com",
+            "github.com",
+        )
+        .unwrap()
     }
 
     #[test]
     fn new_with_valid_key() {
-        let app = GitHubApp::with_hosts(1, TEST_RSA_KEY, "cid".into(), "cs".into(), "api.github.com", "github.com");
+        let app = GitHubApp::with_hosts(
+            1,
+            TEST_RSA_KEY,
+            "cid".into(),
+            "cs".into(),
+            "api.github.com",
+            "github.com",
+        );
         assert!(app.is_ok());
     }
 
     #[test]
     fn new_with_invalid_key() {
-        let app = GitHubApp::with_hosts(1, "not-a-pem-key", "cid".into(), "cs".into(), "api.github.com", "github.com");
+        let app = GitHubApp::with_hosts(
+            1,
+            "not-a-pem-key",
+            "cid".into(),
+            "cs".into(),
+            "api.github.com",
+            "github.com",
+        );
         assert!(app.is_err());
         let err = format!("{:#}", app.err().unwrap());
         assert!(
