@@ -20,6 +20,7 @@ pub struct MetsukeServer {
     user_id: Option<i64>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
+    github_api_host: String,
 }
 
 fn tool_error(msg: impl std::fmt::Display) -> CallToolResult {
@@ -110,6 +111,14 @@ fn default_ref() -> String {
 #[tool_router]
 impl MetsukeServer {
     pub fn new(db: Arc<Database>, github_app: Arc<GitHubApp>) -> Self {
+        Self::with_api_host(db, github_app, "api.github.com")
+    }
+
+    pub fn with_api_host(
+        db: Arc<Database>,
+        github_app: Arc<GitHubApp>,
+        github_api_host: &str,
+    ) -> Self {
         // Capture user_id from task_local at factory time (before rmcp spawns session task)
         let user_id = REQUEST_USER_ID.try_with(|id| *id).ok();
         Self {
@@ -117,6 +126,7 @@ impl MetsukeServer {
             github_app,
             user_id,
             tool_router: Self::tool_router(),
+            github_api_host: github_api_host.to_string(),
         }
     }
 
@@ -157,6 +167,7 @@ impl MetsukeServer {
             Ok(t) => t,
             Err(e) => return Ok(tool_error(e)),
         };
+        let api_host = self.github_api_host.clone();
         let owner = args.owner;
         let repo = args.repo;
         let pr_number = args.pr_number;
@@ -167,7 +178,7 @@ impl MetsukeServer {
             let config = libverify_github::GitHubConfig {
                 token,
                 repo: format!("{owner}/{repo}"),
-                host: "api.github.com".into(),
+                host: api_host,
             };
             let client = libverify_github::GitHubClient::new(&config)?;
             libverify_github::verify_pr(
@@ -211,6 +222,7 @@ impl MetsukeServer {
             Ok(t) => t,
             Err(e) => return Ok(tool_error(e)),
         };
+        let api_host = self.github_api_host.clone();
         let owner = args.owner;
         let repo = args.repo;
         let base_tag = args.base_tag;
@@ -222,7 +234,7 @@ impl MetsukeServer {
             let config = libverify_github::GitHubConfig {
                 token,
                 repo: format!("{owner}/{repo}"),
-                host: "api.github.com".into(),
+                host: api_host,
             };
             let client = libverify_github::GitHubClient::new(&config)?;
             libverify_github::verify_release(
@@ -268,6 +280,7 @@ impl MetsukeServer {
             Ok(t) => t,
             Err(e) => return Ok(tool_error(e)),
         };
+        let api_host = self.github_api_host.clone();
         let owner = args.owner;
         let repo = args.repo;
         let reference = args.reference;
@@ -278,7 +291,7 @@ impl MetsukeServer {
             let config = libverify_github::GitHubConfig {
                 token,
                 repo: format!("{owner}/{repo}"),
-                host: "api.github.com".into(),
+                host: api_host,
             };
             let client = libverify_github::GitHubClient::new(&config)?;
             libverify_github::verify_repo(
