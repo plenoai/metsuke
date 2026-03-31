@@ -195,6 +195,7 @@ function renderPRList(prs) {
 let _currentFiltered = [];
 function renderCurrentList() {
   renderPRList(_currentFiltered);
+  applyAuditBadges();
 }
 
 function applyFilter() {
@@ -206,12 +207,55 @@ function applyFilter() {
   renderPRList(filtered);
 }
 
+// 過去の検証結果をPRバッジに反映
+let _auditCache = {};
+async function loadAuditResults() {
+  try {
+    const entries = await swrFetch(`/api/audit/history?type=pr&owner=${OWNER}&repo=${REPO}&limit=100`);
+    _auditCache = {};
+    for (const e of entries) {
+      const num = e.target_ref.replace('#', '');
+      if (!_auditCache[num]) _auditCache[num] = e;
+    }
+  } catch (_) {}
+}
+
+function applyAuditBadges() {
+  for (const [num, e] of Object.entries(_auditCache)) {
+    const el = document.getElementById(`pr-result-${num}`);
+    if (el && !el.innerHTML) {
+      el.innerHTML = compactBadges(e.pass, e.fail, e.review);
+    }
+  }
+}
+
 async function loadPRs() {
   try {
     allPRs = await swrFetch(`/api/repos/${OWNER}/${REPO}/pulls`);
     applyFilter();
+    await loadAuditResults();
+    applyAuditBadges();
+    autoVerifyIfFew();
   } catch (e) {
     renderLoadError('pr-list', 'PRの取得に失敗しました。', 'loadPRs');
+  }
+}
+
+// 検証結果が無いPRが表示中10件未満なら自動検証
+async function autoVerifyIfFew() {
+  const unverified = _currentFiltered.filter(pr => !_auditCache[pr.pr_number]);
+  if (unverified.length === 0 || _currentFiltered.length >= 10) return;
+  const policy = document.getElementById('pr-policy').value;
+  for (const pr of unverified) {
+    try {
+      const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-pr/${pr.pr_number}?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const c = countFindings(data.findings);
+      _auditCache[pr.pr_number] = { pass: c.pass, fail: c.fail, review: c.review };
+      const el = document.getElementById(`pr-result-${pr.pr_number}`);
+      if (el) el.innerHTML = compactBadges(c.pass, c.fail, c.review);
+    } catch (_) {}
   }
 }
 
