@@ -125,22 +125,6 @@ pub struct ReleaseAuthor {
 }
 
 impl GitHubApp {
-    pub fn new(
-        app_id: u64,
-        private_key_pem: &str,
-        client_id: String,
-        client_secret: String,
-    ) -> Result<Self> {
-        Self::with_hosts(
-            app_id,
-            private_key_pem,
-            client_id,
-            client_secret,
-            "api.github.com",
-            "github.com",
-        )
-    }
-
     pub fn with_hosts(
         app_id: u64,
         private_key_pem: &str,
@@ -169,21 +153,9 @@ impl GitHubApp {
         })
     }
 
-    /// The GitHub API base URL (e.g. "https://api.github.com").
-    pub fn api_base_url(&self) -> &str {
-        &self.api_base_url
-    }
-
     /// The GitHub web base URL (e.g. "https://github.com").
     pub fn web_base_url(&self) -> &str {
         &self.web_base_url
-    }
-
-    /// The GitHub API host (e.g. "api.github.com"), without scheme.
-    pub fn api_host(&self) -> &str {
-        self.api_base_url
-            .strip_prefix("https://")
-            .unwrap_or(&self.api_base_url)
     }
 
     pub fn client_id(&self) -> &str {
@@ -552,18 +524,18 @@ J9/Y+qX1+dFvHem00HtuVTs2mItUXlLIOAlgtrWHl0pIzYSARxM=
 -----END RSA PRIVATE KEY-----";
 
     fn test_app() -> GitHubApp {
-        GitHubApp::new(12345, TEST_RSA_KEY, "Iv1.test".into(), "secret".into()).unwrap()
+        GitHubApp::with_hosts(12345, TEST_RSA_KEY, "Iv1.test".into(), "secret".into(), "api.github.com", "github.com").unwrap()
     }
 
     #[test]
     fn new_with_valid_key() {
-        let app = GitHubApp::new(1, TEST_RSA_KEY, "cid".into(), "cs".into());
+        let app = GitHubApp::with_hosts(1, TEST_RSA_KEY, "cid".into(), "cs".into(), "api.github.com", "github.com");
         assert!(app.is_ok());
     }
 
     #[test]
     fn new_with_invalid_key() {
-        let app = GitHubApp::new(1, "not-a-pem-key", "cid".into(), "cs".into());
+        let app = GitHubApp::with_hosts(1, "not-a-pem-key", "cid".into(), "cs".into(), "api.github.com", "github.com");
         assert!(app.is_err());
         let err = format!("{:#}", app.err().unwrap());
         assert!(

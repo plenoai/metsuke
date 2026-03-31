@@ -110,10 +110,6 @@ fn default_ref() -> String {
 
 #[tool_router]
 impl MetsukeServer {
-    pub fn new(db: Arc<Database>, github_app: Arc<GitHubApp>) -> Self {
-        Self::with_api_host(db, github_app, "api.github.com")
-    }
-
     pub fn with_api_host(
         db: Arc<Database>,
         github_app: Arc<GitHubApp>,
