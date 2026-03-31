@@ -105,8 +105,7 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         .route("/api/repos", axum::routing::get(api_repos))
         .route(
             "/api/repos/{owner}/{repo}/verify",
-            axum::routing::get(api_get_latest_verification)
-                .post(api_verify_repo),
+            axum::routing::get(api_get_latest_verification).post(api_verify_repo),
         )
         .route(
             "/api/repos/{owner}/{repo}/releases",
