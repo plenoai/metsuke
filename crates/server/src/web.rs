@@ -986,7 +986,7 @@ async fn api_verify_repo(
         let config = libverify_github::GitHubConfig {
             token,
             repo: format!("{owner_c}/{repo_c}"),
-            host: "api.github.com".into(),
+            host: state.github_api_host.clone(),
         };
         let client = libverify_github::GitHubClient::new(&config)?;
         libverify_github::verify_repo(&client, &owner_c, &repo_c, "HEAD", policy.as_deref(), false)
@@ -1201,7 +1201,7 @@ async fn api_verify_release(
         let config = libverify_github::GitHubConfig {
             token,
             repo: format!("{owner_c}/{repo_c}"),
-            host: "api.github.com".into(),
+            host: state.github_api_host.clone(),
         };
         let client = libverify_github::GitHubClient::new(&config)?;
         libverify_github::verify_release(
@@ -1456,7 +1456,7 @@ async fn api_verify_pr(
         let config = libverify_github::GitHubConfig {
             token,
             repo: format!("{owner_c}/{repo_c}"),
-            host: "api.github.com".into(),
+            host: state.github_api_host.clone(),
         };
         let client = libverify_github::GitHubClient::new(&config)?;
         libverify_github::verify_pr(
@@ -1630,7 +1630,7 @@ async fn api_readme(
         .ok()
         .flatten();
 
-    let url = format!("https://api.github.com/repos/{owner}/{repo}/readme");
+    let url = format!("https://{}/repos/{owner}/{repo}/readme", state.github_api_host);
     let client = reqwest::Client::new();
     let mut req = client
         .get(&url)

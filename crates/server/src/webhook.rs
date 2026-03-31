@@ -23,6 +23,7 @@ struct WebhookState {
     github_app: Arc<GitHubApp>,
     webhook_secret: Option<String>,
     delivery_ids: Arc<Mutex<HashSet<String>>>,
+    github_api_host: String,
 }
 
 pub fn router(_db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig) -> Router {
@@ -30,6 +31,7 @@ pub fn router(_db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig
         github_app,
         webhook_secret: config.github_webhook_secret.clone(),
         delivery_ids: Arc::new(Mutex::new(HashSet::new())),
+        github_api_host: config.github_api_host.clone(),
     };
 
     Router::new()
@@ -178,7 +180,7 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
         let config = libverify_github::GitHubConfig {
             token: verify_token,
             repo: format!("{verify_owner}/{verify_repo}"),
-            host: "api.github.com".into(),
+            host: state.github_api_host.clone(),
         };
         let client = libverify_github::GitHubClient::new(&config)?;
         libverify_github::verify_pr(&client, &verify_owner, &verify_repo, pr_number, None, false)
@@ -280,7 +282,7 @@ async fn handle_release(state: WebhookState, payload: serde_json::Value) {
         let config = libverify_github::GitHubConfig {
             token: verify_token,
             repo: format!("{verify_owner}/{verify_repo}"),
-            host: "api.github.com".into(),
+            host: state.github_api_host.clone(),
         };
         let client = libverify_github::GitHubClient::new(&config)?;
         libverify_github::verify_repo(

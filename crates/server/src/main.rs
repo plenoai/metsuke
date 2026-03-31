@@ -42,17 +42,26 @@ async fn main() -> anyhow::Result<()> {
 
     let db = Arc::new(Database::open(&config.database_url)?);
 
-    let github_app = Arc::new(GitHubApp::new(
+    let github_app = Arc::new(GitHubApp::with_hosts(
         config.github_app_id,
         &config.github_app_private_key,
         config.github_app_client_id.clone(),
         config.github_app_client_secret.clone(),
+        &config.github_api_host,
+        &config.github_web_host,
     )?);
 
     let mcp_db = db.clone();
     let mcp_app = github_app.clone();
+    let mcp_api_host = config.github_api_host.clone();
     let service = StreamableHttpService::new(
-        move || Ok(MetsukeServer::new(mcp_db.clone(), mcp_app.clone())),
+        move || {
+            Ok(MetsukeServer::with_api_host(
+                mcp_db.clone(),
+                mcp_app.clone(),
+                &mcp_api_host,
+            ))
+        },
         LocalSessionManager::default().into(),
         Default::default(),
     );
