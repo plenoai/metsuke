@@ -263,11 +263,11 @@ async function loadRepos() {
 // Event delegation
 document.getElementById('org-filter').addEventListener('change', function() { filterByOrg(this.value); });
 document.getElementById('sort-select').addEventListener('change', function() { sortRepos(this.value); });
-document.getElementById('repos-container').addEventListener('click', function(e) {
+document.getElementById('repo-list').addEventListener('click', function(e) {
   const pageBtn = e.target.closest('[data-action="page"]');
   if (pageBtn) goToPage(Number(pageBtn.dataset.page));
 });
-document.getElementById('repos-container').addEventListener('input', function(e) {
+document.getElementById('repo-list').addEventListener('input', function(e) {
   if (e.target.id === 'search-input') onSearchInput();
 });
 
