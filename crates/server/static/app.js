@@ -27,15 +27,14 @@ async function swrFetch(url, { maxAge = 60000 } = {}) {
 // Shared HTML Sanitizer
 // ---------------------------------------------------------------------------
 
+// Note: data-* attributes are allowed by default in the Sanitizer API;
+// adding them explicitly causes "Invalid Sanitizer configuration" errors.
 const _sanitizer = { sanitizer: new Sanitizer({
   attributes: ['style', 'class', 'id', 'role', 'tabindex',
     'aria-expanded', 'aria-label', 'aria-live', 'aria-hidden',
     'href', 'target', 'rel', 'scope', 'title', 'disabled', 'value', 'selected',
     'width', 'height', 'viewBox', 'fill', 'd', 'xmlns',
     'placeholder', 'type', 'name', 'for',
-    'data-action', 'data-page', 'data-pr', 'data-base', 'data-head',
-    'data-idx', 'data-retry-fn', 'data-theme', 'data-print-date',
-    'data-footnote-ref', 'data-footnote-backref',
   ],
 }) };
 
