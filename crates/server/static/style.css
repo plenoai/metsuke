@@ -1340,6 +1340,53 @@ select:focus-visible {
   border-radius: 3px;
   color: var(--accent-gold);
 }
+/* ===== Page: Error (standalone) ===== */
+.error-page-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.error-card {
+  text-align: center;
+  max-width: 440px;
+  padding: var(--space-2xl);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.error-mark {
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-sm);
+  color: var(--accent-vermillion);
+}
+.error-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: var(--space-md);
+}
+.error-msg {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: var(--space-xl);
+  word-break: break-all;
+}
+.back-link {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+.back-link:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-vermillion);
+}
+
 .form-group select, .form-group input { min-width: 140px; }
 .audit-filter-input { min-width: 160px; }
 .install-hint {

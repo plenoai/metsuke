@@ -126,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(SetResponseHeaderLayer::overriding(
             axum::http::header::CONTENT_SECURITY_POLICY,
             axum::http::HeaderValue::from_static(
-                "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src https://fonts.gstatic.com; connect-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: https://raw.githubusercontent.com https://github.com https://user-images.githubusercontent.com https://private-user-images.githubusercontent.com https://avatars.githubusercontent.com https://img.shields.io https://github.githubassets.com https://camo.githubusercontent.com; frame-ancestors 'none'"
+                "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src https://fonts.gstatic.com; connect-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: https://raw.githubusercontent.com https://github.com https://user-images.githubusercontent.com https://private-user-images.githubusercontent.com https://avatars.githubusercontent.com https://img.shields.io https://github.githubassets.com https://camo.githubusercontent.com; frame-ancestors 'none'"
             ),
         ));
 

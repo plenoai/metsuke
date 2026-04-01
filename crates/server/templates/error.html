@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/themes.css">
 <script>
@@ -15,55 +16,8 @@
   if (t) document.documentElement.setAttribute('data-theme', t);
 })();
 </script>
-<style>
-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.error-card {
-  text-align: center;
-  max-width: 440px;
-  padding: 2.5rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-.error-mark {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  color: var(--accent-vermillion);
-}
-.error-title {
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin-bottom: 0.75rem;
-}
-.error-msg {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin-bottom: 1.5rem;
-  word-break: break-all;
-}
-.back-link {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  text-decoration: none;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-.back-link:hover {
-  color: var(--text-primary);
-  border-color: var(--accent-vermillion);
-}
-</style>
 </head>
-<body>
+<body class="error-page-body">
 <div class="error-card">
   <div class="error-mark">障</div>
   <div class="error-title">{{ title }}</div>
