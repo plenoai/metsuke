@@ -7,8 +7,7 @@
   if (t === 'github-light' || t === 'github-light-hc') {
     var link = document.getElementById('github-markdown-css');
     if (link) {
-      link.removeAttribute('integrity');
-      link.href = 'https://cdn.jsdelivr.net/npm/github-markdown-css@5.9.0/github-markdown-light.min.css';
+      link.href = '/static/vendor/github-markdown-light.min.css';
     }
   }
 })();

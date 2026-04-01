@@ -54,10 +54,9 @@ const _sanitizer = { sanitizer: new Sanitizer({
     if (link) {
       var isLight = theme === 'github-light' || theme === 'github-light-hc';
       var newHref = isLight
-        ? 'https://cdn.jsdelivr.net/npm/github-markdown-css@5.9.0/github-markdown-light.min.css'
-        : 'https://cdn.jsdelivr.net/npm/github-markdown-css@5.9.0/github-markdown-dark.min.css';
-      if (link.href !== newHref) {
-        link.removeAttribute('integrity');
+        ? '/static/vendor/github-markdown-light.min.css'
+        : '/static/vendor/github-markdown-dark.min.css';
+      if (!link.href.endsWith(newHref)) {
         link.href = newHref;
       }
     }
