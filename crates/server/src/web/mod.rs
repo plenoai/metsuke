@@ -302,4 +302,108 @@ mod tests {
         assert!(cookie.contains("Secure"));
         assert!(cookie.contains("SameSite=Lax"));
     }
+
+    // --- CSP / inline-free regression guards ---
+
+    /// All base.html-derived templates must load scripts only via src= attributes.
+    /// No inline <script>...</script> blocks are allowed (CSP script-src 'self').
+    #[test]
+    fn no_inline_scripts_in_base_templates() {
+        let templates: Vec<(&str, String)> = vec![
+            ("repos", ReposTemplate { login: "u".into(), active_page: "repos" }.render().unwrap()),
+            ("audit", AuditTemplate { login: "u".into(), active_page: "audit" }.render().unwrap()),
+            ("settings", SettingsTemplate { login: "u".into(), active_page: "settings", installations: vec![], base_url: "https://x.com".into() }.render().unwrap()),
+            ("repo_detail", RepoDetailTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
+            ("verify_pr", VerifyPrTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
+            ("verify_release", VerifyReleaseTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
+        ];
+        for (name, html) in &templates {
+            // Find all <script...> tags — each must have a src= attribute
+            for (i, _) in html.match_indices("<script") {
+                let end = html[i..].find('>').unwrap_or(0);
+                let tag = &html[i..i + end + 1];
+                assert!(
+                    tag.contains("src="),
+                    "Template '{name}' has inline <script> without src=: {tag}"
+                );
+            }
+        }
+    }
+
+    /// No inline style= attributes should exist in rendered templates.
+    #[test]
+    fn no_inline_styles_in_base_templates() {
+        let templates: Vec<(&str, String)> = vec![
+            ("repos", ReposTemplate { login: "u".into(), active_page: "repos" }.render().unwrap()),
+            ("audit", AuditTemplate { login: "u".into(), active_page: "audit" }.render().unwrap()),
+            ("settings", SettingsTemplate { login: "u".into(), active_page: "settings", installations: vec![], base_url: "https://x.com".into() }.render().unwrap()),
+            ("repo_detail", RepoDetailTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
+            ("verify_pr", VerifyPrTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
+            ("verify_release", VerifyReleaseTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
+        ];
+        for (name, html) in &templates {
+            assert!(
+                !html.contains("style=\""),
+                "Template '{name}' contains inline style= attribute"
+            );
+        }
+    }
+
+    /// No <style> blocks should exist in rendered templates.
+    #[test]
+    fn no_style_blocks_in_base_templates() {
+        let templates: Vec<(&str, String)> = vec![
+            ("repos", ReposTemplate { login: "u".into(), active_page: "repos" }.render().unwrap()),
+            ("audit", AuditTemplate { login: "u".into(), active_page: "audit" }.render().unwrap()),
+            ("settings", SettingsTemplate { login: "u".into(), active_page: "settings", installations: vec![], base_url: "https://x.com".into() }.render().unwrap()),
+        ];
+        for (name, html) in &templates {
+            assert!(
+                !html.contains("<style"),
+                "Template '{name}' contains <style> block"
+            );
+        }
+    }
+
+    /// All referenced static files must exist on disk.
+    #[test]
+    fn static_assets_exist() {
+        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("static");
+        let required_files = [
+            "style.css",
+            "themes.css",
+            "app.js",
+            "theme-init.js",
+            "verify-common.js",
+            "landing.css",
+            "favicon.svg",
+            "pages/repos.js",
+            "pages/repo-detail.js",
+            "pages/verify-pr.js",
+            "pages/verify-release.js",
+            "pages/audit.js",
+            "pages/settings.js",
+            "vendor/github-markdown-dark.min.css",
+            "vendor/github-markdown-light.min.css",
+        ];
+        for path in &required_files {
+            assert!(
+                base.join(path).exists(),
+                "Required static asset missing: static/{path}"
+            );
+        }
+    }
+
+    /// Landing template must have zero inline scripts and styles.
+    #[test]
+    fn landing_template_is_clean() {
+        let html = LandingTemplate.render().unwrap();
+        assert!(!html.contains("<style"), "Landing has inline <style> block");
+        assert!(!html.contains("style=\""), "Landing has inline style= attribute");
+        for (i, _) in html.match_indices("<script") {
+            let end = html[i..].find('>').unwrap_or(0);
+            let tag = &html[i..i + end + 1];
+            assert!(tag.contains("src="), "Landing has inline <script>: {tag}");
+        }
+    }
 }
