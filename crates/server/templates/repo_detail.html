@@ -2,10 +2,6 @@
 
 {% block title %}{{ owner }}/{{ repo }}{% endblock %}
 
-{% block head %}
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js" integrity="sha256-jrQbZYgx+rF1+tm80A/LLYTg7TolpVBT1OzUREuLQ6A=" crossorigin="anonymous"></script>
-{% endblock %}
-
 {% block content %}
   <div class="breadcrumb">
     <a href="/repos">リポジトリ</a> / {{ owner }}/{{ repo }}
@@ -221,7 +217,7 @@ loadDashboard();
   try {
     const resp = await fetch(`/api/repos/${OWNER}/${REPO}/readme`);
     if (resp.status === 404) {
-      area.style.display = 'none';
+      area.hidden = true;
       return;
     }
     if (!resp.ok) throw new Error(await resp.text());
@@ -233,19 +229,25 @@ loadDashboard();
     header.setHTML('<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"></path></svg> README.md', _sanitizer);
     area.appendChild(header);
 
-    const clean = typeof DOMPurify !== 'undefined'
-      ? DOMPurify.sanitize(rawHtml, {
-          USE_PROFILES: { html: true },
-          ADD_TAGS: ['summary', 'details', 'picture', 'source', 'math', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'mover', 'munder', 'mspace', 'mtable', 'mtr', 'mtd', 'annotation', 'semantics'],
-          ADD_ATTR: ['align', 'media', 'srcset', 'sizes', 'loading', 'decoding', 'crossorigin', 'mathvariant', 'encoding', 'xmlns'],
-          ALLOW_ARIA_ATTR: true,
-          ALLOW_DATA_ATTR: true,
-        })
-      : rawHtml;
+    // README sanitizer: extends base _sanitizer with markdown-specific elements/attributes
+    const readmeSanitizer = { sanitizer: new Sanitizer({
+      attributes: [
+        ..._sanitizer.sanitizer.get().attributes,
+        'align', 'media', 'srcset', 'sizes', 'loading', 'decoding',
+        'crossorigin', 'mathvariant', 'encoding', 'colspan', 'rowspan',
+        'datetime', 'open', 'start', 'reversed',
+      ],
+      elements: [
+        'summary', 'details', 'picture', 'source', 'figcaption', 'figure',
+        'math', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac',
+        'mover', 'munder', 'mspace', 'mtable', 'mtr', 'mtd',
+        'annotation', 'semantics',
+      ],
+    }) };
 
     const content = document.createElement('div');
     content.className = 'markdown-body card';
-    content.setHTML(clean, _sanitizer);
+    content.setHTML(rawHtml, readmeSanitizer);
 
     const ghRaw = `https://raw.githubusercontent.com/${OWNER}/${REPO}/HEAD/`;
     const ghBlob = `https://github.com/${OWNER}/${REPO}/blob/HEAD/`;
@@ -283,7 +285,7 @@ loadDashboard();
     area.appendChild(content);
   } catch (e) {
     loading.remove();
-    area.style.display = 'none';
+    area.hidden = true;
   }
 })();
 </script>
