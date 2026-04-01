@@ -35,7 +35,13 @@
 
   <div id="release-list-section" class="mt-md">
     <div class="section-title">リリース一覧</div>
-    <div id="release-list" aria-live="polite"><div class="loading" role="status">リリースを取得中</div></div>
+    <div id="release-list" aria-live="polite">
+      <div class="skeleton-list" role="status" aria-label="読み込み中">
+        <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+        <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+        <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+      </div>
+    </div>
   </div>
 
   <div id="result-area" aria-live="polite"></div>
@@ -134,7 +140,7 @@ async function verifyRelease() {
   const baseTag = document.getElementById('base-tag').value;
   const headTag = document.getElementById('head-tag').value;
   if (!baseTag || !headTag) return;
-  if (baseTag === headTag) { document.getElementById('result-area').setHTML('<div class="card" style="color:var(--accent-vermillion)">Base TagとHead Tagは異なる値を選択してください</div>', _sanitizer); return; }
+  if (baseTag === headTag) { document.getElementById('result-area').setHTML('<div class="card validation-error">Base TagとHead Tagは異なる値を選択してください</div>', _sanitizer); return; }
 
   const policy = document.getElementById('release-policy').value;
   const btn = document.getElementById('verify-btn');

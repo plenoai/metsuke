@@ -10,18 +10,17 @@
   <div class="breadcrumb">
     <a href="/repos">リポジトリ</a> / {{ owner }}/{{ repo }}
   </div>
+
   <div class="section">
     <div class="page-header">
       <div>
         <div class="detail-heading">{{ owner }}<span class="separator"> / </span>{{ repo }}</div>
-        <a class="gh-link" href="https://github.com/{{ owner }}/{{ repo }}" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:0.75rem;margin-left:0">
+        <a class="gh-link detail-gh-link" href="https://github.com/{{ owner }}/{{ repo }}" target="_blank" rel="noopener">
           <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
           GitHub で開く
         </a>
       </div>
       <div class="toolbar">
-        <a class="verify-btn" href="/repos/{{ owner }}/{{ repo }}/releases" style="text-decoration:none">リリース検証</a>
-        <a class="verify-btn" href="/repos/{{ owner }}/{{ repo }}/pulls" style="text-decoration:none">PR検証</a>
         <select class="policy-select" id="policy-select">
           {% for p in policy_options %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
         </select>
@@ -30,8 +29,44 @@
     </div>
   </div>
 
+  <!-- Dashboard summary cards -->
+  <div class="dashboard-grid" id="dashboard">
+    <div class="dash-card" id="dash-repo">
+      <div class="dash-card-header">
+        <span class="dash-card-title">リポジトリ検証</span>
+      </div>
+      <div class="dash-card-skeleton" id="dash-repo-count"></div>
+      <div class="dash-card-badges" id="dash-repo-badges"></div>
+      <div class="dash-card-meta" id="dash-repo-meta"></div>
+    </div>
+    <div class="dash-card" id="dash-pr">
+      <div class="dash-card-header">
+        <span class="dash-card-title">Pull Requests</span>
+      </div>
+      <div class="dash-card-skeleton" id="dash-pr-count"></div>
+      <div class="dash-card-badges" id="dash-pr-badges"></div>
+      <a class="dash-card-link" href="/repos/{{ owner }}/{{ repo }}/pulls">PR検証を開く</a>
+    </div>
+    <div class="dash-card" id="dash-release">
+      <div class="dash-card-header">
+        <span class="dash-card-title">Releases</span>
+      </div>
+      <div class="dash-card-skeleton" id="dash-release-count"></div>
+      <div class="dash-card-badges" id="dash-release-badges"></div>
+      <a class="dash-card-link" href="/repos/{{ owner }}/{{ repo }}/releases">リリース検証を開く</a>
+    </div>
+  </div>
+
+  <!-- Verification results -->
   <div id="result-area" aria-live="polite"></div>
 
+  <!-- Recent activity -->
+  <div class="recent-activity" id="activity-section" hidden>
+    <div class="section-title">検証履歴</div>
+    <div class="activity-list" id="activity-list"></div>
+  </div>
+
+  <!-- README -->
   <div id="readme-area" class="section mt-md">
     <div id="readme-loading" class="loading" role="status">README を読み込み中</div>
   </div>
@@ -41,6 +76,102 @@
 <script>
 const OWNER = '{{ owner }}';
 const REPO = '{{ repo }}';
+
+// ---- Dashboard data loading ----
+
+async function loadDashboard() {
+  // Fire all requests in parallel
+  const [repoResult, prs, releases, auditEntries] = await Promise.allSettled([
+    fetch(`/api/repos/${OWNER}/${REPO}/verify`).then(r => r.ok ? r.json() : null),
+    swrFetch(`/api/repos/${OWNER}/${REPO}/pulls`),
+    swrFetch(`/api/repos/${OWNER}/${REPO}/releases`),
+    swrFetch(`/api/audit-history?owner=${OWNER}&repo=${REPO}&limit=8`),
+  ]);
+
+  // Repo verification card
+  const repoCountEl = document.getElementById('dash-repo-count');
+  const repoBadgesEl = document.getElementById('dash-repo-badges');
+  const repoMetaEl = document.getElementById('dash-repo-meta');
+  repoCountEl.classList.remove('dash-card-skeleton');
+
+  if (repoResult.status === 'fulfilled' && repoResult.value) {
+    const data = repoResult.value;
+    const c = countFindings(data.findings);
+    const total = c.pass + c.fail + c.review + c.na;
+    repoCountEl.innerHTML = '';
+    repoCountEl.className = 'dash-card-count';
+    repoCountEl.textContent = `${c.pass}/${total}`;
+    repoBadgesEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
+    const profileName = data.profile_name || 'default';
+    repoMetaEl.textContent = `policy: ${profileName}`;
+
+    // Also show in result area
+    const area = document.getElementById('result-area');
+    area.setHTML(renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`), _sanitizer);
+  } else {
+    repoCountEl.className = 'dash-card-count';
+    repoCountEl.innerHTML = '';
+    document.getElementById('dash-repo').classList.add('dash-card--empty');
+    repoCountEl.textContent = '未検証';
+    repoMetaEl.textContent = '検証ボタンで開始';
+  }
+
+  // PR card
+  const prCountEl = document.getElementById('dash-pr-count');
+  prCountEl.classList.remove('dash-card-skeleton');
+  prCountEl.className = 'dash-card-count';
+  if (prs.status === 'fulfilled') {
+    const prList = prs.value || [];
+    const openCount = prList.filter(p => !p.merged_at && p.state !== 'closed').length;
+    const mergedCount = prList.filter(p => p.merged_at).length;
+    prCountEl.textContent = prList.length;
+    const prBadgesEl = document.getElementById('dash-pr-badges');
+    let meta = '';
+    if (openCount > 0) meta += `<span class="badge badge-pass">${openCount} open</span>`;
+    if (mergedCount > 0) meta += `<span class="badge badge-private">${mergedCount} merged</span>`;
+    prBadgesEl.setHTML(meta, _sanitizer);
+  } else {
+    prCountEl.textContent = '—';
+  }
+
+  // Release card
+  const relCountEl = document.getElementById('dash-release-count');
+  relCountEl.classList.remove('dash-card-skeleton');
+  relCountEl.className = 'dash-card-count';
+  if (releases.status === 'fulfilled') {
+    const relList = releases.value || [];
+    relCountEl.textContent = relList.length;
+    if (relList.length > 0) {
+      const latest = relList[0];
+      const relBadgesEl = document.getElementById('dash-release-badges');
+      const date = latest.published_at || latest.created_at;
+      relBadgesEl.setHTML(`<span class="badge">${esc(latest.tag_name)}</span> <span class="release-badge-meta">${timeAgo(date)}</span>`, _sanitizer);
+    }
+  } else {
+    relCountEl.textContent = '—';
+  }
+
+  // Recent activity
+  if (auditEntries.status === 'fulfilled') {
+    const entries = auditEntries.value || [];
+    if (entries.length > 0) {
+      const section = document.getElementById('activity-section');
+      section.hidden = false;
+      const list = document.getElementById('activity-list');
+      list.setHTML(entries.map(e => {
+        const typeLabel = e.type === 'pr' ? 'PR' : e.type === 'release' ? 'Release' : 'Repo';
+        return `<div class="activity-item">
+          <span class="activity-time">${timeAgo(e.verified_at + 'Z')}</span>
+          <span class="type-badge type-${e.type}">${typeLabel}</span>
+          <span class="activity-target">${esc(e.target_ref)}</span>
+          <span class="activity-results">${compactBadges(e.pass, e.fail, e.review)}</span>
+        </div>`;
+      }).join(''), _sanitizer);
+    }
+  }
+}
+
+// ---- Repo verification ----
 
 async function runVerify() {
   const btn = document.getElementById('verify-btn');
@@ -59,6 +190,16 @@ async function runVerify() {
     const data = await resp.json();
     const profileName = data.profile_name || policy;
     area.setHTML(renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`), _sanitizer);
+
+    // Update dashboard card
+    const c = countFindings(data.findings);
+    const total = c.pass + c.fail + c.review + c.na;
+    const repoCountEl = document.getElementById('dash-repo-count');
+    repoCountEl.className = 'dash-card-count';
+    repoCountEl.textContent = `${c.pass}/${total}`;
+    document.getElementById('dash-repo').classList.remove('dash-card--empty');
+    document.getElementById('dash-repo-badges').setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
+    document.getElementById('dash-repo-meta').textContent = `policy: ${profileName}`;
   } catch (e) {
     area.setHTML(renderErrorCard(e.message), _sanitizer);
   }
@@ -71,18 +212,8 @@ async function runVerify() {
 enhancePolicySelect(document.getElementById('policy-select'));
 document.getElementById('verify-btn').addEventListener('click', runVerify);
 
-// Load previous verification result
-(async function loadPreviousResult() {
-  const area = document.getElementById('result-area');
-  try {
-    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify`);
-    if (resp.status === 404) return; // no previous result
-    if (!resp.ok) return;
-    const data = await resp.json();
-    const profileName = data.profile_name || 'default';
-    area.setHTML(renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`), _sanitizer);
-  } catch (_) { /* silently ignore */ }
-})();
+// ---- Load everything ----
+loadDashboard();
 
 (async function loadReadme() {
   const area = document.getElementById('readme-area');
@@ -97,13 +228,11 @@ document.getElementById('verify-btn').addEventListener('click', runVerify);
     const rawHtml = await resp.text();
     loading.remove();
 
-    // README file header (GitHub-style)
     const header = document.createElement('div');
     header.className = 'readme-header';
     header.setHTML('<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"></path></svg> README.md', _sanitizer);
     area.appendChild(header);
 
-    // Sanitize HTML with DOMPurify
     const clean = typeof DOMPurify !== 'undefined'
       ? DOMPurify.sanitize(rawHtml, {
           USE_PROFILES: { html: true },
@@ -118,22 +247,18 @@ document.getElementById('verify-btn').addEventListener('click', runVerify);
     content.className = 'markdown-body card';
     content.setHTML(clean, _sanitizer);
 
-    // Rewrite relative URLs to absolute GitHub URLs
     const ghRaw = `https://raw.githubusercontent.com/${OWNER}/${REPO}/HEAD/`;
     const ghBlob = `https://github.com/${OWNER}/${REPO}/blob/HEAD/`;
 
-    // Fix images: relative src → raw.githubusercontent.com
     content.querySelectorAll('img').forEach(img => {
       const src = img.getAttribute('src');
       if (src && !src.startsWith('http') && !src.startsWith('data:') && !src.startsWith('//')) {
         img.src = ghRaw + src.replace(/^\.?\//, '');
       }
-      // Lazy loading for performance
       img.loading = 'lazy';
       img.decoding = 'async';
     });
 
-    // Fix <source> in <picture>
     content.querySelectorAll('picture source').forEach(source => {
       const srcset = source.getAttribute('srcset');
       if (srcset && !srcset.startsWith('http') && !srcset.startsWith('data:')) {
@@ -141,19 +266,15 @@ document.getElementById('verify-btn').addEventListener('click', runVerify);
       }
     });
 
-    // Fix links: relative href → GitHub blob
     content.querySelectorAll('a').forEach(a => {
       const href = a.getAttribute('href');
       if (!href) return;
-      // Anchor links — keep as-is
       if (href.startsWith('#')) return;
-      // Absolute URLs — open in new tab
       if (href.startsWith('http') || href.startsWith('//')) {
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
         return;
       }
-      // Relative links → GitHub blob view
       a.href = ghBlob + href.replace(/^\.?\//, '');
       a.target = '_blank';
       a.rel = 'noopener noreferrer';

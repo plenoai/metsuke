@@ -183,8 +183,8 @@ function toggleShortcutHelp() {
   overlay.setHTML(`
     <div class="kbd-help-backdrop"></div>
     <div class="kbd-help-panel" tabindex="-1" role="document">
-      <div style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;margin-bottom:0.75rem;color:var(--accent-gold)">キーボードショートカット</div>
-      <table style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-primary);border-collapse:collapse;width:100%">
+      <div class="kbd-help-title">キーボードショートカット</div>
+      <table class="kbd-help-table">
         <tr><td class="kbd-key">g r</td><td>リポジトリ一覧</td></tr>
         <tr><td class="kbd-key">g a</td><td>監査ログ</td></tr>
         <tr><td class="kbd-key">g s</td><td>設定</td></tr>
@@ -193,7 +193,7 @@ function toggleShortcutHelp() {
         <tr><td class="kbd-key">o</td><td>選択項目を開く</td></tr>
         <tr><td class="kbd-key">?</td><td>このヘルプを表示</td></tr>
       </table>
-      <button class="verify-btn kbd-help-close" style="margin-top:0.75rem;font-size:0.6rem">閉じる (Esc)</button>
+      <button class="verify-btn kbd-help-close">閉じる (Esc)</button>
     </div>`, _sanitizer);
   document.body.appendChild(overlay);
   // Save and restore focus on close

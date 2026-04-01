@@ -52,6 +52,24 @@ function timeAgo(isoStr) {
   return new Date(isoStr).toLocaleDateString('ja-JP');
 }
 
+/**
+ * Render a skeleton loading placeholder for list views.
+ * @param {number} count Number of skeleton rows
+ */
+function renderSkeleton(count = 4) {
+  let items = '';
+  for (let i = 0; i < count; i++) {
+    items += `<div class="skeleton-item">
+      <div class="skeleton-block">
+        <div class="skeleton-line skeleton-line--title"></div>
+        <div class="skeleton-line skeleton-line--meta"></div>
+      </div>
+      <div class="skeleton-line skeleton-line--short"></div>
+    </div>`;
+  }
+  return `<div class="skeleton-list" role="status" aria-label="読み込み中">${items}</div>`;
+}
+
 function esc(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -82,13 +100,13 @@ function renderFindingsTable(findings, titleHtml) {
     const longText = (f.rationale || '').length > 120;
     if (longText) {
       return `<tr class="status-${f.status}">
-      <td style="white-space:nowrap">${esc(f.control_id)}</td>
+      <td class="control-id">${esc(f.control_id)}</td>
       <td>${statusBadge(f.status)}</td>
       <td class="rationale-cell collapsible collapsed" role="button" tabindex="0" aria-expanded="false" data-action="toggle-rationale"><span class="rationale-text">${esc(f.rationale)}</span><span class="rationale-toggle"></span></td>
     </tr>`;
     }
     return `<tr class="status-${f.status}">
-      <td style="white-space:nowrap">${esc(f.control_id)}</td>
+      <td class="control-id">${esc(f.control_id)}</td>
       <td>${statusBadge(f.status)}</td>
       <td class="rationale-cell">${esc(f.rationale)}</td>
     </tr>`;

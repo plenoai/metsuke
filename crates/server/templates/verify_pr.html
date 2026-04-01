@@ -24,7 +24,13 @@
     </div>
   </div>
 
-  <div id="pr-list" aria-live="polite"><div class="loading" role="status">PRを取得中</div></div>
+  <div id="pr-list" aria-live="polite">
+    <div class="skeleton-list" role="status" aria-label="読み込み中">
+      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+    </div>
+  </div>
 {% endblock %}
 
 {% block scripts %}

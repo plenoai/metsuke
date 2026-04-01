@@ -6,7 +6,7 @@
   <div class="page-header">
     <div class="section-title mb-0" id="repos-title">リポジトリ</div>
     <div class="toolbar" id="toolbar">
-      <select class="policy-select" id="org-filter" aria-label="組織フィルタ" style="display:none">
+      <select class="policy-select" id="org-filter" aria-label="組織フィルタ" hidden>
         <option value="">全組織</option>
       </select>
       <select class="policy-select" id="sort-select" aria-label="ソート順">
@@ -16,7 +16,12 @@
     </div>
   </div>
   <div id="repo-list" aria-live="polite">
-    <div class="loading" role="status">リポジトリを取得中</div>
+    <div class="skeleton-list" role="status" aria-label="読み込み中">
+      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+    </div>
   </div>
 {% endblock %}
 
@@ -118,8 +123,8 @@ function renderPage() {
 
   if (total === 0) {
     container.setHTML(`<div class="empty-state">
-      <div style="margin-bottom:0.75rem">リポジトリが見つかりません</div>
-      <a class="btn" href="/settings" style="text-decoration:none">GitHub Appをインストール</a>
+      <div class="empty-state-cta">リポジトリが見つかりません</div>
+      <a class="btn btn--link" href="/settings">GitHub Appをインストール</a>
     </div>`, _sanitizer);
     return;
   }
@@ -128,7 +133,7 @@ function renderPage() {
   const start = (currentPage - 1) * PAGE_SIZE;
   const pageRepos = filteredRepos.slice(start, start + PAGE_SIZE);
 
-  const searchBar = `<div style="margin-bottom:0.75rem">
+  const searchBar = `<div class="search-bar-wrap">
     <input type="search" id="search-input" class="policy-select repo-search" placeholder="リポジトリを検索…" aria-label="リポジトリを検索" value="${esc(prevQ)}">
   </div>`;
 
@@ -141,7 +146,7 @@ function renderPage() {
   const orgFilter = document.getElementById('org-filter');
   if (orgs.length > 1) {
     orgFilter.setHTML('<option value="">全組織</option>' + orgs.map(o => `<option value="${esc(o)}" ${activeOrg === o ? 'selected' : ''}>${esc(o)}</option>`).join(''), _sanitizer);
-    orgFilter.style.display = '';
+    orgFilter.hidden = false;
   }
 }
 

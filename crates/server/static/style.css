@@ -426,6 +426,56 @@ select:focus-visible {
   gap: 0.75rem;
 }
 
+/* Empty state with CTA */
+.empty-state-cta {
+  margin-bottom: 0.75rem;
+}
+.btn--link {
+  text-decoration: none;
+}
+
+/* Validation error inline */
+.validation-error {
+  color: var(--accent-vermillion);
+}
+
+/* Null/empty placeholder */
+.text-muted-dash {
+  color: var(--text-secondary);
+}
+
+/* Release tag badge meta */
+.release-badge-meta {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+/* Keyboard help overlay (dynamically generated) */
+.kbd-help-title {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: var(--accent-gold);
+}
+.kbd-help-table {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  border-collapse: collapse;
+  width: 100%;
+}
+.kbd-help-close {
+  margin-top: 0.75rem;
+  font-size: 0.6rem;
+}
+
+/* Search bar wrapper */
+.search-bar-wrap {
+  margin-bottom: 0.75rem;
+}
+
 /* Findings table */
 .findings-table {
   width: 100%;
@@ -449,6 +499,9 @@ select:focus-visible {
   border-bottom: 1px solid var(--border-subtle);
   vertical-align: top;
   color: var(--text-primary);
+}
+.findings-table .control-id {
+  white-space: nowrap;
 }
 .findings-table tr:last-child td {
   border-bottom: none;
@@ -648,6 +701,198 @@ select:focus-visible {
     word-break: break-word;
   }
 
+}
+
+/* ===== Page: Repo Detail Dashboard ===== */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.dash-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.2s ease;
+}
+.dash-card:hover {
+  border-color: var(--accent-gold);
+}
+.dash-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.dash-card-title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.dash-card-count {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-primary);
+}
+.dash-card-meta {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.dash-card-badges {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+.dash-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  margin-top: auto;
+}
+.dash-card-link:hover {
+  color: var(--accent-gold);
+}
+.dash-card-link::after {
+  content: '→';
+}
+.dash-card--empty .dash-card-count {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.dash-card-skeleton {
+  height: 1.6rem;
+  width: 2rem;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Skeleton loading for lists */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.skeleton-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.skeleton-line {
+  height: 0.8rem;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.skeleton-line--title {
+  width: 40%;
+  height: 0.95rem;
+}
+.skeleton-line--meta {
+  width: 25%;
+  height: 0.65rem;
+}
+.skeleton-line--short {
+  width: 15%;
+  height: 0.65rem;
+}
+.skeleton-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.skeleton-item:nth-child(2) .skeleton-line { animation-delay: 0.1s; }
+.skeleton-item:nth-child(3) .skeleton-line { animation-delay: 0.2s; }
+.skeleton-item:nth-child(4) .skeleton-line { animation-delay: 0.3s; }
+.skeleton-item:nth-child(5) .skeleton-line { animation-delay: 0.4s; }
+.skeleton-item:nth-child(6) .skeleton-line { animation-delay: 0.5s; }
+
+/* Recent activity on dashboard */
+.recent-activity {
+  margin-bottom: 1.5rem;
+}
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.activity-time {
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  white-space: nowrap;
+  min-width: 5rem;
+}
+.activity-target {
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-results {
+  display: flex;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+/* Detail page GitHub link */
+.detail-gh-link {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  margin-left: 0;
+}
+
+@media (max-width: 600px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .activity-item {
+    flex-wrap: wrap;
+  }
+  .activity-time {
+    min-width: auto;
+  }
 }
 
 /* ===== Page: Repos ===== */
