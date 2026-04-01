@@ -155,7 +155,7 @@ function filterByOrg(org) {
 // ---------------------------------------------------------------------------
 
 async function fetchRepos() {
-  const resp = await fetch('/api/repos');
+  const resp = await fetchWithTimeout('/api/repos');
   if (!resp.ok) throw new Error(await resp.text());
   return resp.json();
 }

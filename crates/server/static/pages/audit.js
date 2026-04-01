@@ -38,7 +38,7 @@ async function loadAudit() {
         url += `&owner=${encodeURIComponent(repoFilter)}`;
       }
     }
-    const resp = await fetch(url);
+    const resp = await fetchWithTimeout(url);
     const entries = resp.ok ? await resp.json() : [];
     allEntries = entries;
 

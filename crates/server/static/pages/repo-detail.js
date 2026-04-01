@@ -143,7 +143,7 @@ loadDashboard();
   const area = document.getElementById('readme-area');
   const loading = document.getElementById('readme-loading');
   try {
-    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/readme`);
+    const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/readme`);
     if (resp.status === 404) {
       area.hidden = true;
       return;

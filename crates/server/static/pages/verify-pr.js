@@ -30,7 +30,7 @@ async function loadCachedFindings(num) {
   const findingsEl = document.getElementById(`pr-findings-${num}`);
   if (!findingsEl) return;
   try {
-    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}/latest`);
+    const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}/latest`);
     if (!resp.ok) return;
     const data = await resp.json();
     if (data.findings) {
@@ -130,7 +130,7 @@ async function autoVerifyIfFew() {
   const policy = document.getElementById('pr-policy').value;
   for (const pr of unverified) {
     try {
-      const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-pr/${pr.pr_number}?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
+      const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${pr.pr_number}?policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
       if (!resp.ok) continue;
       const data = await resp.json();
       const c = countFindings(data.findings);
@@ -154,7 +154,7 @@ async function verifyPRById(num) {
   findingsEl.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
 
   try {
-    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}?policy=${encodeURIComponent(policy)}`, { method: 'POST' });
+    const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}?policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     const c = countFindings(data.findings);

@@ -121,7 +121,7 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
   const resultEl = document.getElementById(`release-result-${idx}`);
 
   try {
-    const resp = await fetch(`/api/repos/${OWNER}/${REPO}/verify-release?base_tag=${encodeURIComponent(baseTag)}&head_tag=${encodeURIComponent(headTag)}&policy=${encodeURIComponent(policy)}`, { method: 'POST' });
+    const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-release?base_tag=${encodeURIComponent(baseTag)}&head_tag=${encodeURIComponent(headTag)}&policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     const c = countFindings(data.findings);
