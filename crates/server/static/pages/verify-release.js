@@ -81,7 +81,7 @@ async function loadReleases() {
     await loadReleaseAuditResults();
     applyReleaseAuditBadges();
   } catch (e) {
-    renderLoadError('release-list', 'リリースの取得に失敗しました。', 'loadReleases');
+    renderLoadError('release-list', classifyError(e), 'loadReleases');
   }
 }
 
@@ -106,7 +106,7 @@ async function verifyRelease() {
     const data = await resp.json();
     area.setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`), _sanitizer);
   } catch (e) {
-    area.setHTML(renderErrorCard(e.message), _sanitizer);
+    area.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
   }
   btn.disabled = false;
   btn.textContent = '検証を実行';

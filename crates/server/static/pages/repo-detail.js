@@ -125,7 +125,7 @@ async function runVerify() {
     document.getElementById('dash-repo-badges').setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
     document.getElementById('dash-repo-meta').textContent = `policy: ${profileName}`;
   } catch (e) {
-    area.setHTML(renderErrorCard(e.message), _sanitizer);
+    area.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
   }
 
   btn.disabled = false;

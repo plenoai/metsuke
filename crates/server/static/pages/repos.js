@@ -165,7 +165,7 @@ async function loadRepos() {
     allRepos = await fetchRepos();
     renderPage();
   } catch (e) {
-    renderLoadError('repo-list', 'リポジトリの取得に失敗しました。', 'loadRepos');
+    renderLoadError('repo-list', classifyError(e), 'loadRepos');
     return;
   }
 

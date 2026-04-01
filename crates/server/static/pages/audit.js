@@ -85,7 +85,7 @@ async function loadAudit() {
       <button data-action="next-page" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
     `, _sanitizer);
   } catch (e) {
-    renderLoadError('audit-content', '監査ログの取得に失敗しました。', 'loadAudit');
+    renderLoadError('audit-content', classifyError(e), 'loadAudit');
   }
 }
 

@@ -119,7 +119,7 @@ async function loadPRs() {
     applyAuditBadges();
     autoVerifyIfFew();
   } catch (e) {
-    renderLoadError('pr-list', 'PRの取得に失敗しました。', 'loadPRs');
+    renderLoadError('pr-list', classifyError(e), 'loadPRs');
   }
 }
 
@@ -163,7 +163,7 @@ async function verifyPRById(num) {
     btn.textContent = '再検証';
   } catch (e) {
     if (resultEl) resultEl.setHTML('<span class="badge badge-fail" title="ERROR">ERR</span>', _sanitizer);
-    findingsEl.setHTML(renderErrorCard(e.message), _sanitizer);
+    findingsEl.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
     btn.textContent = '再試行';
   }
   btn.disabled = false;
