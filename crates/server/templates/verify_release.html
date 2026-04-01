@@ -119,7 +119,7 @@ function applyReleaseAuditBadges() {
     const cached = _releaseAuditCache[ref];
     if (!cached) continue;
     const el = document.getElementById(`release-result-${i}`);
-    if (el && !el.innerHTML) {
+    if (el && !el.textContent.trim()) {
       el.setHTML(compactBadges(cached.pass, cached.fail, cached.review), _sanitizer);
     }
   }

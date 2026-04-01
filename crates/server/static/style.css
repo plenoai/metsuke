@@ -4,6 +4,22 @@
 :root {
   --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+  /* Type scale: modular scale ~1.2 (minor third) */
+  --text-2xl: 1.6rem;   /* page title, hero counts */
+  --text-xl: 1.3rem;    /* detail heading */
+  --text-lg: 1rem;      /* install name */
+  --text-base: 0.85rem; /* body text, descriptions */
+  --text-sm: 0.75rem;   /* nav, breadcrumb, form labels */
+  --text-xs: 0.65rem;   /* section titles, badge text */
+
+  /* Spacing scale */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.5rem;
+  --space-2xl: 2.5rem;
 }
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -17,7 +33,7 @@ body {
 .shell {
   max-width: 900px;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
+  padding: var(--space-2xl) var(--space-xl) 4rem;
 }
 
 /* Header */
@@ -35,7 +51,7 @@ body {
   gap: 1rem;
 }
 .brand {
-  font-size: 1.6rem;
+  font-size: var(--text-2xl);
   font-weight: 800;
   letter-spacing: 0.05em;
   text-decoration: none;
@@ -43,7 +59,7 @@ body {
 }
 .brand-sub {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--text-secondary);
@@ -57,7 +73,7 @@ body {
 }
 .nav-link {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   text-decoration: none;
   padding: 0.35rem 0.7rem;
@@ -109,7 +125,7 @@ body {
 .section:nth-child(2) { animation-delay: 0.1s; }
 .section:nth-child(3) { animation-delay: 0.2s; }
 .section-title {
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   font-family: var(--font-mono);
   font-weight: 500;
   letter-spacing: 0.25em;
@@ -266,7 +282,7 @@ body {
 /* Breadcrumb */
 .breadcrumb {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   margin-bottom: 0.75rem;
 }
@@ -369,7 +385,7 @@ select:focus-visible {
 
 /* Repo detail: title area */
 .detail-heading {
-  font-size: 1.3rem;
+  font-size: var(--text-xl);
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -731,14 +747,14 @@ select:focus-visible {
 }
 .dash-card-title {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--text-secondary);
   font-weight: 500;
 }
 .dash-card-count {
-  font-size: 1.6rem;
+  font-size: var(--text-2xl);
   font-weight: 800;
   line-height: 1;
   color: var(--text-primary);

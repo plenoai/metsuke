@@ -98,7 +98,7 @@ async function loadDashboard() {
     const data = repoResult.value;
     const c = countFindings(data.findings);
     const total = c.pass + c.fail + c.review + c.na;
-    repoCountEl.innerHTML = '';
+    repoCountEl.textContent = '';
     repoCountEl.className = 'dash-card-count';
     repoCountEl.textContent = `${c.pass}/${total}`;
     repoBadgesEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
@@ -110,7 +110,7 @@ async function loadDashboard() {
     area.setHTML(renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`), _sanitizer);
   } else {
     repoCountEl.className = 'dash-card-count';
-    repoCountEl.innerHTML = '';
+    repoCountEl.textContent = '';
     document.getElementById('dash-repo').classList.add('dash-card--empty');
     repoCountEl.textContent = '未検証';
     repoMetaEl.textContent = '検証ボタンで開始';

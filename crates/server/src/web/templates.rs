@@ -1,6 +1,10 @@
 use askama::Template;
 
 #[derive(Template)]
+#[template(path = "landing.html")]
+pub(super) struct LandingTemplate;
+
+#[derive(Template)]
 #[template(path = "error.html")]
 pub(super) struct ErrorTemplate {
     pub(super) title: String,

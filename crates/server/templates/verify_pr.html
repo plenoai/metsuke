@@ -142,7 +142,7 @@ async function loadAuditResults() {
 function applyAuditBadges() {
   for (const [num, e] of Object.entries(_auditCache)) {
     const el = document.getElementById(`pr-result-${num}`);
-    if (el && !el.innerHTML) {
+    if (el && !el.textContent.trim()) {
       el.setHTML(compactBadges(e.pass, e.fail, e.review), _sanitizer);
     }
   }
