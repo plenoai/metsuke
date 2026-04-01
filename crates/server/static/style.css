@@ -701,6 +701,11 @@ select:focus-visible {
   .btn { padding: 0.65rem 1rem; min-height: 48px; }
   .logout-link { min-height: 48px; display: inline-flex; align-items: center; }
 
+  /* Page header: stack title above toolbar on narrow screens */
+  .page-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+  .toolbar { width: 100%; }
+  .detail-heading { font-size: var(--text-lg); }
+
   /* Form inputs: prevent iOS zoom */
   .form-group input,
   .form-group select,
