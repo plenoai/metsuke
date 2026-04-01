@@ -41,14 +41,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
+  margin-bottom: var(--space-2xl);
+  padding-bottom: var(--space-xl);
   border-bottom: 1px solid var(--border-subtle);
 }
 .header-left {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-lg);
 }
 .brand {
   font-size: var(--text-2xl);
@@ -69,7 +69,7 @@ body {
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-lg);
 }
 .nav-link {
   font-family: var(--font-mono);
@@ -95,7 +95,7 @@ body {
   align-items: center;
   gap: 0.6rem;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   color: var(--text-secondary);
 }
 .user-badge strong {
@@ -105,7 +105,7 @@ body {
   color: var(--text-secondary);
   text-decoration: none;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   letter-spacing: 0.05em;
   padding: 0.35rem 0.7rem;
   border: 1px solid var(--border);
@@ -119,7 +119,7 @@ body {
 
 /* Section */
 .section {
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-xl);
   animation: fadeIn 0.5s ease-out both;
 }
 .section:nth-child(2) { animation-delay: 0.1s; }
@@ -131,10 +131,10 @@ body {
   letter-spacing: 0.25em;
   text-transform: uppercase;
   color: var(--accent-gold);
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-lg);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 .section-title::before {
   content: '';
@@ -156,7 +156,7 @@ body {
 /* Badges */
 .badge {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.05em;
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
@@ -264,7 +264,7 @@ body {
   padding: 3rem;
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
 }
 .loading::after {
   content: '';
@@ -1260,7 +1260,7 @@ select:focus-visible {
 }
 .install-name {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: var(--text-lg);
 }
 .install-meta {
   display: flex;
@@ -1284,7 +1284,7 @@ select:focus-visible {
 }
 .install-id {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 .code-wrap {
@@ -1327,7 +1327,7 @@ select:focus-visible {
   border-color: var(--accent-gold);
 }
 .mcp-desc {
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   color: var(--text-secondary);
   margin-bottom: 0.75rem;
   line-height: 1.6;
