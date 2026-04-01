@@ -99,7 +99,7 @@ async fn main() -> anyhow::Result<()> {
             ServiceBuilder::new()
                 .layer(SetResponseHeaderLayer::if_not_present(
                     axum::http::header::CACHE_CONTROL,
-                    axum::http::HeaderValue::from_static("public, max-age=86400"),
+                    axum::http::HeaderValue::from_static("public, no-cache"),
                 ))
                 .service(tower_http::services::ServeDir::new(&static_dir)),
         )
