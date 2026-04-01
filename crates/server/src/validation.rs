@@ -29,17 +29,11 @@ pub fn validate_github_name(value: &str, field: &str) -> Result<(), ErrorData> {
 }
 
 /// Validate that a policy name is a known preset (not a file path).
-const KNOWN_PRESETS: &[&str] = &[
-    "default", "oss", "aiops", "soc1", "soc2", "slsa-l1", "slsa-l2", "slsa-l3", "slsa-l4",
-];
-
 pub fn validate_policy(value: &str) -> Result<(), ErrorData> {
-    if !KNOWN_PRESETS.contains(&value) {
+    let presets = libverify_policy::available_presets();
+    if !presets.contains(&value) {
         return Err(ErrorData::invalid_params(
-            format!(
-                "Unknown policy: {value}. Available: {}",
-                KNOWN_PRESETS.join(", ")
-            ),
+            format!("Unknown policy: {value}. Available: {}", presets.join(", ")),
             None,
         ));
     }

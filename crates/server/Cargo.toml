@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 libverify-github.workspace = true
+libverify-policy.workspace = true
 
 rmcp.workspace = true
 axum.workspace = true
