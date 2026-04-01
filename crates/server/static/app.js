@@ -33,6 +33,9 @@ const _sanitizer = { sanitizer: new Sanitizer({
     'href', 'target', 'rel', 'scope', 'title', 'disabled', 'value', 'selected',
     'width', 'height', 'viewBox', 'fill', 'd', 'xmlns',
     'placeholder', 'type', 'name', 'for',
+    'data-action', 'data-page', 'data-pr', 'data-base', 'data-head',
+    'data-idx', 'data-retry-fn', 'data-theme', 'data-print-date',
+    'data-footnote-ref', 'data-footnote-backref',
   ],
 }) };
 

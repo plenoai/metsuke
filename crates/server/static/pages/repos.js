@@ -180,9 +180,7 @@ async function loadRepos() {
       } catch (_) { /* will retry on next event */ }
     }
   });
-  es.onerror = () => {
-    // Reconnect is automatic with EventSource; nothing to do
-  };
+  window.addEventListener('pagehide', () => es.close());
 }
 
 // Event delegation

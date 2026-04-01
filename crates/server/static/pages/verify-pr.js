@@ -198,3 +198,4 @@ es.addEventListener('job', async (e) => {
     }
   } catch (_) {}
 });
+window.addEventListener('pagehide', () => es.close());
