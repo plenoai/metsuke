@@ -2,61 +2,10 @@
 
 {% block title %}Repositories{% endblock %}
 
-{% block head %}
-<style>
-.repo-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.repo-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1rem 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: border-color 0.2s ease;
-}
-.repo-card:hover {
-  border-color: var(--accent-gold);
-}
-.repo-info {
-  flex: 1;
-  min-width: 0;
-}
-.repo-name {
-  font-weight: 700;
-  font-size: 0.95rem;
-  margin-bottom: 0.25rem;
-}
-.repo-name a {
-  color: var(--text-primary);
-  text-decoration: none;
-}
-.repo-name a:hover {
-  color: var(--accent-gold);
-}
-.repo-meta {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-@media (max-width: 600px) {
-  .repo-card { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
-}
-</style>
-{% endblock %}
-
 {% block content %}
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
-    <div class="section-title" id="repos-title" style="margin-bottom:0">リポジトリ</div>
-    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap" id="toolbar">
+  <div class="page-header">
+    <div class="section-title mb-0" id="repos-title">リポジトリ</div>
+    <div class="toolbar" id="toolbar">
       <select class="policy-select" id="org-filter" aria-label="組織フィルタ" style="display:none">
         <option value="">全組織</option>
       </select>
@@ -130,7 +79,7 @@ function renderCard(r) {
         ${r.private ? '<span class="badge badge-private">private</span>' : ''}
         ${r.language ? `<span>${esc(r.language)}</span>` : ''}
         ${r.default_branch ? `<span>${esc(r.default_branch)}</span>` : ''}
-        ${r.pushed_at ? `<span>${esc(r.pushed_at)}</span>` : ''}
+        ${r.pushed_at ? `<span>${timeAgo(r.pushed_at)}</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -141,17 +90,17 @@ function renderPagination() {
   if (tp <= 1) return '';
   const start = Math.max(1, currentPage - 2);
   const end = Math.min(tp, currentPage + 2);
-  let html = '<div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:0.25rem;margin-top:1rem;margin-bottom:1rem;font-family:var(--font-mono);font-size:0.75rem">';
-  if (currentPage > 1) html += `<button class="verify-btn" data-action="page" data-page="${currentPage - 1}" style="padding:0.25rem 0.5rem">‹</button>`;
+  let html = '<div class="pagination">';
+  if (currentPage > 1) html += `<button class="verify-btn pagination-btn" data-action="page" data-page="${currentPage - 1}">‹</button>`;
   for (let i = start; i <= end; i++) {
     if (i === currentPage) {
-      html += `<span style="padding:0.25rem 0.5rem;background:var(--accent-gold);color:var(--bg-deep);border-radius:4px;font-weight:700">${i}</span>`;
+      html += `<span class="pagination-current">${i}</span>`;
     } else {
-      html += `<button class="verify-btn" data-action="page" data-page="${i}" style="padding:0.25rem 0.5rem">${i}</button>`;
+      html += `<button class="verify-btn pagination-btn" data-action="page" data-page="${i}">${i}</button>`;
     }
   }
-  if (currentPage < tp) html += `<button class="verify-btn" data-action="page" data-page="${currentPage + 1}" style="padding:0.25rem 0.5rem">›</button>`;
-  html += `<span style="margin-left:0.5rem;color:var(--text-secondary)">${PAGE_SIZE * (currentPage - 1) + 1}–${Math.min(PAGE_SIZE * currentPage, filteredRepos.length)} / ${filteredRepos.length}</span>`;
+  if (currentPage < tp) html += `<button class="verify-btn pagination-btn" data-action="page" data-page="${currentPage + 1}">›</button>`;
+  html += `<span class="pagination-counter">${PAGE_SIZE * (currentPage - 1) + 1}–${Math.min(PAGE_SIZE * currentPage, filteredRepos.length)} / ${filteredRepos.length}</span>`;
   html += '</div>';
   return html;
 }
@@ -180,7 +129,7 @@ function renderPage() {
   const pageRepos = filteredRepos.slice(start, start + PAGE_SIZE);
 
   const searchBar = `<div style="margin-bottom:0.75rem">
-    <input type="search" id="search-input" class="policy-select" style="width:100%;padding:0.5rem 0.75rem;font-size:0.8rem" placeholder="リポジトリを検索…" aria-label="リポジトリを検索" value="${esc(prevQ)}">
+    <input type="search" id="search-input" class="policy-select repo-search" placeholder="リポジトリを検索…" aria-label="リポジトリを検索" value="${esc(prevQ)}">
   </div>`;
 
   container.setHTML(searchBar

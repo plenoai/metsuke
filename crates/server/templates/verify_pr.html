@@ -2,117 +2,14 @@
 
 {% block title %}PR検証 — {{ owner }}/{{ repo }}{% endblock %}
 
-{% block head %}
-<style>
-.pr-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.pr-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 0.75rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  transition: border-color 0.2s ease;
-  gap: 0.75rem;
-  cursor: pointer;
-}
-.pr-item:hover {
-  border-color: var(--text-secondary-border);
-}
-.pr-item.selected {
-  border-color: var(--accent-purple-border);
-  background: var(--bg-surface);
-}
-.pr-detail {
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  background: var(--bg-surface);
-  margin-top: -0.4rem;
-  margin-bottom: 0.4rem;
-}
-.pr-detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-.pr-item.selected {
-  border-radius: 8px 8px 0 0;
-}
-.pr-item-info {
-  flex: 1;
-  min-width: 0;
-}
-.pr-item-title {
-  font-size: 0.85rem;
-  font-weight: 700;
-  margin-bottom: 0.15rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pr-item-meta {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--text-secondary);
-  display: flex;
-  gap: 0.6rem;
-}
-.pr-state {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-  font-weight: 600;
-}
-.pr-open {
-  background: var(--accent-green-dim);
-  color: var(--accent-green);
-  border: 1px solid var(--accent-green-border);
-}
-.pr-closed {
-  background: var(--accent-vermillion-glow);
-  color: var(--accent-vermillion);
-  border: 1px solid var(--accent-vermillion-glow);
-}
-.pr-merged {
-  background: var(--accent-purple-dim);
-  color: var(--accent-purple);
-  border: 1px solid var(--accent-purple-border);
-}
-.pr-draft {
-  background: var(--text-secondary-dim);
-  color: var(--text-secondary);
-  border: 1px solid var(--text-secondary-border);
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-}
-@media (max-width: 600px) {
-  .findings-table { font-size: 0.65rem; }
-  .findings-table th, .findings-table td { padding: 0.4rem; }
-  .pr-item { flex-direction: column; align-items: flex-start; }
-}
-</style>
-{% endblock %}
-
 {% block content %}
   <div class="breadcrumb">
     <a href="/repos">リポジトリ</a> / <a href="/repos/{{ owner }}/{{ repo }}">{{ owner }}/{{ repo }}</a> / PR検証
   </div>
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
-    <div class="section-title" style="margin-bottom:0">Pull Request</div>
-    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+  <div class="page-header">
+    <div class="section-title mb-0">Pull Request</div>
+    <div class="toolbar">
       <select class="policy-select" id="pr-filter" aria-label="状態フィルタ">
         <option value="">all</option>
         <option value="open">open</option>
@@ -178,7 +75,7 @@ async function loadCachedFindings(num) {
 function renderPRList(prs) {
   const container = document.getElementById('pr-list');
   if (prs.length === 0) {
-    container.setHTML('<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">PRはありません</div>', _sanitizer);
+    container.setHTML('<div class="empty-state">PRはありません</div>', _sanitizer);
     return;
   }
   container.setHTML('<div class="pr-list">' + prs.map(pr => {
@@ -194,13 +91,13 @@ function renderPRList(prs) {
           ${pr.draft ? '<span class="pr-draft">draft</span>' : ''}
         </div>
       </div>
-      <div style="display:flex;gap:0.4rem;align-items:center">
-        <div id="pr-result-${pr.pr_number}" class="result-summary" style="display:flex;gap:0.25rem"></div>
+      <div class="inline-row">
+        <div id="pr-result-${pr.pr_number}" class="inline-row--tight"></div>
       </div>
     </div>
     ${isSelected ? `<div class="pr-detail" id="pr-detail-${pr.pr_number}">
       <div class="pr-detail-header">
-        <a href="https://github.com/${OWNER}/${REPO}/pull/${pr.pr_number}" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">GitHub で開く ↗</a>
+        <a href="https://github.com/${OWNER}/${REPO}/pull/${pr.pr_number}" target="_blank" rel="noopener" class="pr-detail-link">GitHub で開く ↗</a>
         <button class="verify-btn" id="pr-verify-btn-${pr.pr_number}" data-action="verify-pr" data-pr="${pr.pr_number}">検証</button>
       </div>
       <div id="pr-findings-${pr.pr_number}"></div>

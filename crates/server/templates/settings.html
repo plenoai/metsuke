@@ -2,108 +2,12 @@
 
 {% block title %}Settings{% endblock %}
 
-{% block head %}
-<style>
-.install-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 0;
-}
-.install-item + .install-item {
-  border-top: 1px solid var(--border-subtle);
-}
-.install-name {
-  font-weight: 700;
-  font-size: 1rem;
-}
-.install-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-.tag {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
-  padding: 0.2rem 0.55rem;
-  border-radius: 4px;
-  background: var(--accent-gold-dim);
-  color: var(--accent-gold);
-  border: 1px solid var(--accent-gold-border);
-}
-.tag-org {
-  background: var(--accent-indigo-dim);
-  color: var(--accent-indigo);
-  border-color: var(--accent-indigo-border);
-}
-.install-id {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-.code-wrap {
-  position: relative;
-  margin-top: 0.75rem;
-}
-.code-block {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  line-height: 1.6;
-  background: var(--bg-deep);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  overflow-x: auto;
-  color: var(--text-primary);
-  white-space: pre;
-}
-.copy-btn {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  padding: 0.3rem 0.6rem;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  letter-spacing: 0.05em;
-}
-.copy-btn:hover {
-  color: var(--text-primary);
-  border-color: var(--accent-gold);
-}
-.copy-btn.copied {
-  color: var(--accent-gold);
-  border-color: var(--accent-gold);
-}
-.mcp-desc {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.75rem;
-  line-height: 1.6;
-}
-.mcp-desc code {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  background: var(--bg-deep);
-  padding: 0.15rem 0.4rem;
-  border-radius: 3px;
-  color: var(--accent-gold);
-}
-</style>
-{% endblock %}
-
 {% block content %}
   <div class="section">
     <div class="section-title">インストール済みアカウント</div>
     <div class="card">
       {% if installations.is_empty() %}
-        <div class="hint" style="text-align:center;padding:1.5rem">
+        <div class="hint install-hint">
           インストールされたアカウントはありません
         </div>
       {% else %}

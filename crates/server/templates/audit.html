@@ -2,98 +2,6 @@
 
 {% block title %}監査ログ{% endblock %}
 
-{% block head %}
-<style>
-.audit-toolbar {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
-}
-.audit-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-}
-.audit-table th {
-  text-align: left;
-  padding: 0.6rem 0.75rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-deep);
-  white-space: nowrap;
-}
-.audit-table td {
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: middle;
-}
-.audit-table tr:hover td {
-  background: var(--bg-elevated);
-}
-.type-badge {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  padding: 0.15rem 0.4rem;
-  border-radius: 3px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  font-weight: 500;
-}
-.type-release {
-  background: var(--accent-indigo-dim);
-  color: var(--accent-indigo);
-  border: 1px solid var(--accent-indigo-border);
-}
-.type-pr {
-  background: var(--accent-gold-dim);
-  color: var(--accent-gold);
-  border: 1px solid var(--accent-gold-border);
-}
-.type-repo {
-  background: var(--text-secondary-dim);
-  color: var(--text-secondary);
-  border: 1px solid var(--text-secondary-border);
-}
-.pagination {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-}
-.pagination button {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 0.4rem 0.75rem;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  transition: border-color 0.2s ease;
-}
-.pagination button:hover:not(:disabled) {
-  border-color: var(--accent-gold);
-}
-.pagination button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-@media (max-width: 600px) {
-  .audit-table { font-size: 0.65rem; }
-  .audit-table th, .audit-table td { padding: 0.4rem; }
-}
-</style>
-{% endblock %}
-
 {% block content %}
   <div class="section-title">監査ログ</div>
 
@@ -104,7 +12,7 @@
       <option value="pr">PR</option>
       <option value="repo">Repo</option>
     </select>
-    <input type="search" class="policy-select" id="filter-repo" placeholder="org/repo で検索…" aria-label="リポジトリ検索" style="min-width:160px">
+    <input type="search" class="policy-select audit-filter-input" id="filter-repo" placeholder="org/repo で検索…" aria-label="リポジトリ検索">
     <input type="date" class="policy-select" id="filter-from" aria-label="開始日">
     <input type="date" class="policy-select" id="filter-to" aria-label="終了日">
     <select class="policy-select" id="filter-preset" aria-label="期間プリセット">
@@ -177,12 +85,12 @@ async function loadAudit() {
     }
 
     const rows = entries.map(e => `<tr>
-      <td style="white-space:nowrap;color:var(--text-secondary);font-size:0.68rem">${new Date(e.verified_at + 'Z').toLocaleString('ja-JP')}</td>
+      <td class="audit-timestamp">${new Date(e.verified_at + 'Z').toLocaleString('ja-JP')}</td>
       <td>${typeBadge(e.type)}</td>
-      <td><a href="/repos/${encodeURIComponent(e.owner)}/${encodeURIComponent(e.repo)}" style="color:var(--text-primary);text-decoration:none">${esc(e.owner)}/${esc(e.repo)}</a></td>
-      <td style="font-size:0.72rem">${esc(e.target_ref)}</td>
-      <td style="font-size:0.68rem;color:var(--text-secondary)">${esc(e.policy)}</td>
-      <td style="display:flex;gap:0.2rem">${resultBadges(e)}</td>
+      <td><a href="/repos/${encodeURIComponent(e.owner)}/${encodeURIComponent(e.repo)}" class="audit-repo-link">${esc(e.owner)}/${esc(e.repo)}</a></td>
+      <td class="audit-ref">${esc(e.target_ref)}</td>
+      <td class="audit-policy">${esc(e.policy)}</td>
+      <td class="audit-results">${resultBadges(e)}</td>
     </tr>`).join('');
 
     container.setHTML(`<div class="card" style="padding:0;overflow-x:auto">
@@ -206,7 +114,7 @@ async function loadAudit() {
     const pag = document.getElementById('audit-pagination');
     pag.setHTML(`
       <button data-action="prev-page" ${currentOffset === 0 ? 'disabled' : ''}>前へ</button>
-      <span style="color:var(--text-secondary);align-self:center">${currentOffset + 1}〜${currentOffset + entries.length} 件</span>
+      <span class="pagination-info">${currentOffset + 1}〜${currentOffset + entries.length} 件</span>
       <button data-action="next-page" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
     `, _sanitizer);
   } catch (e) {

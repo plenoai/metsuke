@@ -2,70 +2,6 @@
 
 {% block title %}Release検証 — {{ owner }}/{{ repo }}{% endblock %}
 
-{% block head %}
-<style>
-.release-form {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  margin-bottom: 1.5rem;
-}
-.form-group select, .form-group input { min-width: 140px; }
-.release-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.release-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 0.75rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  transition: border-color 0.2s ease;
-  gap: 0.75rem;
-}
-.release-item:hover {
-  border-color: var(--border);
-}
-.release-item-info {
-  flex: 1;
-  min-width: 0;
-}
-.release-item-tag {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  font-weight: 700;
-  margin-bottom: 0.15rem;
-}
-.release-item-meta {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--text-secondary);
-  display: flex;
-  gap: 0.6rem;
-}
-.release-prerelease {
-  background: var(--accent-gold-dim);
-  color: var(--accent-gold);
-  border: 1px solid var(--accent-gold-border);
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-}
-@media (max-width: 600px) {
-  .release-form { flex-direction: column; align-items: stretch; }
-  .form-group select { width: 100%; }
-  .findings-table { font-size: 0.65rem; }
-  .release-item { flex-direction: column; align-items: flex-start; }
-}
-</style>
-{% endblock %}
-
 {% block content %}
   <div class="breadcrumb">
     <a href="/repos">リポジトリ</a> / <a href="/repos/{{ owner }}/{{ repo }}">{{ owner }}/{{ repo }}</a> / Release検証
@@ -91,13 +27,13 @@
           {% endfor %}
         </select>
       </div>
-      <button class="btn" id="verify-btn" style="font-size:0.8rem;align-self:flex-end">
+      <button class="btn" id="verify-btn">
         検証を実行
       </button>
     </div>
   </div>
 
-  <div id="release-list-section" style="margin-top:1.5rem">
+  <div id="release-list-section" class="mt-md">
     <div class="section-title">リリース一覧</div>
     <div id="release-list" aria-live="polite"><div class="loading" role="status">リリースを取得中</div></div>
   </div>
@@ -129,7 +65,7 @@ function renderReleaseList(releases) {
 
   const container = document.getElementById('release-list');
   if (releases.length === 0) {
-    container.setHTML('<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);padding:1rem 0">リリースはありません</div>', _sanitizer);
+    container.setHTML('<div class="empty-state">リリースはありません</div>', _sanitizer);
     return;
   }
   container.setHTML('<div class="release-list">' + releases.map((rel, i) => {
@@ -140,7 +76,7 @@ function renderReleaseList(releases) {
       <div class="release-item-info">
         <div class="release-item-tag">
           ${esc(rel.tag_name)}
-          ${name !== rel.tag_name ? `<span style="font-weight:400;color:var(--text-secondary);font-size:0.75rem;margin-left:0.5rem">${esc(name)}</span>` : ''}
+          ${name !== rel.tag_name ? `<span class="release-tag-secondary">${esc(name)}</span>` : ''}
         </div>
         <div class="release-item-meta">
           <span>${esc(rel.author)}</span>
@@ -149,9 +85,9 @@ function renderReleaseList(releases) {
           ${rel.draft ? '<span class="release-prerelease">draft</span>' : ''}
         </div>
       </div>
-      <div style="display:flex;gap:0.4rem;align-items:center">
-        <div id="release-result-${i}" class="result-summary" style="display:flex;gap:0.25rem"></div>
-        ${prevTag ? `<button class="verify-btn" data-action="verify-release" data-base="${esc(prevTag)}" data-head="${esc(rel.tag_name)}" data-idx="${i}">検証</button>` : '<span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-secondary)">初回リリース</span>'}
+      <div class="inline-row">
+        <div id="release-result-${i}" class="inline-row--tight"></div>
+        ${prevTag ? `<button class="verify-btn" data-action="verify-release" data-base="${esc(prevTag)}" data-head="${esc(rel.tag_name)}" data-idx="${i}">検証</button>` : `<span class="release-initial">初回リリース</span>`}
       </div>
     </div>`;
   }).join('') + '</div>', _sanitizer);

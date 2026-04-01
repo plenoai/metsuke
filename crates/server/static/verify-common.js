@@ -32,6 +32,26 @@ function enhancePolicySelect(selectEl, helpElId) {
   update();
 }
 
+/**
+ * Format an ISO date string as a relative time (e.g. "3日前", "2時間前").
+ * Falls back to localized date if older than 30 days.
+ */
+function timeAgo(isoStr) {
+  if (!isoStr) return '';
+  const now = Date.now();
+  const then = new Date(isoStr).getTime();
+  const diff = now - then;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return 'たった今';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}分前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}時間前`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}日前`;
+  return new Date(isoStr).toLocaleDateString('ja-JP');
+}
+
 function esc(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -75,7 +95,7 @@ function renderFindingsTable(findings, titleHtml) {
   }).join('');
 
   return `
-    <div style="margin-top:1.5rem">
+    <div class="findings-section">
       <div class="section-title">${titleHtml}</div>
       <div class="summary-bar">
         <div class="summary-item"><span class="badge badge-pass">PASS</span> ${counts.pass}</div>
@@ -83,7 +103,7 @@ function renderFindingsTable(findings, titleHtml) {
         <div class="summary-item"><span class="badge badge-fail">FAIL</span> ${counts.fail}</div>
         ${counts.na > 0 ? `<div class="summary-item"><span class="badge badge-na">N/A</span> ${counts.na}</div>` : ''}
       </div>
-      <div class="card" style="padding:0;overflow-x:auto">
+      <div class="card findings-card">
         <table class="findings-table" aria-label="検証結果">
           <thead>
             <tr><th scope="col">コントロール</th><th scope="col">ステータス</th><th scope="col">根拠</th></tr>
@@ -96,9 +116,9 @@ function renderFindingsTable(findings, titleHtml) {
 }
 
 function renderErrorCard(message) {
-  return `<div class="card" style="border-color:var(--accent-vermillion)">
-    <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--accent-vermillion);margin-bottom:0.5rem">検証に失敗しました</div>
-    <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary)">${esc(message)}</div>
+  return `<div class="card error-card-inline">
+    <div class="error-card-title">検証に失敗しました</div>
+    <div class="error-card-message">${esc(message)}</div>
   </div>`;
 }
 
@@ -141,7 +161,7 @@ function classifyError(err, resp) {
 function renderLoadError(containerId, message, retryFnName) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  el.setHTML(`<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;gap:0.75rem">
+  el.setHTML(`<div class="empty-state load-error">
     <div>${esc(message)}</div>
     <button class="verify-btn" data-action="retry" data-retry-fn="${retryFnName}">再取得</button>
   </div>`, _sanitizer);
