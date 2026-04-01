@@ -310,12 +310,71 @@ mod tests {
     #[test]
     fn no_inline_scripts_in_base_templates() {
         let templates: Vec<(&str, String)> = vec![
-            ("repos", ReposTemplate { login: "u".into(), active_page: "repos" }.render().unwrap()),
-            ("audit", AuditTemplate { login: "u".into(), active_page: "audit" }.render().unwrap()),
-            ("settings", SettingsTemplate { login: "u".into(), active_page: "settings", installations: vec![], base_url: "https://x.com".into() }.render().unwrap()),
-            ("repo_detail", RepoDetailTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
-            ("verify_pr", VerifyPrTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
-            ("verify_release", VerifyReleaseTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
+            (
+                "repos",
+                ReposTemplate {
+                    login: "u".into(),
+                    active_page: "repos",
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "audit",
+                AuditTemplate {
+                    login: "u".into(),
+                    active_page: "audit",
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "settings",
+                SettingsTemplate {
+                    login: "u".into(),
+                    active_page: "settings",
+                    installations: vec![],
+                    base_url: "https://x.com".into(),
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "repo_detail",
+                RepoDetailTemplate {
+                    login: "u".into(),
+                    active_page: "repos",
+                    owner: "o".into(),
+                    repo: "r".into(),
+                    policy_options: policy_options(),
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "verify_pr",
+                VerifyPrTemplate {
+                    login: "u".into(),
+                    active_page: "repos",
+                    owner: "o".into(),
+                    repo: "r".into(),
+                    policy_options: policy_options(),
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "verify_release",
+                VerifyReleaseTemplate {
+                    login: "u".into(),
+                    active_page: "repos",
+                    owner: "o".into(),
+                    repo: "r".into(),
+                    policy_options: policy_options(),
+                }
+                .render()
+                .unwrap(),
+            ),
         ];
         for (name, html) in &templates {
             // Find all <script...> tags — each must have a src= attribute
@@ -334,12 +393,71 @@ mod tests {
     #[test]
     fn no_inline_styles_in_base_templates() {
         let templates: Vec<(&str, String)> = vec![
-            ("repos", ReposTemplate { login: "u".into(), active_page: "repos" }.render().unwrap()),
-            ("audit", AuditTemplate { login: "u".into(), active_page: "audit" }.render().unwrap()),
-            ("settings", SettingsTemplate { login: "u".into(), active_page: "settings", installations: vec![], base_url: "https://x.com".into() }.render().unwrap()),
-            ("repo_detail", RepoDetailTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
-            ("verify_pr", VerifyPrTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
-            ("verify_release", VerifyReleaseTemplate { login: "u".into(), active_page: "repos", owner: "o".into(), repo: "r".into(), policy_options: policy_options() }.render().unwrap()),
+            (
+                "repos",
+                ReposTemplate {
+                    login: "u".into(),
+                    active_page: "repos",
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "audit",
+                AuditTemplate {
+                    login: "u".into(),
+                    active_page: "audit",
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "settings",
+                SettingsTemplate {
+                    login: "u".into(),
+                    active_page: "settings",
+                    installations: vec![],
+                    base_url: "https://x.com".into(),
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "repo_detail",
+                RepoDetailTemplate {
+                    login: "u".into(),
+                    active_page: "repos",
+                    owner: "o".into(),
+                    repo: "r".into(),
+                    policy_options: policy_options(),
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "verify_pr",
+                VerifyPrTemplate {
+                    login: "u".into(),
+                    active_page: "repos",
+                    owner: "o".into(),
+                    repo: "r".into(),
+                    policy_options: policy_options(),
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "verify_release",
+                VerifyReleaseTemplate {
+                    login: "u".into(),
+                    active_page: "repos",
+                    owner: "o".into(),
+                    repo: "r".into(),
+                    policy_options: policy_options(),
+                }
+                .render()
+                .unwrap(),
+            ),
         ];
         for (name, html) in &templates {
             assert!(
@@ -353,9 +471,35 @@ mod tests {
     #[test]
     fn no_style_blocks_in_base_templates() {
         let templates: Vec<(&str, String)> = vec![
-            ("repos", ReposTemplate { login: "u".into(), active_page: "repos" }.render().unwrap()),
-            ("audit", AuditTemplate { login: "u".into(), active_page: "audit" }.render().unwrap()),
-            ("settings", SettingsTemplate { login: "u".into(), active_page: "settings", installations: vec![], base_url: "https://x.com".into() }.render().unwrap()),
+            (
+                "repos",
+                ReposTemplate {
+                    login: "u".into(),
+                    active_page: "repos",
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "audit",
+                AuditTemplate {
+                    login: "u".into(),
+                    active_page: "audit",
+                }
+                .render()
+                .unwrap(),
+            ),
+            (
+                "settings",
+                SettingsTemplate {
+                    login: "u".into(),
+                    active_page: "settings",
+                    installations: vec![],
+                    base_url: "https://x.com".into(),
+                }
+                .render()
+                .unwrap(),
+            ),
         ];
         for (name, html) in &templates {
             assert!(
@@ -399,7 +543,10 @@ mod tests {
     fn landing_template_is_clean() {
         let html = LandingTemplate.render().unwrap();
         assert!(!html.contains("<style"), "Landing has inline <style> block");
-        assert!(!html.contains("style=\""), "Landing has inline style= attribute");
+        assert!(
+            !html.contains("style=\""),
+            "Landing has inline style= attribute"
+        );
         for (i, _) in html.match_indices("<script") {
             let end = html[i..].find('>').unwrap_or(0);
             let tag = &html[i..i + end + 1];
