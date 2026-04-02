@@ -1187,8 +1187,10 @@ select:focus-visible {
   color: var(--text-secondary);
 }
 .audit__results {
-  display: flex;
-  gap: 0.2rem;
+  white-space: nowrap;
+}
+.audit__results .badge {
+  margin-right: 0.2rem;
 }
 .audit__repo-link {
   color: var(--text-primary);
