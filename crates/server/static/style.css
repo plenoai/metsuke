@@ -1058,9 +1058,15 @@ select:focus-visible {
   border-radius: 8px;
   transition: border-color 0.2s ease;
   gap: 0.75rem;
+  cursor: pointer;
 }
 .release-item:hover {
-  border-color: var(--border);
+  border-color: var(--text-secondary-border);
+}
+.release-item.is-selected {
+  border-color: var(--accent-purple-border);
+  background: var(--bg-surface);
+  border-radius: 8px 8px 0 0;
 }
 .release-item__info {
   flex: 1;
@@ -1098,6 +1104,39 @@ select:focus-visible {
   font-family: var(--font-mono);
   font-size: 0.65rem;
   color: var(--text-secondary);
+}
+.release-detail {
+  padding: 0.75rem;
+  border: 1px solid var(--accent-purple-border);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  background: var(--bg-surface);
+  margin-bottom: 0.4rem;
+}
+.release-detail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.release-detail__link {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+.release-detail__link:hover {
+  text-decoration: underline;
+}
+.release-detail__body {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  line-height: 1.5;
+  max-height: 6rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
 }
 
 /* ===== Page: Audit Log ===== */

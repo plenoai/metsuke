@@ -1,6 +1,7 @@
 const OWNER = document.currentScript.dataset.owner;
 const REPO = document.currentScript.dataset.repo;
 let allReleases = [];
+let selectedIdx = null;
 
 function renderReleaseList(releases) {
   allReleases = releases;
@@ -18,7 +19,12 @@ function renderReleaseList(releases) {
     headSelect.value = releases[0].tag_name;
   }
 
+  renderCurrentList();
+}
+
+function renderCurrentList() {
   const container = document.getElementById('release-list');
+  const releases = allReleases;
   if (releases.length === 0) {
     container.setHTML('<div class="empty-state">リリースはありません</div>', _sanitizer);
     return;
@@ -27,7 +33,8 @@ function renderReleaseList(releases) {
     const prevTag = i < releases.length - 1 ? releases[i + 1].tag_name : null;
     const date = rel.published_at || rel.created_at;
     const name = rel.name || rel.tag_name;
-    return `<div class="release-item">
+    const isSelected = selectedIdx === i;
+    return `<div class="release-item${isSelected ? ' is-selected' : ''}" data-action="toggle-release" data-idx="${i}">
       <div class="release-item__info">
         <div class="release-item__tag">
           ${esc(rel.tag_name)}
@@ -42,10 +49,64 @@ function renderReleaseList(releases) {
       </div>
       <div class="inline-row">
         <div id="release-result-${i}" class="inline-row--tight"></div>
-        ${prevTag ? `<button class="btn--verify" data-action="verify-release" data-base="${esc(prevTag)}" data-head="${esc(rel.tag_name)}" data-idx="${i}">検証</button>` : `<span class="release-item__initial">初回リリース</span>`}
       </div>
-    </div>`;
+    </div>
+    ${isSelected ? renderReleaseDetail(rel, i, prevTag) : ''}`;
   }).join('') + '</div>', _sanitizer);
+
+  applyReleaseAuditBadges();
+}
+
+function renderReleaseDetail(rel, idx, prevTag) {
+  const bodySnippet = rel.body ? `<div class="release-detail__body">${esc(rel.body)}</div>` : '';
+  return `<div class="release-detail" id="release-detail-${idx}">
+    <div class="release-detail__header">
+      <a href="${esc(rel.html_url || `https://github.com/${OWNER}/${REPO}/releases/tag/${encodeURIComponent(rel.tag_name)}`)}" target="_blank" rel="noopener" class="release-detail__link">GitHub で開く ↗</a>
+      ${prevTag
+        ? `<button class="btn--verify" id="release-verify-btn-${idx}" data-action="verify-release" data-base="${esc(prevTag)}" data-head="${esc(rel.tag_name)}" data-idx="${idx}">検証</button>`
+        : `<span class="release-item__initial">初回リリース</span>`}
+    </div>
+    ${bodySnippet}
+    <div id="release-findings-${idx}"></div>
+  </div>`;
+}
+
+function toggleRelease(idx) {
+  if (selectedIdx === idx) {
+    selectedIdx = null;
+  } else {
+    selectedIdx = idx;
+  }
+  renderCurrentList();
+  if (selectedIdx !== null) loadCachedReleaseFindings(selectedIdx);
+}
+
+async function loadCachedReleaseFindings(idx) {
+  const rel = allReleases[idx];
+  const prevTag = idx < allReleases.length - 1 ? allReleases[idx + 1].tag_name : null;
+  if (!prevTag) return;
+  const ref = `${prevTag}..${rel.tag_name}`;
+  const findingsEl = document.getElementById(`release-findings-${idx}`);
+  if (!findingsEl) return;
+
+  const cached = _releaseAuditCache[ref];
+  if (cached && cached.findings) {
+    findingsEl.setHTML(renderFindingsTable(cached.findings, `${esc(prevTag)} .. ${esc(rel.tag_name)} 検証結果`), _sanitizer);
+    const btn = document.getElementById(`release-verify-btn-${idx}`);
+    if (btn) btn.textContent = '再検証';
+    return;
+  }
+
+  try {
+    const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-release/latest/${encodeURIComponent(ref)}`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data.findings) {
+      findingsEl.setHTML(renderFindingsTable(data.findings, `${esc(prevTag)} .. ${esc(rel.tag_name)} 検証結果`), _sanitizer);
+      const btn = document.getElementById(`release-verify-btn-${idx}`);
+      if (btn) btn.textContent = '再検証';
+    }
+  } catch (_) {}
 }
 
 let _releaseAuditCache = {};
@@ -119,17 +180,25 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
   btn.textContent = '検証中…';
   btn.classList.add('is-running');
   const resultEl = document.getElementById(`release-result-${idx}`);
+  const findingsEl = document.getElementById(`release-findings-${idx}`);
+
+  if (findingsEl) {
+    findingsEl.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
+  }
 
   try {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-release?base_tag=${encodeURIComponent(baseTag)}&head_tag=${encodeURIComponent(headTag)}&policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     const c = countFindings(data.findings);
-    resultEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
-    document.getElementById('result-area').setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`), _sanitizer);
+    if (resultEl) resultEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
+    if (findingsEl) {
+      findingsEl.setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`), _sanitizer);
+    }
     btn.textContent = '再検証';
   } catch (e) {
-    resultEl.setHTML('<span class="badge badge--fail" title="ERROR">ERR</span>', _sanitizer);
+    if (resultEl) resultEl.setHTML('<span class="badge badge--fail" title="ERROR">ERR</span>', _sanitizer);
+    if (findingsEl) findingsEl.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
     btn.textContent = '再試行';
   }
   btn.disabled = false;
@@ -139,9 +208,15 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
 // Event delegation
 document.getElementById('verify-btn').addEventListener('click', verifyRelease);
 document.getElementById('release-list').addEventListener('click', function(e) {
-  const btn = e.target.closest('[data-action="verify-release"]');
-  if (btn) {
-    verifyReleaseByTag(btn.dataset.base, btn.dataset.head, Number(btn.dataset.idx), btn);
+  const verifyBtn = e.target.closest('[data-action="verify-release"]');
+  if (verifyBtn) {
+    e.stopPropagation();
+    verifyReleaseByTag(verifyBtn.dataset.base, verifyBtn.dataset.head, Number(verifyBtn.dataset.idx), verifyBtn);
+    return;
+  }
+  const releaseItem = e.target.closest('[data-action="toggle-release"]');
+  if (releaseItem) {
+    toggleRelease(Number(releaseItem.dataset.idx));
   }
 });
 
