@@ -401,7 +401,10 @@ select:focus-visible {
   gap: 0.4rem;
 }
 .inline-row--tight {
+  display: flex;
+  align-items: center;
   gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 /* Section spacing helpers */
