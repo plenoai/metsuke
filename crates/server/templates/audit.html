@@ -3,16 +3,16 @@
 {% block title %}監査ログ{% endblock %}
 
 {% block content %}
-  <div class="section-title">監査ログ</div>
+  <div class="section__title">監査ログ</div>
 
-  <div class="audit-toolbar">
+  <div class="audit__toolbar">
     <select class="policy-select" id="filter-type" aria-label="タイプフィルタ">
       <option value="">全タイプ</option>
       <option value="release">Release</option>
       <option value="pr">PR</option>
       <option value="repo">Repo</option>
     </select>
-    <input type="search" class="policy-select audit-filter-input" id="filter-repo" placeholder="org/repo で検索…" aria-label="リポジトリ検索">
+    <input type="search" class="policy-select audit__filter-input" id="filter-repo" placeholder="org/repo で検索…" aria-label="リポジトリ検索">
     <input type="date" class="policy-select" id="filter-from" aria-label="開始日">
     <input type="date" class="policy-select" id="filter-to" aria-label="終了日">
     <select class="policy-select" id="filter-preset" aria-label="期間プリセット">
@@ -22,14 +22,14 @@
       <option value="ytd">年初来</option>
       <option value="last-12m">過去12ヶ月</option>
     </select>
-    <button class="verify-btn" id="export-csv-btn">CSV出力</button>
+    <button class="btn--verify" id="export-csv-btn">CSV出力</button>
   </div>
 
   <div id="audit-content" aria-live="polite">
-    <div class="skeleton-list" role="status" aria-label="読み込み中">
-      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
-      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
-      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+    <div class="skeleton__list" role="status" aria-label="読み込み中">
+      <div class="skeleton__item"><div class="skeleton__block"><div class="skeleton__line skeleton__line--title"></div><div class="skeleton__line skeleton__line--meta"></div></div><div class="skeleton__line skeleton__line--short"></div></div>
+      <div class="skeleton__item"><div class="skeleton__block"><div class="skeleton__line skeleton__line--title"></div><div class="skeleton__line skeleton__line--meta"></div></div><div class="skeleton__line skeleton__line--short"></div></div>
+      <div class="skeleton__item"><div class="skeleton__block"><div class="skeleton__line skeleton__line--title"></div><div class="skeleton__line skeleton__line--meta"></div></div><div class="skeleton__line skeleton__line--short"></div></div>
     </div>
   </div>
   <div id="audit-pagination" class="pagination"></div>

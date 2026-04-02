@@ -95,10 +95,10 @@ document.addEventListener('keydown', function(e) {
       return;
     case 'j':
     case 'k': {
-      var cards = Array.from(document.querySelectorAll('.repo-card:not([hidden]), .pr-item, .audit-table tbody tr'));
+      var cards = Array.from(document.querySelectorAll('.repo-card:not([hidden]), .pr-item, .audit__table tbody tr'));
       if (cards.length === 0) return;
       e.preventDefault();
-      var current = document.querySelector('.repo-card.kbd-focus, .pr-item.kbd-focus, .audit-table tbody tr.kbd-focus');
+      var current = document.querySelector('.repo-card.kbd-focus, .pr-item.kbd-focus, .audit__table tbody tr.kbd-focus');
       var idx = current ? cards.indexOf(current) : -1;
       if (current) current.classList.remove('kbd-focus');
       idx = e.key === 'j' ? Math.min(idx + 1, cards.length - 1) : Math.max(idx - 1, 0);
@@ -130,26 +130,27 @@ function toggleShortcutHelp() {
   if (overlay) { overlay.remove(); return; }
   overlay = document.createElement('div');
   overlay.id = 'kbd-help-overlay';
+  overlay.className = 'kbd-help';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-label', 'キーボードショートカット');
   overlay.setHTML(
-    '<div class="kbd-help-backdrop"></div>' +
-    '<div class="kbd-help-panel" tabindex="-1" role="document">' +
-      '<div class="kbd-help-title">キーボードショートカット</div>' +
-      '<table class="kbd-help-table">' +
-        '<tr><td class="kbd-key">g r</td><td>リポジトリ一覧</td></tr>' +
-        '<tr><td class="kbd-key">g a</td><td>監査ログ</td></tr>' +
-        '<tr><td class="kbd-key">g s</td><td>設定</td></tr>' +
-        '<tr><td class="kbd-key">/</td><td>検索にフォーカス</td></tr>' +
-        '<tr><td class="kbd-key">j / k</td><td>リスト上下移動</td></tr>' +
-        '<tr><td class="kbd-key">o</td><td>選択項目を開く</td></tr>' +
-        '<tr><td class="kbd-key">?</td><td>このヘルプを表示</td></tr>' +
+    '<div class="kbd-help__backdrop"></div>' +
+    '<div class="kbd-help__panel" tabindex="-1" role="document">' +
+      '<div class="kbd-help__title">キーボードショートカット</div>' +
+      '<table class="kbd-help__table">' +
+        '<tr><td class="kbd-help__key">g r</td><td>リポジトリ一覧</td></tr>' +
+        '<tr><td class="kbd-help__key">g a</td><td>監査ログ</td></tr>' +
+        '<tr><td class="kbd-help__key">g s</td><td>設定</td></tr>' +
+        '<tr><td class="kbd-help__key">/</td><td>検索にフォーカス</td></tr>' +
+        '<tr><td class="kbd-help__key">j / k</td><td>リスト上下移動</td></tr>' +
+        '<tr><td class="kbd-help__key">o</td><td>選択項目を開く</td></tr>' +
+        '<tr><td class="kbd-help__key">?</td><td>このヘルプを表示</td></tr>' +
       '</table>' +
-      '<button class="verify-btn kbd-help-close">閉じる (Esc)</button>' +
+      '<button class="btn--verify kbd-help__close">閉じる (Esc)</button>' +
     '</div>', _sanitizer);
   document.body.appendChild(overlay);
   var _prevFocus = document.activeElement;
-  var panel = overlay.querySelector('.kbd-help-panel');
+  var panel = overlay.querySelector('.kbd-help__panel');
   function closeOverlay() {
     overlay.remove();
     if (_prevFocus) _prevFocus.focus();
@@ -167,8 +168,8 @@ function toggleShortcutHelp() {
       }
     }
   });
-  overlay.querySelector('.kbd-help-backdrop').onclick = closeOverlay;
-  overlay.querySelector('.kbd-help-close').onclick = closeOverlay;
+  overlay.querySelector('.kbd-help__backdrop').onclick = closeOverlay;
+  overlay.querySelector('.kbd-help__close').onclick = closeOverlay;
   panel.focus();
 }
 

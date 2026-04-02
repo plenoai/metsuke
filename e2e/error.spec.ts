@@ -8,15 +8,15 @@ test.describe('Error page', () => {
   });
 
   test('displays error card with correct content', async ({ page }) => {
-    await expect(page.locator('.error-mark')).toHaveText('障');
-    await expect(page.locator('.error-title')).toContainText('認証エラー');
-    await expect(page.locator('.error-msg')).toContainText('CSRF');
-    await expect(page.locator('.back-link')).toHaveAttribute('href', '/');
+    await expect(page.locator('.error-page__mark')).toHaveText('障');
+    await expect(page.locator('.error-page__title')).toContainText('認証エラー');
+    await expect(page.locator('.error-page__msg')).toContainText('CSRF');
+    await expect(page.locator('.error-page__back')).toHaveAttribute('href', '/');
   });
 
   test('error card is centered', async ({ page }) => {
     const body = page.locator('body');
-    await expect(body).toHaveClass(/error-page-body/);
+    await expect(body).toHaveClass(/error-page/);
     const display = await page.evaluate(() =>
       getComputedStyle(document.body).display
     );
@@ -36,7 +36,7 @@ test.describe('Error page', () => {
   });
 
   test('back link navigates to landing', async ({ page }) => {
-    await page.click('.back-link');
+    await page.click('.error-page__back');
     await expect(page).toHaveURL(/\/$/);
   });
 });

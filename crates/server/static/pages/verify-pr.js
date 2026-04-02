@@ -11,9 +11,9 @@ function prState(pr) {
 
 function prStateBadge(pr) {
   const s = prState(pr);
-  if (s === 'merged') return '<span class="pr-state pr-merged">merged</span>';
-  if (s === 'closed') return '<span class="pr-state pr-closed">closed</span>';
-  return '<span class="pr-state pr-open">open</span>';
+  if (s === 'merged') return '<span class="pr-state pr-state--merged">merged</span>';
+  if (s === 'closed') return '<span class="pr-state pr-state--closed">closed</span>';
+  return '<span class="pr-state pr-state--open">open</span>';
 }
 
 function togglePR(num) {
@@ -50,14 +50,14 @@ function renderPRList(prs) {
   container.setHTML('<div class="pr-list">' + prs.map(pr => {
     const isSelected = selectedPR === pr.pr_number;
     return `
-    <div class="pr-item${isSelected ? ' selected' : ''}" data-action="toggle-pr" data-pr="${pr.pr_number}">
-      <div class="pr-item-info">
-        <div class="pr-item-title">#${pr.pr_number} ${esc(pr.title)}</div>
-        <div class="pr-item-meta">
+    <div class="pr-item${isSelected ? ' is-selected' : ''}" data-action="toggle-pr" data-pr="${pr.pr_number}">
+      <div class="pr-item__info">
+        <div class="pr-item__title">#${pr.pr_number} ${esc(pr.title)}</div>
+        <div class="pr-item__meta">
           ${prStateBadge(pr)}
           <span>${esc(pr.author)}</span>
           <span>${new Date(pr.updated_at).toLocaleDateString('ja-JP')}</span>
-          ${pr.draft ? '<span class="pr-draft">draft</span>' : ''}
+          ${pr.draft ? '<span class="pr-state--draft">draft</span>' : ''}
         </div>
       </div>
       <div class="inline-row">
@@ -65,9 +65,9 @@ function renderPRList(prs) {
       </div>
     </div>
     ${isSelected ? `<div class="pr-detail" id="pr-detail-${pr.pr_number}">
-      <div class="pr-detail-header">
-        <a href="https://github.com/${OWNER}/${REPO}/pull/${pr.pr_number}" target="_blank" rel="noopener" class="pr-detail-link">GitHub で開く ↗</a>
-        <button class="verify-btn" id="pr-verify-btn-${pr.pr_number}" data-action="verify-pr" data-pr="${pr.pr_number}">検証</button>
+      <div class="pr-detail__header">
+        <a href="https://github.com/${OWNER}/${REPO}/pull/${pr.pr_number}" target="_blank" rel="noopener" class="pr-detail__link">GitHub で開く ↗</a>
+        <button class="btn--verify" id="pr-verify-btn-${pr.pr_number}" data-action="verify-pr" data-pr="${pr.pr_number}">検証</button>
       </div>
       <div id="pr-findings-${pr.pr_number}"></div>
     </div>` : ''}`;
@@ -150,7 +150,7 @@ async function verifyPRById(num) {
 
   btn.disabled = true;
   btn.textContent = '検証中…';
-  btn.classList.add('running');
+  btn.classList.add('is-running');
   findingsEl.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
 
   try {
@@ -162,12 +162,12 @@ async function verifyPRById(num) {
     findingsEl.setHTML(renderFindingsTable(data.findings, `PR #${num} 検証結果`), _sanitizer);
     btn.textContent = '再検証';
   } catch (e) {
-    if (resultEl) resultEl.setHTML('<span class="badge badge-fail" title="ERROR">ERR</span>', _sanitizer);
+    if (resultEl) resultEl.setHTML('<span class="badge badge--fail" title="ERROR">ERR</span>', _sanitizer);
     findingsEl.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
     btn.textContent = '再試行';
   }
   btn.disabled = false;
-  btn.classList.remove('running');
+  btn.classList.remove('is-running');
 }
 
 // Event listeners

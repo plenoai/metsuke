@@ -10,8 +10,8 @@
   <div class="section">
     <div class="page-header">
       <div>
-        <div class="detail-heading">{{ owner }}<span class="separator"> / </span>{{ repo }}</div>
-        <a class="gh-link detail-gh-link" href="https://github.com/{{ owner }}/{{ repo }}" target="_blank" rel="noopener">
+        <div class="detail-heading">{{ owner }}<span class="detail-heading__separator"> / </span>{{ repo }}</div>
+        <a class="gh-link detail-heading__gh-link" href="https://github.com/{{ owner }}/{{ repo }}" target="_blank" rel="noopener">
           <svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5H4.56l6.22 6.22a.75.75 0 11-1.06 1.06L3.5 4.56v2.69a.75.75 0 01-1.5 0v-3.5A1.75 1.75 0 013.75 2z"/><path d="M9.25 3.5a.75.75 0 010-1.5h3A1.75 1.75 0 0114 3.75v8.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-3a.75.75 0 011.5 0v3c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-8.5a.25.25 0 00-.25-.25h-3z"/></svg>
           GitHub で開く
         </a>
@@ -20,36 +20,36 @@
         <select class="policy-select" id="policy-select">
           {% for p in policy_options %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
         </select>
-        <button class="verify-btn" id="verify-btn">リポジトリ検証</button>
+        <button class="btn--verify" id="verify-btn">リポジトリ検証</button>
       </div>
     </div>
   </div>
 
   <!-- Dashboard summary cards -->
-  <div class="dashboard-grid" id="dashboard">
+  <div class="dashboard" id="dashboard">
     <div class="dash-card" id="dash-repo">
-      <div class="dash-card-header">
-        <span class="dash-card-title">リポジトリ検証</span>
+      <div class="dash-card__header">
+        <span class="dash-card__title">リポジトリ検証</span>
       </div>
-      <div class="dash-card-skeleton" id="dash-repo-count"></div>
-      <div class="dash-card-badges" id="dash-repo-badges"></div>
-      <div class="dash-card-meta" id="dash-repo-meta"></div>
+      <div class="dash-card__skeleton" id="dash-repo-count"></div>
+      <div class="dash-card__badges" id="dash-repo-badges"></div>
+      <div class="dash-card__meta" id="dash-repo-meta"></div>
     </div>
     <div class="dash-card" id="dash-pr">
-      <div class="dash-card-header">
-        <span class="dash-card-title">Pull Requests</span>
+      <div class="dash-card__header">
+        <span class="dash-card__title">Pull Requests</span>
       </div>
-      <div class="dash-card-skeleton" id="dash-pr-count"></div>
-      <div class="dash-card-badges" id="dash-pr-badges"></div>
-      <a class="dash-card-link" href="/repos/{{ owner }}/{{ repo }}/pulls">PR検証を開く</a>
+      <div class="dash-card__skeleton" id="dash-pr-count"></div>
+      <div class="dash-card__badges" id="dash-pr-badges"></div>
+      <a class="dash-card__link" href="/repos/{{ owner }}/{{ repo }}/pulls">PR検証を開く</a>
     </div>
     <div class="dash-card" id="dash-release">
-      <div class="dash-card-header">
-        <span class="dash-card-title">Releases</span>
+      <div class="dash-card__header">
+        <span class="dash-card__title">Releases</span>
       </div>
-      <div class="dash-card-skeleton" id="dash-release-count"></div>
-      <div class="dash-card-badges" id="dash-release-badges"></div>
-      <a class="dash-card-link" href="/repos/{{ owner }}/{{ repo }}/releases">リリース検証を開く</a>
+      <div class="dash-card__skeleton" id="dash-release-count"></div>
+      <div class="dash-card__badges" id="dash-release-badges"></div>
+      <a class="dash-card__link" href="/repos/{{ owner }}/{{ repo }}/releases">リリース検証を開く</a>
     </div>
   </div>
 
@@ -57,13 +57,13 @@
   <div id="result-area" aria-live="polite"></div>
 
   <!-- Recent activity -->
-  <div class="recent-activity" id="activity-section" hidden>
-    <div class="section-title">検証履歴</div>
-    <div class="activity-list" id="activity-list"></div>
+  <div class="activity" id="activity-section" hidden>
+    <div class="section__title">検証履歴</div>
+    <div class="activity__list" id="activity-list"></div>
   </div>
 
   <!-- README -->
-  <div id="readme-area" class="section mt-md">
+  <div id="readme-area" class="section u-mt-md">
     <div id="readme-loading" class="loading" role="status">README を読み込み中</div>
   </div>
 {% endblock %}

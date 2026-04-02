@@ -16,14 +16,14 @@ async function loadDashboard() {
   const repoCountEl = document.getElementById('dash-repo-count');
   const repoBadgesEl = document.getElementById('dash-repo-badges');
   const repoMetaEl = document.getElementById('dash-repo-meta');
-  repoCountEl.classList.remove('dash-card-skeleton');
+  repoCountEl.classList.remove('dash-card__skeleton');
 
   if (repoResult.status === 'fulfilled' && repoResult.value) {
     const data = repoResult.value;
     const c = countFindings(data.findings);
     const total = c.pass + c.fail + c.review + c.na;
     repoCountEl.textContent = '';
-    repoCountEl.className = 'dash-card-count';
+    repoCountEl.className = 'dash-card__count';
     repoCountEl.textContent = `${c.pass}/${total}`;
     repoBadgesEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
     const profileName = data.profile_name || 'default';
@@ -33,7 +33,7 @@ async function loadDashboard() {
     const area = document.getElementById('result-area');
     area.setHTML(renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`), _sanitizer);
   } else {
-    repoCountEl.className = 'dash-card-count';
+    repoCountEl.className = 'dash-card__count';
     repoCountEl.textContent = '';
     document.getElementById('dash-repo').classList.add('dash-card--empty');
     repoCountEl.textContent = '未検証';
@@ -42,8 +42,8 @@ async function loadDashboard() {
 
   // PR card
   const prCountEl = document.getElementById('dash-pr-count');
-  prCountEl.classList.remove('dash-card-skeleton');
-  prCountEl.className = 'dash-card-count';
+  prCountEl.classList.remove('dash-card__skeleton');
+  prCountEl.className = 'dash-card__count';
   if (prs.status === 'fulfilled') {
     const prList = prs.value || [];
     const openCount = prList.filter(p => !p.merged_at && p.state !== 'closed').length;
@@ -51,8 +51,8 @@ async function loadDashboard() {
     prCountEl.textContent = prList.length;
     const prBadgesEl = document.getElementById('dash-pr-badges');
     let meta = '';
-    if (openCount > 0) meta += `<span class="badge badge-pass">${openCount} open</span>`;
-    if (mergedCount > 0) meta += `<span class="badge badge-private">${mergedCount} merged</span>`;
+    if (openCount > 0) meta += `<span class="badge badge--pass">${openCount} open</span>`;
+    if (mergedCount > 0) meta += `<span class="badge badge--private">${mergedCount} merged</span>`;
     prBadgesEl.setHTML(meta, _sanitizer);
   } else {
     prCountEl.textContent = '—';
@@ -60,8 +60,8 @@ async function loadDashboard() {
 
   // Release card
   const relCountEl = document.getElementById('dash-release-count');
-  relCountEl.classList.remove('dash-card-skeleton');
-  relCountEl.className = 'dash-card-count';
+  relCountEl.classList.remove('dash-card__skeleton');
+  relCountEl.className = 'dash-card__count';
   if (releases.status === 'fulfilled') {
     const relList = releases.value || [];
     relCountEl.textContent = relList.length;
@@ -69,7 +69,7 @@ async function loadDashboard() {
       const latest = relList[0];
       const relBadgesEl = document.getElementById('dash-release-badges');
       const date = latest.published_at || latest.created_at;
-      relBadgesEl.setHTML(`<span class="badge">${esc(latest.tag_name)}</span> <span class="release-badge-meta">${timeAgo(date)}</span>`, _sanitizer);
+      relBadgesEl.setHTML(`<span class="badge">${esc(latest.tag_name)}</span> <span class="release-item__badge-meta">${timeAgo(date)}</span>`, _sanitizer);
     }
   } else {
     relCountEl.textContent = '—';
@@ -84,11 +84,11 @@ async function loadDashboard() {
       const list = document.getElementById('activity-list');
       list.setHTML(entries.map(e => {
         const typeLabel = e.type === 'pr' ? 'PR' : e.type === 'release' ? 'Release' : 'Repo';
-        return `<div class="activity-item">
-          <span class="activity-time">${timeAgo(e.verified_at + 'Z')}</span>
+        return `<div class="activity__item">
+          <span class="activity__time">${timeAgo(e.verified_at + 'Z')}</span>
           <span class="type-badge type-${e.type}">${typeLabel}</span>
-          <span class="activity-target">${esc(e.target_ref)}</span>
-          <span class="activity-results">${compactBadges(e.pass, e.fail, e.review)}</span>
+          <span class="activity__target">${esc(e.target_ref)}</span>
+          <span class="activity__results">${compactBadges(e.pass, e.fail, e.review)}</span>
         </div>`;
       }).join(''), _sanitizer);
     }
@@ -105,7 +105,7 @@ async function runVerify() {
 
   btn.disabled = true;
   btn.textContent = '検証中…';
-  btn.classList.add('running');
+  btn.classList.add('is-running');
   area.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
 
   try {
@@ -119,7 +119,7 @@ async function runVerify() {
     const c = countFindings(data.findings);
     const total = c.pass + c.fail + c.review + c.na;
     const repoCountEl = document.getElementById('dash-repo-count');
-    repoCountEl.className = 'dash-card-count';
+    repoCountEl.className = 'dash-card__count';
     repoCountEl.textContent = `${c.pass}/${total}`;
     document.getElementById('dash-repo').classList.remove('dash-card--empty');
     document.getElementById('dash-repo-badges').setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
@@ -130,7 +130,7 @@ async function runVerify() {
 
   btn.disabled = false;
   btn.textContent = '再検証';
-  btn.classList.remove('running');
+  btn.classList.remove('is-running');
 }
 
 enhancePolicySelect(document.getElementById('policy-select'));
@@ -153,7 +153,7 @@ loadDashboard();
     loading.remove();
 
     const header = document.createElement('div');
-    header.className = 'readme-header';
+    header.className = 'readme__header';
     header.setHTML('<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"></path></svg> README.md', _sanitizer);
     area.appendChild(header);
 

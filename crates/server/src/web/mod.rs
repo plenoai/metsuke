@@ -258,7 +258,7 @@ mod tests {
         let html = t.render().unwrap();
         assert!(html.contains("監査ログ"));
         assert!(html.contains("filter-type"));
-        assert!(html.contains(r#"nav-link active" href="/audit"#));
+        assert!(html.contains(r#"nav__item is-active" href="/audit"#));
     }
 
     #[test]
@@ -270,21 +270,21 @@ mod tests {
             base_url: "https://x.com".into(),
         };
         let html = settings.render().unwrap();
-        assert!(html.contains(r#"nav-link active" href="/settings"#));
+        assert!(html.contains(r#"nav__item is-active" href="/settings"#));
 
         let repos = ReposTemplate {
             login: "u".into(),
             active_page: "repos",
         };
         let html = repos.render().unwrap();
-        assert!(html.contains(r#"nav-link active" href="/repos"#));
+        assert!(html.contains(r#"nav__item is-active" href="/repos"#));
 
         let audit = AuditTemplate {
             login: "u".into(),
             active_page: "audit",
         };
         let html = audit.render().unwrap();
-        assert!(html.contains(r#"nav-link active" href="/audit"#));
+        assert!(html.contains(r#"nav__item is-active" href="/audit"#));
     }
 
     #[test]

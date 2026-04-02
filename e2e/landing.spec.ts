@@ -7,7 +7,7 @@ test.describe('Landing page', () => {
     await page.goto('/');
   });
 
-  test('renders brand and CTA', async ({ page }) => {
+  test('renders header__brand and CTA', async ({ page }) => {
     await expect(page.locator('.mon')).toHaveText('目付');
     await expect(page.locator('.logotype')).toHaveText('Metsuke');
     await expect(page.locator('.cta')).toContainText('GitHub でログイン');

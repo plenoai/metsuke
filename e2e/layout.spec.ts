@@ -36,11 +36,11 @@ async function auditLayout(page: Page): Promise<LayoutIssue[]> {
       if (gap === 'normal' || gap === '0px') {
         // Check if this element has a CSS class that suggests it should have a gap
         const classes = el.className.toString();
-        const gapClasses = ['toolbar', 'nav-links', 'header-left', 'page-header',
-          'inline-row', 'repo-meta', 'pr-item-meta', 'release-item-meta',
-          'audit-toolbar', 'summary-bar', 'install-meta', 'dashboard-grid',
-          'repo-grid', 'pr-list', 'release-list', 'activity-list',
-          'skeleton-list', 'btn-row'];
+        const gapClasses = ['toolbar', 'nav__list', 'header__left', 'page-header',
+          'inline-row', 'repo-card__meta', 'pr-item__meta', 'release-item__meta',
+          'audit__toolbar', 'summary', 'install__meta', 'dashboard',
+          'repo-grid', 'pr-list', 'release-list', 'activity__list',
+          'skeleton__list', 'btn__row'];
         const shouldHaveGap = gapClasses.some(c => classes.includes(c));
         if (shouldHaveGap) {
           issues.push({
@@ -54,7 +54,7 @@ async function auditLayout(page: Page): Promise<LayoutIssue[]> {
     });
 
     // 2. Check for zero-height visible elements (collapsed layout)
-    document.querySelectorAll('.card, .repo-card, .pr-item, .release-item, .dash-card, .activity-item, .skeleton-item').forEach(el => {
+    document.querySelectorAll('.card, .repo-card, .pr-item, .release-item, .dash-card, .activity__item, .skeleton__item').forEach(el => {
       const rect = el.getBoundingClientRect();
       if (rect.height === 0 && !el.hasAttribute('hidden')) {
         issues.push({
@@ -67,7 +67,7 @@ async function auditLayout(page: Page): Promise<LayoutIssue[]> {
     });
 
     // 3. Check flex children alignment — siblings should not overlap vertically in column layout
-    document.querySelectorAll('.repo-grid, .pr-list, .release-list, .activity-list').forEach(container => {
+    document.querySelectorAll('.repo-grid, .pr-list, .release-list, .activity__list').forEach(container => {
       const children = Array.from(container.children);
       for (let i = 1; i < children.length; i++) {
         const prev = children[i - 1].getBoundingClientRect();
@@ -83,8 +83,28 @@ async function auditLayout(page: Page): Promise<LayoutIssue[]> {
       }
     });
 
-    // 4. Check flex row containers for wrapping overflow
-    document.querySelectorAll('.page-header, .toolbar, .audit-toolbar, .pr-detail-header').forEach(el => {
+    // 4. Pagination: button/span vertical alignment check
+    document.querySelectorAll('.pagination').forEach(container => {
+      const children = Array.from(container.children);
+      if (children.length < 2) return;
+      const rects = children.map(c => c.getBoundingClientRect());
+      // All children in a flex-row should share the same vertical center (2px tolerance)
+      const centers = rects.map(r => r.top + r.height / 2);
+      const avgCenter = centers.reduce((a, b) => a + b, 0) / centers.length;
+      centers.forEach((c, i) => {
+        if (Math.abs(c - avgCenter) > 2) {
+          issues.push({
+            selector: desc(container),
+            element: desc(children[i]),
+            issue: 'misaligned',
+            detail: `child center=${c.toFixed(1)} deviates from avg=${avgCenter.toFixed(1)} by ${Math.abs(c - avgCenter).toFixed(1)}px`,
+          });
+        }
+      });
+    });
+
+    // 5. Check flex row containers for wrapping overflow
+    document.querySelectorAll('.page-header, .toolbar, .audit__toolbar, .pr-detail__header').forEach(el => {
       const rect = el.getBoundingClientRect();
       const parent = el.parentElement;
       if (!parent) return;
@@ -120,7 +140,7 @@ test.describe('Layout integrity - error page', () => {
   test('no layout issues on error page', async ({ page }) => {
     await page.context().clearCookies();
     await page.goto('/auth/callback?code=fake&state=web:bad');
-    await page.waitForSelector('.error-card', { timeout: 5000 });
+    await page.waitForSelector('.error-page__card', { timeout: 5000 });
     const issues = await auditLayout(page);
     if (issues.length > 0) {
       console.log('Layout issues found:', JSON.stringify(issues, null, 2));
@@ -178,7 +198,7 @@ test.describe('Layout integrity - audit page', () => {
       path: '/',
     }]);
     await page.goto('/audit');
-    await page.waitForSelector('.audit-table', { timeout: 15000 });
+    await page.waitForSelector('.audit__table', { timeout: 15000 });
     const issues = await auditLayout(page);
     if (issues.length > 0) {
       console.log('Layout issues found:', JSON.stringify(issues, null, 2));
@@ -196,7 +216,7 @@ test.describe('Layout integrity - settings page', () => {
       path: '/',
     }]);
     await page.goto('/settings');
-    await page.waitForSelector('.install-item, .install-hint', { timeout: 15000 });
+    await page.waitForSelector('.install__item, .install__hint', { timeout: 15000 });
     const issues = await auditLayout(page);
     if (issues.length > 0) {
       console.log('Layout issues found:', JSON.stringify(issues, null, 2));

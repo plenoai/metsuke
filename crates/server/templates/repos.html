@@ -4,7 +4,7 @@
 
 {% block content %}
   <div class="page-header">
-    <div class="section-title mb-0" id="repos-title">リポジトリ</div>
+    <div class="section__title u-mb-0" id="repos-title">リポジトリ</div>
     <div class="toolbar" id="toolbar">
       <select class="policy-select" id="org-filter" aria-label="組織フィルタ" hidden>
         <option value="">全組織</option>
@@ -17,11 +17,11 @@
     </div>
   </div>
   <div id="repo-list" aria-live="polite">
-    <div class="skeleton-list" role="status" aria-label="読み込み中">
-      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
-      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
-      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
-      <div class="skeleton-item"><div class="skeleton-block"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--meta"></div></div><div class="skeleton-line skeleton-line--short"></div></div>
+    <div class="skeleton__list" role="status" aria-label="読み込み中">
+      <div class="skeleton__item"><div class="skeleton__block"><div class="skeleton__line skeleton__line--title"></div><div class="skeleton__line skeleton__line--meta"></div></div><div class="skeleton__line skeleton__line--short"></div></div>
+      <div class="skeleton__item"><div class="skeleton__block"><div class="skeleton__line skeleton__line--title"></div><div class="skeleton__line skeleton__line--meta"></div></div><div class="skeleton__line skeleton__line--short"></div></div>
+      <div class="skeleton__item"><div class="skeleton__block"><div class="skeleton__line skeleton__line--title"></div><div class="skeleton__line skeleton__line--meta"></div></div><div class="skeleton__line skeleton__line--short"></div></div>
+      <div class="skeleton__item"><div class="skeleton__block"><div class="skeleton__line skeleton__line--title"></div><div class="skeleton__line skeleton__line--meta"></div></div><div class="skeleton__line skeleton__line--short"></div></div>
     </div>
   </div>
 {% endblock %}

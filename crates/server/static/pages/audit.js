@@ -4,17 +4,17 @@ let allEntries = [];
 
 
 function typeBadge(type) {
-  if (type === 'release') return '<span class="type-badge type-release">release</span>';
-  if (type === 'pr') return '<span class="type-badge type-pr">pr</span>';
-  return '<span class="type-badge type-repo">repo</span>';
+  if (type === 'release') return '<span class="type-badge type-badge--release">release</span>';
+  if (type === 'pr') return '<span class="type-badge type-badge--pr">pr</span>';
+  return '<span class="type-badge type-badge--repo">repo</span>';
 }
 
 function resultBadges(e) {
   let b = '';
-  if (e.pass > 0) b += `<span class="badge badge-pass" title="PASS">PASS ${e.pass}</span>`;
-  if (e.review > 0) b += `<span class="badge badge-review" title="REVIEW">REV ${e.review}</span>`;
-  if (e.fail > 0) b += `<span class="badge badge-fail" title="FAIL">FAIL ${e.fail}</span>`;
-  return b || '<span class="text-muted-dash">—</span>';
+  if (e.pass > 0) b += `<span class="badge badge--pass" title="PASS">PASS ${e.pass}</span>`;
+  if (e.review > 0) b += `<span class="badge badge--review" title="REVIEW">REV ${e.review}</span>`;
+  if (e.fail > 0) b += `<span class="badge badge--fail" title="FAIL">FAIL ${e.fail}</span>`;
+  return b || '<span class="u-text-muted">—</span>';
 }
 
 async function loadAudit() {
@@ -44,7 +44,7 @@ async function loadAudit() {
 
     if (entries.length === 0 && currentOffset === 0) {
       container.setHTML(`<div class="empty-state">
-        <div class="empty-state-cta">監査ログはまだありません</div>
+        <div class="empty-state__cta">監査ログはまだありません</div>
         <a class="btn btn--link" href="/repos">リポジトリ一覧へ</a>
       </div>`, _sanitizer);
       document.getElementById('audit-pagination').setHTML('', _sanitizer);
@@ -52,16 +52,16 @@ async function loadAudit() {
     }
 
     const rows = entries.map(e => `<tr>
-      <td class="audit-timestamp">${new Date(e.verified_at + 'Z').toLocaleString('ja-JP')}</td>
+      <td class="audit__timestamp">${new Date(e.verified_at + 'Z').toLocaleString('ja-JP')}</td>
       <td>${typeBadge(e.type)}</td>
-      <td><a href="/repos/${encodeURIComponent(e.owner)}/${encodeURIComponent(e.repo)}" class="audit-repo-link">${esc(e.owner)}/${esc(e.repo)}</a></td>
-      <td class="audit-ref">${esc(e.target_ref)}</td>
-      <td class="audit-policy">${esc(e.policy)}</td>
-      <td class="audit-results">${resultBadges(e)}</td>
+      <td><a href="/repos/${encodeURIComponent(e.owner)}/${encodeURIComponent(e.repo)}" class="audit__repo-link">${esc(e.owner)}/${esc(e.repo)}</a></td>
+      <td class="audit__ref">${esc(e.target_ref)}</td>
+      <td class="audit__policy">${esc(e.policy)}</td>
+      <td class="audit__results">${resultBadges(e)}</td>
     </tr>`).join('');
 
-    container.setHTML(`<div class="card findings-card">
-      <table class="audit-table">
+    container.setHTML(`<div class="card findings__card">
+      <table class="audit__table">
         <thead>
           <tr><th scope="col">日時</th><th scope="col">タイプ</th><th scope="col">リポジトリ</th><th scope="col">対象</th><th scope="col">ポリシー</th><th scope="col">結果</th></tr>
         </thead>
@@ -81,7 +81,7 @@ async function loadAudit() {
     const pag = document.getElementById('audit-pagination');
     pag.setHTML(`
       <button data-action="prev-page" ${currentOffset === 0 ? 'disabled' : ''}>前へ</button>
-      <span class="pagination-info">${currentOffset + 1}〜${currentOffset + entries.length} 件</span>
+      <span class="pagination__info">${currentOffset + 1}〜${currentOffset + entries.length} 件</span>
       <button data-action="next-page" ${entries.length < PAGE_SIZE ? 'disabled' : ''}>次へ</button>
     `, _sanitizer);
   } catch (e) {

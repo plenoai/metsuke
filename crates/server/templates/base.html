@@ -19,20 +19,20 @@
 <div class="shell">
   <a class="skip-link" href="#main">コンテンツへスキップ</a>
   <header class="header" role="banner">
-    <div class="header-left">
+    <div class="header__left">
       <div>
-        <a class="brand" href="/repos" aria-label="Metsuke ホーム">目付</a>
-        <div class="brand-sub">Metsuke</div>
+        <a class="header__brand" href="/repos" aria-label="Metsuke ホーム">目付</a>
+        <div class="header__sub">Metsuke</div>
       </div>
-      <nav class="nav-links" aria-label="メインナビゲーション">
-        <a class="nav-link{% if active_page == "repos" %} active{% endif %}" href="/repos">リポジトリ</a>
-        <a class="nav-link{% if active_page == "audit" %} active{% endif %}" href="/audit">監査ログ</a>
-        <a class="nav-link{% if active_page == "settings" %} active{% endif %}" href="/settings">設定</a>
+      <nav class="nav__list" aria-label="メインナビゲーション">
+        <a class="nav__item{% if active_page == "repos" %} is-active{% endif %}" href="/repos">リポジトリ</a>
+        <a class="nav__item{% if active_page == "audit" %} is-active{% endif %}" href="/audit">監査ログ</a>
+        <a class="nav__item{% if active_page == "settings" %} is-active{% endif %}" href="/settings">設定</a>
       </nav>
     </div>
     <div class="user-badge">
       <strong>{{ login }}</strong>
-      <a class="logout-link" href="/auth/logout">ログアウト</a>
+      <a class="user-badge__logout" href="/auth/logout">ログアウト</a>
     </div>
   </header>
   <main id="main" role="main">

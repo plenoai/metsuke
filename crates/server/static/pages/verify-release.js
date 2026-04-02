@@ -28,21 +28,21 @@ function renderReleaseList(releases) {
     const date = rel.published_at || rel.created_at;
     const name = rel.name || rel.tag_name;
     return `<div class="release-item">
-      <div class="release-item-info">
-        <div class="release-item-tag">
+      <div class="release-item__info">
+        <div class="release-item__tag">
           ${esc(rel.tag_name)}
-          ${name !== rel.tag_name ? `<span class="release-tag-secondary">${esc(name)}</span>` : ''}
+          ${name !== rel.tag_name ? `<span class="release-item__tag-sub">${esc(name)}</span>` : ''}
         </div>
-        <div class="release-item-meta">
+        <div class="release-item__meta">
           <span>${esc(rel.author)}</span>
           <span>${new Date(date).toLocaleDateString('ja-JP')}</span>
-          ${rel.prerelease ? '<span class="release-prerelease">pre-release</span>' : ''}
-          ${rel.draft ? '<span class="release-prerelease">draft</span>' : ''}
+          ${rel.prerelease ? '<span class="release-item--prerelease">pre-release</span>' : ''}
+          ${rel.draft ? '<span class="release-item--prerelease">draft</span>' : ''}
         </div>
       </div>
       <div class="inline-row">
         <div id="release-result-${i}" class="inline-row--tight"></div>
-        ${prevTag ? `<button class="verify-btn" data-action="verify-release" data-base="${esc(prevTag)}" data-head="${esc(rel.tag_name)}" data-idx="${i}">検証</button>` : `<span class="release-initial">初回リリース</span>`}
+        ${prevTag ? `<button class="btn--verify" data-action="verify-release" data-base="${esc(prevTag)}" data-head="${esc(rel.tag_name)}" data-idx="${i}">検証</button>` : `<span class="release-item__initial">初回リリース</span>`}
       </div>
     </div>`;
   }).join('') + '</div>', _sanitizer);
@@ -97,7 +97,7 @@ async function verifyRelease() {
 
   btn.disabled = true;
   btn.textContent = '検証中…';
-  btn.classList.add('running');
+  btn.classList.add('is-running');
   area.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
 
   try {
@@ -110,14 +110,14 @@ async function verifyRelease() {
   }
   btn.disabled = false;
   btn.textContent = '検証を実行';
-  btn.classList.remove('running');
+  btn.classList.remove('is-running');
 }
 
 async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
   const policy = document.getElementById('release-policy').value;
   btn.disabled = true;
   btn.textContent = '検証中…';
-  btn.classList.add('running');
+  btn.classList.add('is-running');
   const resultEl = document.getElementById(`release-result-${idx}`);
 
   try {
@@ -129,11 +129,11 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
     document.getElementById('result-area').setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`), _sanitizer);
     btn.textContent = '再検証';
   } catch (e) {
-    resultEl.setHTML('<span class="badge badge-fail" title="ERROR">ERR</span>', _sanitizer);
+    resultEl.setHTML('<span class="badge badge--fail" title="ERROR">ERR</span>', _sanitizer);
     btn.textContent = '再試行';
   }
   btn.disabled = false;
-  btn.classList.remove('running');
+  btn.classList.remove('is-running');
 }
 
 // Event delegation
