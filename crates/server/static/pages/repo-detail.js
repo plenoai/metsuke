@@ -4,15 +4,20 @@ const REPO = document.currentScript.dataset.repo;
 // ---- Compliance visualization ----
 
 const CONTROL_CATEGORIES = [
-  { prefix: 'source_', label: 'Source' },
-  { prefix: 'build_', label: 'Build' },
-  { prefix: 'dep_', label: 'Dependencies' },
-  { prefix: 'branch_', label: 'Branch Protection' },
-  { prefix: 'code_review_', label: 'Code Review' },
-  { prefix: 'ci_', label: 'CI' },
-  { prefix: 'commit_sign', label: 'Signing' },
-  { prefix: 'security_', label: 'Security' },
-  { prefix: 'release_', label: 'Release' },
+  { prefix: 'source-', label: 'Source' },
+  { prefix: 'build-', label: 'Build' },
+  { prefix: 'dep-', label: 'Dependencies' },
+  { prefix: 'branch-protection', label: 'Branch Protection' },
+  { prefix: 'code-review', label: 'Code Review' },
+  { prefix: 'codeowners', label: 'Code Review' },
+  { prefix: 'ci-', label: 'CI' },
+  { prefix: 'actions-', label: 'CI' },
+  { prefix: 'commit-sign', label: 'Signing' },
+  { prefix: 'security-', label: 'Security' },
+  { prefix: 'secret-scanning', label: 'Security' },
+  { prefix: 'vulnerability-', label: 'Security' },
+  { prefix: 'dismiss-stale', label: 'Branch Protection' },
+  { prefix: 'release-', label: 'Release' },
 ];
 
 function categorizeFindings(findings) {
