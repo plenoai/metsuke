@@ -2,6 +2,7 @@ use askama_web::WebTemplateExt;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Json, Redirect, Response};
+use serde::Serialize;
 
 use crate::blocking::run_blocking;
 
@@ -10,6 +11,15 @@ use super::helpers::*;
 use super::jobs::spawn_sync_repos_job;
 use super::policy_options;
 use super::templates::{RepoDetailTemplate, ReposTemplate};
+
+#[derive(Serialize)]
+struct ComplianceEntry {
+    owner: String,
+    repo: String,
+    pass: i64,
+    fail: i64,
+    review: i64,
+}
 
 pub(super) async fn api_repos(headers: HeaderMap, State(state): State<WebState>) -> Response {
     let (user_id, _login) = match require_user(&state.db, &headers).await {
@@ -27,6 +37,33 @@ pub(super) async fn api_repos(headers: HeaderMap, State(state): State<WebState>)
     }
 
     Json(repos).into_response()
+}
+
+/// Returns the latest repo-level compliance summary for all repos.
+pub(super) async fn api_compliance(headers: HeaderMap, State(state): State<WebState>) -> Response {
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let db = state.db.clone();
+    let summaries: Vec<crate::db::RepoComplianceSummary> =
+        run_blocking(move || db.get_all_repo_compliance(user_id))
+            .await
+            .unwrap_or_default();
+
+    let entries: Vec<ComplianceEntry> = summaries
+        .into_iter()
+        .map(|s| ComplianceEntry {
+            owner: s.owner,
+            repo: s.repo,
+            pass: s.pass_count,
+            fail: s.fail_count,
+            review: s.review_count,
+        })
+        .collect();
+
+    Json(entries).into_response()
 }
 
 pub(super) async fn sync_installations(state: &WebState, user_id: i64) {

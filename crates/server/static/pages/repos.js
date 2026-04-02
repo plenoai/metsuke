@@ -5,6 +5,7 @@ let filteredRepos = [];
 let currentPage = 1;
 let activeOrg = '';
 let currentSort = 'activity';
+let complianceCache = {};
 
 // ---------------------------------------------------------------------------
 // Data-driven filter / sort / paginate
@@ -28,6 +29,15 @@ function computeFiltered() {
   const mode = currentSort;
   list = [...list].sort((a, b) => {
     if (mode === 'activity') return (b.pushed_at || '').localeCompare(a.pushed_at || '');
+    if (mode === 'compliance') {
+      const ca = complianceCache[`${a.owner}/${a.name}`];
+      const cb = complianceCache[`${b.owner}/${b.name}`];
+      // Repos with failures first, then unverified, then passing
+      const fa = ca ? ca.fail : -1;
+      const fb = cb ? cb.fail : -1;
+      if (fa !== fb) return fb - fa;
+      return (b.pushed_at || '').localeCompare(a.pushed_at || '');
+    }
     return a.full_name.toLowerCase().localeCompare(b.full_name.toLowerCase());
   });
 
@@ -43,6 +53,9 @@ function totalPages() {
 // ---------------------------------------------------------------------------
 
 function renderCard(r) {
+  const key = `${r.owner}/${r.name}`;
+  const c = complianceCache[key];
+  const badges = c ? compactBadges(c.pass, c.fail, c.review) : '';
   return `<div class="repo-card" id="repo-${esc(r.full_name.replace('/', '-'))}">
     <div class="repo-info">
       <div class="repo-name">
@@ -58,6 +71,7 @@ function renderCard(r) {
         ${r.pushed_at ? `<span>${timeAgo(r.pushed_at)}</span>` : ''}
       </div>
     </div>
+    <div class="inline-row--tight">${badges}</div>
   </div>`;
 }
 
@@ -160,6 +174,17 @@ async function fetchRepos() {
   return resp.json();
 }
 
+async function loadCompliance() {
+  try {
+    const entries = await swrFetch('/api/compliance');
+    complianceCache = {};
+    for (const e of entries) {
+      complianceCache[`${e.owner}/${e.repo}`] = e;
+    }
+    renderPage();
+  } catch (_) { /* non-critical, badges just won't show */ }
+}
+
 async function loadRepos() {
   try {
     allRepos = await fetchRepos();
@@ -168,6 +193,9 @@ async function loadRepos() {
     renderLoadError('repo-list', classifyError(e), 'loadRepos');
     return;
   }
+
+  // Load compliance badges asynchronously (non-blocking)
+  loadCompliance();
 
   // Subscribe to job events for live updates
   const es = new EventSource('/api/events');

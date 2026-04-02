@@ -8,6 +8,14 @@ pub struct VerificationSummary {
     pub na_count: i64,
 }
 
+pub struct RepoComplianceSummary {
+    pub owner: String,
+    pub repo: String,
+    pub pass_count: i64,
+    pub fail_count: i64,
+    pub review_count: i64,
+}
+
 pub struct AuditEntry {
     pub id: i64,
     pub verification_type: String,

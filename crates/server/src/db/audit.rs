@@ -2,7 +2,7 @@ use anyhow::Result;
 use rusqlite::OptionalExtension;
 
 use super::Database;
-use super::types::{AuditEntry, VerificationSummary};
+use super::types::{AuditEntry, RepoComplianceSummary, VerificationSummary};
 
 impl Database {
     // --- Audit Log ---
@@ -154,6 +154,33 @@ impl Database {
                     })
                 },
             )?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Get the latest repo verification summary for ALL repos belonging to a user.
+    /// Returns one row per (owner, repo) with the most recent verification counts.
+    pub fn get_all_repo_compliance(&self, user_id: i64) -> Result<Vec<RepoComplianceSummary>> {
+        let conn = self.reader();
+        let mut stmt = conn.prepare_cached(
+            "SELECT a.owner, a.repo, a.pass_count, a.fail_count, a.review_count
+             FROM audit_log a
+             WHERE a.user_id = ?1 AND a.verification_type = 'repo'
+               AND a.id = (SELECT MAX(b.id) FROM audit_log b
+                           WHERE b.user_id = a.user_id AND b.verification_type = 'repo'
+                             AND b.owner = a.owner AND b.repo = a.repo)
+             ORDER BY a.owner, a.repo",
+        )?;
+        let rows = stmt
+            .query_map(rusqlite::params![user_id], |row| {
+                Ok(RepoComplianceSummary {
+                    owner: row.get(0)?,
+                    repo: row.get(1)?,
+                    pass_count: row.get(2)?,
+                    fail_count: row.get(3)?,
+                    review_count: row.get(4)?,
+                })
+            })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(rows)
     }
