@@ -32,10 +32,13 @@ function computeFiltered() {
     if (mode === 'compliance') {
       const ca = complianceCache[`${a.owner}/${a.name}`];
       const cb = complianceCache[`${b.owner}/${b.name}`];
-      // Repos with failures first, then unverified, then passing
-      const fa = ca ? ca.fail : -1;
-      const fb = cb ? cb.fail : -1;
-      if (fa !== fb) return fb - fa;
+      // Verified repos first (sorted by fail count desc), then unverified
+      if (ca && !cb) return -1;
+      if (!ca && cb) return 1;
+      if (ca && cb) {
+        if (ca.fail !== cb.fail) return cb.fail - ca.fail;
+        if (ca.review !== cb.review) return cb.review - ca.review;
+      }
       return (b.pushed_at || '').localeCompare(a.pushed_at || '');
     }
     return a.full_name.toLowerCase().localeCompare(b.full_name.toLowerCase());
