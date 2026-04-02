@@ -59,15 +59,15 @@ function timeAgo(isoStr) {
 function renderSkeleton(count = 4) {
   let items = '';
   for (let i = 0; i < count; i++) {
-    items += `<div class="skeleton-item">
-      <div class="skeleton-block">
-        <div class="skeleton-line skeleton-line--title"></div>
-        <div class="skeleton-line skeleton-line--meta"></div>
+    items += `<div class="skeleton__item">
+      <div class="skeleton__block">
+        <div class="skeleton__line skeleton__line--title"></div>
+        <div class="skeleton__line skeleton__line--meta"></div>
       </div>
-      <div class="skeleton-line skeleton-line--short"></div>
+      <div class="skeleton__line skeleton__line--short"></div>
     </div>`;
   }
-  return `<div class="skeleton-list" role="status" aria-label="読み込み中">${items}</div>`;
+  return `<div class="skeleton__list" role="status" aria-label="読み込み中">${items}</div>`;
 }
 
 function esc(s) {
@@ -86,10 +86,10 @@ function countFindings(findings) {
 }
 
 function statusBadge(status) {
-  if (status === 'satisfied') return '<span class="badge badge-pass">PASS</span>';
-  if (status === 'violated') return '<span class="badge badge-fail">FAIL</span>';
-  if (status === 'indeterminate') return '<span class="badge badge-review">REVIEW</span>';
-  if (status === 'not_applicable') return '<span class="badge badge-na">N/A</span>';
+  if (status === 'satisfied') return '<span class="badge badge--pass">PASS</span>';
+  if (status === 'violated') return '<span class="badge badge--fail">FAIL</span>';
+  if (status === 'indeterminate') return '<span class="badge badge--review">REVIEW</span>';
+  if (status === 'not_applicable') return '<span class="badge badge--na">N/A</span>';
   return '<span class="badge">' + esc(status) + '</span>';
 }
 
@@ -98,31 +98,32 @@ function renderFindingsTable(findings, titleHtml) {
 
   const rows = (findings || []).map(f => {
     const longText = (f.rationale || '').length > 120;
+    const statusClass = f.status === 'violated' ? 'is-violated' : f.status === 'indeterminate' ? 'is-indeterminate' : f.status === 'satisfied' ? 'is-satisfied' : '';
     if (longText) {
-      return `<tr class="status-${f.status}">
-      <td class="control-id">${esc(f.control_id)}</td>
+      return `<tr class="${statusClass}">
+      <td class="findings__control-id">${esc(f.control_id)}</td>
       <td>${statusBadge(f.status)}</td>
-      <td class="rationale-cell collapsible collapsed" role="button" tabindex="0" aria-expanded="false" data-action="toggle-rationale"><span class="rationale-text">${esc(f.rationale)}</span><span class="rationale-toggle"></span></td>
+      <td class="findings__rationale is-collapsible is-collapsed" role="button" tabindex="0" aria-expanded="false" data-action="toggle-rationale"><span class="findings__rationale-text">${esc(f.rationale)}</span><span class="findings__rationale-toggle"></span></td>
     </tr>`;
     }
-    return `<tr class="status-${f.status}">
-      <td class="control-id">${esc(f.control_id)}</td>
+    return `<tr class="${statusClass}">
+      <td class="findings__control-id">${esc(f.control_id)}</td>
       <td>${statusBadge(f.status)}</td>
-      <td class="rationale-cell">${esc(f.rationale)}</td>
+      <td class="findings__rationale">${esc(f.rationale)}</td>
     </tr>`;
   }).join('');
 
   return `
-    <div class="findings-section">
-      <div class="section-title">${titleHtml}</div>
-      <div class="summary-bar">
-        <div class="summary-item"><span class="badge badge-pass">PASS</span> ${counts.pass}</div>
-        <div class="summary-item"><span class="badge badge-review">REVIEW</span> ${counts.review}</div>
-        <div class="summary-item"><span class="badge badge-fail">FAIL</span> ${counts.fail}</div>
-        ${counts.na > 0 ? `<div class="summary-item"><span class="badge badge-na">N/A</span> ${counts.na}</div>` : ''}
+    <div class="findings">
+      <div class="section__title">${titleHtml}</div>
+      <div class="summary">
+        <div class="summary__item"><span class="badge badge--pass">PASS</span> ${counts.pass}</div>
+        <div class="summary__item"><span class="badge badge--review">REVIEW</span> ${counts.review}</div>
+        <div class="summary__item"><span class="badge badge--fail">FAIL</span> ${counts.fail}</div>
+        ${counts.na > 0 ? `<div class="summary__item"><span class="badge badge--na">N/A</span> ${counts.na}</div>` : ''}
       </div>
-      <div class="card findings-card">
-        <table class="findings-table" aria-label="検証結果">
+      <div class="card findings__card">
+        <table class="findings__table" aria-label="検証結果">
           <thead>
             <tr><th scope="col">コントロール</th><th scope="col">ステータス</th><th scope="col">根拠</th></tr>
           </thead>
@@ -134,17 +135,17 @@ function renderFindingsTable(findings, titleHtml) {
 }
 
 function renderErrorCard(message) {
-  return `<div class="card error-card-inline">
-    <div class="error-card-title">検証に失敗しました</div>
-    <div class="error-card-message">${esc(message)}</div>
+  return `<div class="card error-inline">
+    <div class="error-inline__title">検証に失敗しました</div>
+    <div class="error-inline__msg">${esc(message)}</div>
   </div>`;
 }
 
 function compactBadges(pass, fail, review) {
   let badges = '';
-  if (pass > 0) badges += `<span class="badge badge-pass" title="PASS">PASS ${pass}</span>`;
-  if (review > 0) badges += `<span class="badge badge-review" title="REVIEW">REVIEW ${review}</span>`;
-  if (fail > 0) badges += `<span class="badge badge-fail" title="FAIL">FAIL ${fail}</span>`;
+  if (pass > 0) badges += `<span class="badge badge--pass" title="PASS">PASS ${pass}</span>`;
+  if (review > 0) badges += `<span class="badge badge--review" title="REVIEW">REVIEW ${review}</span>`;
+  if (fail > 0) badges += `<span class="badge badge--fail" title="FAIL">FAIL ${fail}</span>`;
   return badges;
 }
 
@@ -179,9 +180,9 @@ function classifyError(err, resp) {
 function renderLoadError(containerId, message, retryFnName) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  el.setHTML(`<div class="empty-state load-error">
+  el.setHTML(`<div class="empty-state">
     <div>${esc(message)}</div>
-    <button class="verify-btn" data-action="retry" data-retry-fn="${retryFnName}">再取得</button>
+    <button class="btn--verify" data-action="retry" data-retry-fn="${retryFnName}">再取得</button>
   </div>`, _sanitizer);
 }
 
@@ -189,8 +190,8 @@ function renderLoadError(containerId, message, retryFnName) {
 document.addEventListener('click', function(e) {
   const toggle = e.target.closest('[data-action="toggle-rationale"]');
   if (toggle) {
-    toggle.classList.toggle('collapsed');
-    toggle.setAttribute('aria-expanded', !toggle.classList.contains('collapsed'));
+    toggle.classList.toggle('is-collapsed');
+    toggle.setAttribute('aria-expanded', !toggle.classList.contains('is-collapsed'));
     return;
   }
   const retry = e.target.closest('[data-action="retry"]');
