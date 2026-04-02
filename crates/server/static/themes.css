@@ -31,6 +31,11 @@
   --scrollbar-track: var(--bg-deep);
   --code-bg: #1a1a1e;
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --color-danger: var(--accent-vermillion);
+  --color-warning: var(--accent-gold);
+  --color-success: var(--accent-green);
+  --color-info: var(--accent-indigo);
+  --color-audit: var(--accent-purple);
   color-scheme: dark;
 }
 
@@ -64,6 +69,11 @@
   --scrollbar-track: #f6f8fa;
   --code-bg: #f6f8fa;
   --shadow-card: 0 1px 3px rgba(31, 35, 40, 0.08);
+  --color-danger: var(--accent-vermillion);
+  --color-warning: var(--accent-gold);
+  --color-success: var(--accent-green);
+  --color-info: var(--accent-indigo);
+  --color-audit: var(--accent-purple);
   color-scheme: light;
 }
 
@@ -97,6 +107,11 @@
   --scrollbar-track: #0d1117;
   --code-bg: #161b22;
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --color-danger: var(--accent-vermillion);
+  --color-warning: var(--accent-gold);
+  --color-success: var(--accent-green);
+  --color-info: var(--accent-indigo);
+  --color-audit: var(--accent-purple);
   color-scheme: dark;
 }
 
@@ -130,6 +145,11 @@
   --scrollbar-track: #1c2128;
   --code-bg: #2d333b;
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --color-danger: var(--accent-vermillion);
+  --color-warning: var(--accent-gold);
+  --color-success: var(--accent-green);
+  --color-info: var(--accent-indigo);
+  --color-audit: var(--accent-purple);
   color-scheme: dark;
 }
 
@@ -163,6 +183,11 @@
   --scrollbar-track: #010409;
   --code-bg: #151b23;
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --color-danger: var(--accent-vermillion);
+  --color-warning: var(--accent-gold);
+  --color-success: var(--accent-green);
+  --color-info: var(--accent-indigo);
+  --color-audit: var(--accent-purple);
   color-scheme: dark;
 }
 
@@ -196,6 +221,11 @@
   --scrollbar-track: #f0f0f3;
   --code-bg: #f0f0f3;
   --shadow-card: 0 1px 3px rgba(14, 17, 22, 0.1);
+  --color-danger: var(--accent-vermillion);
+  --color-warning: var(--accent-gold);
+  --color-success: var(--accent-green);
+  --color-info: var(--accent-indigo);
+  --color-audit: var(--accent-purple);
   color-scheme: light;
 }
 

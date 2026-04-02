@@ -1,6 +1,69 @@
 const OWNER = document.currentScript.dataset.owner;
 const REPO = document.currentScript.dataset.repo;
 
+// ---- Compliance visualization ----
+
+const CONTROL_CATEGORIES = [
+  { prefix: 'source_', label: 'Source' },
+  { prefix: 'build_', label: 'Build' },
+  { prefix: 'dep_', label: 'Dependencies' },
+  { prefix: 'branch_', label: 'Branch Protection' },
+  { prefix: 'code_review_', label: 'Code Review' },
+  { prefix: 'ci_', label: 'CI' },
+  { prefix: 'commit_sign', label: 'Signing' },
+  { prefix: 'security_', label: 'Security' },
+  { prefix: 'release_', label: 'Release' },
+];
+
+function categorizeFindings(findings) {
+  const categories = new Map();
+  for (const f of (findings || [])) {
+    let catLabel = 'Other';
+    for (const cat of CONTROL_CATEGORIES) {
+      if (f.control_id.startsWith(cat.prefix)) { catLabel = cat.label; break; }
+    }
+    if (!categories.has(catLabel)) categories.set(catLabel, []);
+    categories.get(catLabel).push(f);
+  }
+  return categories;
+}
+
+function statusToDotClass(status) {
+  if (status === 'satisfied') return 'control-grid__dot--pass';
+  if (status === 'violated') return 'control-grid__dot--fail';
+  if (status === 'indeterminate') return 'control-grid__dot--review';
+  return 'control-grid__dot--na';
+}
+
+function renderComplianceViz(findings) {
+  const c = countFindings(findings);
+  const total = c.pass + c.fail + c.review + c.na;
+  if (total === 0) return '';
+
+  const pctPass = (c.pass / total * 100).toFixed(1);
+  const pctFail = (c.fail / total * 100).toFixed(1);
+  const pctReview = (c.review / total * 100).toFixed(1);
+
+  const categories = categorizeFindings(findings);
+  let gridHtml = '';
+  for (const [label, items] of categories) {
+    const dots = items.map(f =>
+      `<span class="control-grid__dot ${statusToDotClass(f.status)}" title="${esc(f.control_id)}"></span>`
+    ).join('');
+    gridHtml += `<div class="control-grid__category"><span class="control-grid__title">${esc(label)}</span><div class="control-grid__dots">${dots}</div></div>`;
+  }
+
+  return `<div class="compliance-viz">
+  <div class="compliance-viz__label">${c.pass} / ${total} controls passed</div>
+  <div class="compliance-viz__bar">
+    <div class="compliance-viz__fill compliance-viz__fill--pass" style="width:${pctPass}%"></div>
+    <div class="compliance-viz__fill compliance-viz__fill--fail" style="width:${pctFail}%"></div>
+    <div class="compliance-viz__fill compliance-viz__fill--review" style="width:${pctReview}%"></div>
+  </div>
+</div>
+<div class="control-grid">${gridHtml}</div>`;
+}
+
 // ---- Dashboard data loading ----
 
 async function loadDashboard() {
@@ -28,6 +91,9 @@ async function loadDashboard() {
     repoBadgesEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
     const profileName = data.profile_name || 'default';
     repoMetaEl.textContent = `policy: ${profileName}`;
+
+    // Compliance visualization
+    document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.findings), _sanitizer);
 
     // Also show in result area
     const area = document.getElementById('result-area');
@@ -114,6 +180,9 @@ async function runVerify() {
     const data = await resp.json();
     const profileName = data.profile_name || policy;
     area.setHTML(renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`), _sanitizer);
+
+    // Update compliance visualization
+    document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.findings), _sanitizer);
 
     // Update dashboard card
     const c = countFindings(data.findings);
