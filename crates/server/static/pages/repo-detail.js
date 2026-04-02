@@ -80,38 +80,26 @@ async function loadDashboard() {
     swrFetch(`/api/audit-history?owner=${OWNER}&repo=${REPO}&limit=8`),
   ]);
 
-  // Repo verification card
-  const repoCountEl = document.getElementById('dash-repo-count');
-  const repoBadgesEl = document.getElementById('dash-repo-badges');
-  const repoMetaEl = document.getElementById('dash-repo-meta');
-  repoCountEl.classList.remove('dash-card__skeleton');
-
+  // Repo verification → Compliance Viz only (no card)
   if (repoResult.status === 'fulfilled' && repoResult.value) {
     const data = repoResult.value;
-    const c = countFindings(data.findings);
-    const total = c.pass + c.fail + c.review + c.na;
-    repoCountEl.textContent = '';
-    repoCountEl.className = 'dash-card__count';
-    repoCountEl.textContent = `${c.pass}/${total}`;
-    repoBadgesEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
     const profileName = data.profile_name || 'default';
-    repoMetaEl.textContent = `policy: ${profileName}`;
-
-    // Compliance visualization
     document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.findings), _sanitizer);
-
-    // Also show in result area
     const area = document.getElementById('result-area');
     area.setHTML(renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`), _sanitizer);
-  } else {
-    repoCountEl.className = 'dash-card__count';
-    repoCountEl.textContent = '';
-    document.getElementById('dash-repo').classList.add('dash-card--empty');
-    repoCountEl.textContent = '未検証';
-    repoMetaEl.textContent = '検証ボタンで開始';
   }
 
-  // PR card
+  // Build audit lookup for PR/Release verification status
+  const auditMap = { pr: {}, release: {} };
+  if (auditEntries.status === 'fulfilled') {
+    for (const e of (auditEntries.value || [])) {
+      if (e.type === 'pr' || e.type === 'release') {
+        if (!auditMap[e.type][e.target_ref]) auditMap[e.type][e.target_ref] = e;
+      }
+    }
+  }
+
+  // PR card — primary metric: unverified count
   const prCountEl = document.getElementById('dash-pr-count');
   prCountEl.classList.remove('dash-card__skeleton');
   prCountEl.className = 'dash-card__count';
@@ -119,29 +107,37 @@ async function loadDashboard() {
     const prList = prs.value || [];
     const openCount = prList.filter(p => !p.merged_at && p.state !== 'closed').length;
     const mergedCount = prList.filter(p => p.merged_at).length;
-    prCountEl.textContent = prList.length;
+    const unverifiedCount = prList.filter(p => !auditMap.pr[String(p.pr_number)]).length;
+    prCountEl.textContent = unverifiedCount;
+    const prMetaEl = document.getElementById('dash-pr-meta');
+    prMetaEl.textContent = `${unverifiedCount} 件未検証 / 全 ${prList.length} 件`;
     const prBadgesEl = document.getElementById('dash-pr-badges');
-    let meta = '';
-    if (openCount > 0) meta += `<span class="badge badge--pass">${openCount} open</span>`;
-    if (mergedCount > 0) meta += `<span class="badge badge--private">${mergedCount} merged</span>`;
-    prBadgesEl.setHTML(meta, _sanitizer);
+    let badges = '';
+    if (openCount > 0) badges += `<span class="badge badge--review">${openCount} open</span>`;
+    if (mergedCount > 0) badges += `<span class="badge badge--pass">${mergedCount} merged</span>`;
+    prBadgesEl.setHTML(badges, _sanitizer);
+    if (unverifiedCount === 0) document.getElementById('dash-pr').classList.add('dash-card--clear');
   } else {
     prCountEl.textContent = '—';
   }
 
-  // Release card
+  // Release card — primary metric: unverified count
   const relCountEl = document.getElementById('dash-release-count');
   relCountEl.classList.remove('dash-card__skeleton');
   relCountEl.className = 'dash-card__count';
   if (releases.status === 'fulfilled') {
     const relList = releases.value || [];
-    relCountEl.textContent = relList.length;
+    const unverifiedRel = relList.filter(r => !auditMap.release[r.tag_name]).length;
+    relCountEl.textContent = unverifiedRel;
+    const relMetaEl = document.getElementById('dash-release-meta');
+    relMetaEl.textContent = `${unverifiedRel} 件未検証 / 全 ${relList.length} 件`;
     if (relList.length > 0) {
       const latest = relList[0];
       const relBadgesEl = document.getElementById('dash-release-badges');
       const date = latest.published_at || latest.created_at;
       relBadgesEl.setHTML(`<span class="badge">${esc(latest.tag_name)}</span> <span class="release-item__badge-meta">${timeAgo(date)}</span>`, _sanitizer);
     }
+    if (unverifiedRel === 0) document.getElementById('dash-release').classList.add('dash-card--clear');
   } else {
     relCountEl.textContent = '—';
   }
@@ -188,16 +184,6 @@ async function runVerify() {
 
     // Update compliance visualization
     document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.findings), _sanitizer);
-
-    // Update dashboard card
-    const c = countFindings(data.findings);
-    const total = c.pass + c.fail + c.review + c.na;
-    const repoCountEl = document.getElementById('dash-repo-count');
-    repoCountEl.className = 'dash-card__count';
-    repoCountEl.textContent = `${c.pass}/${total}`;
-    document.getElementById('dash-repo').classList.remove('dash-card--empty');
-    document.getElementById('dash-repo-badges').setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
-    document.getElementById('dash-repo-meta').textContent = `policy: ${profileName}`;
   } catch (e) {
     area.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
   }

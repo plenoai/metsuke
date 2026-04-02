@@ -30,19 +30,12 @@
 
   <!-- Dashboard summary cards -->
   <div class="dashboard" id="dashboard">
-    <div class="dash-card" id="dash-repo">
-      <div class="dash-card__header">
-        <span class="dash-card__title">リポジトリ検証</span>
-      </div>
-      <div class="dash-card__skeleton" id="dash-repo-count"></div>
-      <div class="dash-card__badges" id="dash-repo-badges"></div>
-      <div class="dash-card__meta" id="dash-repo-meta"></div>
-    </div>
     <div class="dash-card" id="dash-pr">
       <div class="dash-card__header">
         <span class="dash-card__title">Pull Requests</span>
       </div>
       <div class="dash-card__skeleton" id="dash-pr-count"></div>
+      <div class="dash-card__meta" id="dash-pr-meta"></div>
       <div class="dash-card__badges" id="dash-pr-badges"></div>
       <a class="dash-card__link" href="/repos/{{ owner }}/{{ repo }}/pulls">PR検証を開く</a>
     </div>
@@ -51,6 +44,7 @@
         <span class="dash-card__title">Releases</span>
       </div>
       <div class="dash-card__skeleton" id="dash-release-count"></div>
+      <div class="dash-card__meta" id="dash-release-meta"></div>
       <div class="dash-card__badges" id="dash-release-badges"></div>
       <a class="dash-card__link" href="/repos/{{ owner }}/{{ repo }}/releases">リリース検証を開く</a>
     </div>
