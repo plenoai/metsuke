@@ -5,3 +5,10 @@ target
 flake.nix
 flake.lock
 .envrc
+node_modules
+e2e
+test-results
+playwright-report
+playwright.config.ts
+package.json
+pnpm-lock.yaml

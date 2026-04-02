@@ -1,0 +1,77 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Landing page', () => {
+  test.beforeEach(async ({ page }) => {
+    // Clear session cookie to ensure unauthenticated state
+    await page.context().clearCookies();
+    await page.goto('/');
+  });
+
+  test('renders brand and CTA', async ({ page }) => {
+    await expect(page.locator('.mon')).toHaveText('目付');
+    await expect(page.locator('.logotype')).toHaveText('Metsuke');
+    await expect(page.locator('.cta')).toContainText('GitHub でログイン');
+  });
+
+  test('CTA links to auth login', async ({ page }) => {
+    const cta = page.locator('.cta');
+    await expect(cta).toHaveAttribute('href', '/auth/login');
+  });
+
+  test('loads external CSS (no inline styles)', async ({ page }) => {
+    // Verify no <style> blocks exist
+    const styleBlocks = await page.locator('style').count();
+    expect(styleBlocks).toBe(0);
+
+    // Verify external CSS is loaded
+    const themesCss = page.locator('link[href="/static/themes.css"]');
+    await expect(themesCss).toHaveCount(1);
+    const landingCss = page.locator('link[href="/static/landing.css"]');
+    await expect(landingCss).toHaveCount(1);
+  });
+
+  test('loads external JS (no inline scripts)', async ({ page }) => {
+    const inlineScripts = await page.locator('script:not([src])').count();
+    expect(inlineScripts).toBe(0);
+  });
+
+  test('has correct meta tags', async ({ page }) => {
+    await expect(page).toHaveTitle('Metsuke — SDLC Process Inspector');
+    const desc = page.locator('meta[name="description"]');
+    await expect(desc).toHaveAttribute('content', /SDLC/);
+    const ogTitle = page.locator('meta[property="og:title"]');
+    await expect(ogTitle).toHaveAttribute('content', /Metsuke/);
+  });
+
+  test('has accessible structure', async ({ page }) => {
+    // Divider is decorative
+    const divider = page.locator('.divider');
+    await expect(divider).toHaveAttribute('role', 'presentation');
+    // CTA SVG is decorative
+    const svg = page.locator('.cta svg');
+    await expect(svg).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('theme variables are applied', async ({ page }) => {
+    // Body should have background from CSS variables
+    const bgColor = await page.evaluate(() =>
+      getComputedStyle(document.body).backgroundColor
+    );
+    // metsuke-dark: --bg-deep: #0a0a0c → rgb(10, 10, 12)
+    expect(bgColor).not.toBe('rgba(0, 0, 0, 0)');
+  });
+});
+
+test.describe('Landing page - mobile', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test('renders correctly on mobile', async ({ page }) => {
+    await page.context().clearCookies();
+    await page.goto('/');
+    await expect(page.locator('.mon')).toBeVisible();
+    await expect(page.locator('.cta')).toBeVisible();
+    // CTA should have minimum touch target
+    const ctaBox = await page.locator('.cta').boundingBox();
+    expect(ctaBox!.height).toBeGreaterThanOrEqual(44);
+  });
+});
