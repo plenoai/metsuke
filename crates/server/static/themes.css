@@ -1,5 +1,46 @@
 /* Metsuke Color Themes — inspired by GitHub's Primer color system */
 
+/* ===== Default (fallback before theme is set) ===== */
+:root {
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --bg-deep: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1c2128;
+  --border: #30363d;
+  --border-subtle: #21262d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --accent-vermillion: #f85149;
+  --accent-vermillion-glow: rgba(248, 81, 73, 0.1);
+  --accent-gold: #d29922;
+  --accent-gold-dim: rgba(210, 153, 34, 0.1);
+  --accent-gold-border: rgba(210, 153, 34, 0.2);
+  --accent-indigo: #58a6ff;
+  --accent-indigo-dim: rgba(88, 166, 255, 0.1);
+  --accent-indigo-border: rgba(88, 166, 255, 0.2);
+  --accent-green: #3fb950;
+  --accent-green-dim: rgba(63, 185, 80, 0.1);
+  --accent-green-border: rgba(63, 185, 80, 0.25);
+  --accent-purple: #a371f7;
+  --accent-purple-dim: rgba(163, 113, 247, 0.1);
+  --accent-purple-border: rgba(163, 113, 247, 0.25);
+  --text-secondary-dim: rgba(139, 148, 158, 0.1);
+  --text-secondary-border: rgba(139, 148, 158, 0.2);
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --scrollbar-thumb: #484f58;
+  --scrollbar-track: #0d1117;
+  --code-bg: #161b22;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --color-danger: var(--accent-vermillion);
+  --color-warning: var(--accent-gold);
+  --color-success: var(--accent-green);
+  --color-info: var(--accent-indigo);
+  --color-audit: var(--accent-purple);
+  color-scheme: dark;
+}
+
 /* ===== Metsuke Dark (original) ===== */
 [data-theme="metsuke-dark"] {
   --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
@@ -79,12 +120,8 @@
   color-scheme: light;
 }
 
-/* ===== Default: GitHub Dark ===== */
-[data-theme="github-dark"],
-:root {
-  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
-
+/* ===== GitHub Dark ===== */
+[data-theme="github-dark"] {
   --bg-deep: #0d1117;
   --bg-surface: #161b22;
   --bg-elevated: #1c2128;
