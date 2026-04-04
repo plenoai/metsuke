@@ -280,20 +280,20 @@ async fn verify_single_target(
         let policy_ref = policy.as_deref();
         let result = match &target {
             BulkTarget::Repo { owner, repo } => {
-                libverify_github::verify_repo(&client, owner, repo, "HEAD", policy_ref, false)
+                libverify_github::verify_repo(&client, owner, repo, "HEAD", policy_ref, false, vec![])
             }
             BulkTarget::Pr {
                 owner,
                 repo,
                 pr_number,
-            } => libverify_github::verify_pr(&client, owner, repo, *pr_number, policy_ref, false),
+            } => libverify_github::verify_pr(&client, owner, repo, *pr_number, policy_ref, false, vec![]),
             BulkTarget::Release {
                 owner,
                 repo,
                 base_tag,
                 head_tag,
             } => libverify_github::verify_release(
-                &client, owner, repo, base_tag, head_tag, policy_ref, false,
+                &client, owner, repo, base_tag, head_tag, policy_ref, false, vec![],
             ),
         }?;
 

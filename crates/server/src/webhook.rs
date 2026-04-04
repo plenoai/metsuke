@@ -185,7 +185,7 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
             host: state.github_api_host.clone(),
         };
         let client = libverify_github::GitHubClient::new(&config)?;
-        libverify_github::verify_pr(&client, &verify_owner, &verify_repo, pr_number, None, false)
+        libverify_github::verify_pr(&client, &verify_owner, &verify_repo, pr_number, None, false, vec![])
     })
     .await
     {
@@ -320,6 +320,7 @@ async fn handle_release(state: WebhookState, payload: serde_json::Value) {
             &verify_tag,
             None,
             false,
+            vec![],
         )
     })
     .await

@@ -10,8 +10,8 @@ repository = "https://github.com/HikaruEgashira/metsuke"
 authors = ["Hikaru Egashira"]
 
 [workspace.dependencies]
-libverify-github = "0.4"
-libverify-policy = "0.4"
+libverify-github = "0.11"
+libverify-policy = "0.11"
 
 rmcp = { version = "0.8", features = ["server", "macros", "transport-streamable-http-server", "schemars"] }
 axum = "0.8"
