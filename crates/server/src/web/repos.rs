@@ -155,15 +155,16 @@ pub(super) async fn api_readme(
         state.github_api_host
     );
     let client = reqwest::Client::new();
-    let mut req = client
-        .get(&url)
-        .header("Accept", "application/vnd.github.html+json")
-        .header("User-Agent", "metsuke")
-        .header("X-GitHub-Api-Version", "2022-11-28");
-    if let Some(t) = token {
-        req = req.header("Authorization", format!("Bearer {t}"));
-    }
-    let resp = req.send().await;
+
+    let resp = fetch_readme(&client, &url, token.as_deref()).await;
+
+    // If the token is invalid (401/403), retry without it — the repo may be public.
+    let resp = match &resp {
+        Ok(r) if token.is_some() && matches!(r.status().as_u16(), 401 | 403) => {
+            fetch_readme(&client, &url, None).await
+        }
+        _ => resp,
+    };
 
     match resp {
         Ok(r) if r.status().is_success() => {
@@ -193,4 +194,20 @@ pub(super) async fn api_readme(
         )
             .into_response(),
     }
+}
+
+async fn fetch_readme(
+    client: &reqwest::Client,
+    url: &str,
+    token: Option<&str>,
+) -> Result<reqwest::Response, reqwest::Error> {
+    let mut req = client
+        .get(url)
+        .header("Accept", "application/vnd.github.html+json")
+        .header("User-Agent", "metsuke")
+        .header("X-GitHub-Api-Version", "2022-11-28");
+    if let Some(t) = token {
+        req = req.header("Authorization", format!("Bearer {t}"));
+    }
+    req.send().await
 }
