@@ -145,10 +145,36 @@ pub(super) async fn api_readme(
     };
 
     let db = state.db.clone();
-    let token = run_blocking(move || db.get_github_token(user_id))
-        .await
-        .ok()
-        .flatten();
+    let owner_q = owner.clone();
+    let installation_id =
+        match run_blocking(move || db.get_installation_for_owner(user_id, &owner_q)).await {
+            Ok(Some(id)) => id,
+            Ok(None) => {
+                return (
+                    axum::http::StatusCode::NOT_FOUND,
+                    "No installation found for this owner",
+                )
+                    .into_response();
+            }
+            Err(e) => {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("{e}"),
+                )
+                    .into_response();
+            }
+        };
+
+    let token = match state.github_app.create_installation_token(installation_id).await {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{e}"),
+            )
+                .into_response();
+        }
+    };
 
     let url = format!(
         "https://{}/repos/{owner}/{repo}/readme",
@@ -156,15 +182,7 @@ pub(super) async fn api_readme(
     );
     let client = reqwest::Client::new();
 
-    let resp = fetch_readme(&client, &url, token.as_deref()).await;
-
-    // If the token is invalid (401/403), retry without it — the repo may be public.
-    let resp = match &resp {
-        Ok(r) if token.is_some() && matches!(r.status().as_u16(), 401 | 403) => {
-            fetch_readme(&client, &url, None).await
-        }
-        _ => resp,
-    };
+    let resp = fetch_readme(&client, &url, Some(&token)).await;
 
     match resp {
         Ok(r) if r.status().is_success() => {
