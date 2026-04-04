@@ -452,7 +452,7 @@ impl MetsukeServer {
                                     review,
                                     na,
                                     &json_str,
-                                    "bulk",
+                                    "mcp",
                                 )
                             })
                             .await;

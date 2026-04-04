@@ -201,7 +201,7 @@ async fn run_bulk_job(ctx: BulkJobContext, targets: Vec<BulkTarget>) {
                             review,
                             na,
                             &json_str,
-                            "bulk",
+                            "api",
                         )
                     })
                     .await;
