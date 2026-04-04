@@ -13,14 +13,11 @@
 {% block head %}{% endblock %}
 </head>
 <body>
-<div class="shell">
-  <a class="skip-link" href="#main">コンテンツへスキップ</a>
-  <header class="header" role="banner">
+<a class="skip-link" href="#main">コンテンツへスキップ</a>
+<header class="header" role="banner">
+  <div class="header__inner">
     <div class="header__left">
-      <div>
-        <a class="header__brand" href="/repos" aria-label="Metsuke ホーム">目付</a>
-        <div class="header__sub">Metsuke</div>
-      </div>
+      <a class="header__brand" href="/repos" aria-label="Metsuke ホーム">目付</a>
       <nav class="nav__list" aria-label="メインナビゲーション">
         <a class="nav__item{% if active_page == "repos" %} is-active{% endif %}" href="/repos">リポジトリ</a>
         <a class="nav__item{% if active_page == "audit" %} is-active{% endif %}" href="/audit">監査ログ</a>
@@ -31,7 +28,9 @@
       <strong class="user-badge__name">{{ login }}</strong>
       <a class="user-badge__logout" href="/auth/logout">ログアウト</a>
     </div>
-  </header>
+  </div>
+</header>
+<div class="shell">
   <main id="main" role="main">
     {% block content %}{% endblock %}
   </main>
