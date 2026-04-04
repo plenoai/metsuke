@@ -17,11 +17,22 @@
 <header class="header" role="banner">
   <div class="header__inner">
     <div class="header__left">
-      <a class="header__brand" href="/repos" aria-label="Metsuke ホーム">目付</a>
+      <a class="header__brand" href="/repos" aria-label="Metsuke ホーム">
+        <svg class="header__logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="currentColor" opacity="0.15" stroke="currentColor" stroke-width="1"/><path d="M5 16 Q16 6 27 16 Q16 26 5 16 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="16" cy="16" r="5" fill="currentColor" opacity="0.9"/><circle cx="16" cy="16" r="2.2" fill="var(--bg-surface)"/><circle cx="17.5" cy="14.5" r="1" fill="currentColor" opacity="0.3"/></svg>
+      </a>
       <nav class="nav__list" aria-label="メインナビゲーション">
-        <a class="nav__item{% if active_page == "repos" %} is-active{% endif %}" href="/repos">リポジトリ</a>
-        <a class="nav__item{% if active_page == "audit" %} is-active{% endif %}" href="/audit">監査ログ</a>
-        <a class="nav__item{% if active_page == "settings" %} is-active{% endif %}" href="/settings">設定</a>
+        <a class="nav__item{% if active_page == "repos" %} is-active{% endif %}" href="/repos">
+          <svg class="nav__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/></svg>
+          リポジトリ
+        </a>
+        <a class="nav__item{% if active_page == "audit" %} is-active{% endif %}" href="/audit">
+          <svg class="nav__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7.25-3.25v2.992l2.028.812a.75.75 0 0 1-.557 1.392l-2.5-1A.751.751 0 0 1 7.25 8.25v-3.5a.75.75 0 0 1 1.5 0Z"/></svg>
+          監査ログ
+        </a>
+        <a class="nav__item{% if active_page == "settings" %} is-active{% endif %}" href="/settings">
+          <svg class="nav__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8.2 8.2 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224.231.114.454.243.668.386.123.082.233.09.299.071l1.1-.303c.662-.183 1.398.023 1.829.632.392.555.586 1.203.586 1.593a1.89 1.89 0 0 1-.208.822l-.544.963c-.034.059-.05.162-.013.299a4 4 0 0 1 0 1.232c-.037.137-.021.24.013.299l.544.963c.26.46.327 1.003.208 1.457a5.575 5.575 0 0 1-.586.96c-.431.609-1.167.815-1.83.632l-1.099-.303c-.066-.019-.176-.011-.299.071a5.32 5.32 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8.006 8.006 0 0 1-1.402 0c-.743-.064-1.29-.614-1.458-1.26l-.29-1.106c-.017-.066-.078-.158-.211-.224a5.32 5.32 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.1.303c-.662.183-1.398-.023-1.829-.632a5.573 5.573 0 0 1-.586-.96 1.89 1.89 0 0 1-.208-.822 1.89 1.89 0 0 1 .208-.822l.544-.963c.034-.059.05-.162.013-.299a4 4 0 0 1 0-1.232c.037-.137.021-.24-.013-.299l-.544-.963a1.89 1.89 0 0 1-.208-.822c0-.39.194-.838.586-1.593.431-.609 1.167-.815 1.83-.632l1.099.303c.066.019.176.011.299-.071.214-.143.437-.272.668-.386.133-.066.194-.158.212-.224L5.84 1.29c.17-.645.715-1.196 1.458-1.26A8.2 8.2 0 0 1 8 0ZM6.5 8a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM8 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
+          設定
+        </a>
       </nav>
     </div>
     <div class="user-badge">
