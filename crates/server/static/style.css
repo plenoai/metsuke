@@ -94,6 +94,7 @@ body {
 
 /* User badge */
 .user-badge {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -101,10 +102,15 @@ body {
   font-size: var(--text-base);
   color: var(--text-secondary);
 }
-.user-badge strong {
+.user-badge__name {
   color: var(--text-primary);
+  cursor: default;
 }
 .user-badge__logout {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 0.3rem;
   color: var(--text-secondary);
   text-decoration: none;
   font-family: var(--font-mono);
@@ -113,7 +119,15 @@ body {
   padding: 0.35rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 4px;
-  transition: all 0.2s ease;
+  background: var(--surface);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.user-badge:hover .user-badge__logout,
+.user-badge:focus-within .user-badge__logout {
+  opacity: 1;
+  pointer-events: auto;
 }
 .user-badge__logout:hover {
   color: var(--accent-vermillion);
@@ -1658,6 +1672,10 @@ select:focus-visible {
     min-height: 48px;
     display: inline-flex;
     align-items: center;
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
+    margin-top: 0;
   }
   /* Prevent iOS zoom on form inputs */
   .form-group input,
