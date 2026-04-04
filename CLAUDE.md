@@ -34,7 +34,6 @@ Spacing and text utilities use `u-` prefix:
 
 ```css
 .u-mt-0   /* margin-top: 0 */
-.u-mt-md  /* margin-top: medium */
 .u-mb-0   /* margin-bottom: 0 */
 .u-text-muted
 ```
@@ -89,6 +88,35 @@ Spacing and text utilities use `u-` prefix:
 | `readme` | README display area |
 | `search-bar` | Search input wrapper |
 | `detail-heading` | Repo detail page heading |
+
+## Spacing: Flow Layout
+
+Vertical spacing between sibling components is managed by **parent containers** using flexbox `gap`, not by individual component margins.
+
+### Rules
+
+1. `<main>` and `.flow` are flow containers: `display: flex; flex-direction: column; gap: var(--space-lg)`.
+2. Components that are direct children of a flow container **must not** use `margin-top` or `margin-bottom` for inter-sibling spacing. The container's `gap` handles it.
+3. **Internal** margins (e.g. `.section__title { margin-bottom }` inside `.section`, `.btn__row { margin-top }` inside `.section`) are allowed — they control intra-component spacing.
+4. When JS renders multiple blocks into a container (e.g. search + pagination + grid), add `class="flow"` to the container element.
+5. Standalone `.section__title` (direct child of `main`) gets `margin-bottom: 0` via `main > .section__title` override.
+
+### Adding new page sections
+
+```html
+<!-- Good: main's gap provides spacing between children -->
+<main>
+  <div class="breadcrumb">…</div>
+  <div class="page-header">…</div>
+  <div id="content" class="flow">…</div>
+</main>
+
+<!-- Bad: margin on each component for sibling spacing -->
+<main>
+  <div class="breadcrumb" style="margin-bottom: 0.75rem">…</div>
+  <div class="page-header" style="margin-bottom: 1rem">…</div>
+</main>
+```
 
 ## Stack
 

@@ -35,6 +35,18 @@ body {
   padding: var(--space-2xl) var(--space-xl) 4rem;
 }
 
+/* Flow layout: parent-managed vertical rhythm via gap.
+   Child components must NOT set margin-top/bottom for inter-sibling spacing. */
+main,
+.flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+main > .section__title {
+  margin-bottom: 0;
+}
+
 /* Header */
 .header {
   display: flex;
@@ -140,7 +152,6 @@ body {
 
 /* Section */
 .section {
-  margin-bottom: var(--space-xl);
   animation: fadeIn 0.5s ease-out both;
 }
 .section:nth-child(2) { animation-delay: 0.1s; }
@@ -307,7 +318,6 @@ body {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--text-secondary);
-  margin-bottom: 0.75rem;
 }
 .breadcrumb a {
   color: var(--text-secondary);
@@ -393,7 +403,6 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
@@ -433,13 +442,9 @@ select:focus-visible {
 
 /* Section spacing helpers */
 .u-mt-0 { margin-top: 0; }
-.u-mt-md { margin-top: 1.5rem; }
 .u-mb-0 { margin-bottom: 0; }
 
 /* Findings section (JS-rendered) */
-.findings {
-  margin-top: 1.5rem;
-}
 .findings__card {
   padding: 0;
   overflow-x: auto;
@@ -515,9 +520,6 @@ select:focus-visible {
 }
 
 /* Search bar wrapper */
-.search-bar {
-  margin-bottom: 0.75rem;
-}
 
 /* Findings table */
 .findings__table {
@@ -722,7 +724,6 @@ select:focus-visible {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.75rem;
-  margin-bottom: 1.5rem;
 }
 .dash-card {
   background: var(--bg-surface);
@@ -857,9 +858,6 @@ select:focus-visible {
 .skeleton__item:nth-child(6) .skeleton__line { animation-delay: 0.5s; }
 
 /* Recent activity on dashboard */
-.activity {
-  margin-bottom: 1.5rem;
-}
 .activity__list {
   display: flex;
   flex-direction: column;
@@ -952,7 +950,6 @@ select:focus-visible {
   width: 100%;
   padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
-  margin-bottom: 0.75rem;
 }
 
 /* ===== Page: PR Verification ===== */
@@ -1059,7 +1056,6 @@ select:focus-visible {
   gap: 0.75rem;
   align-items: flex-end;
   flex-wrap: wrap;
-  margin-bottom: 1.5rem;
 }
 .release-list {
   display: flex;
@@ -1163,7 +1159,6 @@ select:focus-visible {
   gap: 0.75rem;
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
 }
 .audit__table {
   width: 100%;
@@ -1261,7 +1256,6 @@ select:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin-top: 1rem;
   font-family: var(--font-mono);
   font-size: 0.75rem;
 }
