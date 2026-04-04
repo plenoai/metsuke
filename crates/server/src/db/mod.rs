@@ -142,7 +142,9 @@ impl Database {
         // Add github_token column to users (idempotent migration)
         let _ = conn.execute_batch("ALTER TABLE users ADD COLUMN github_token TEXT;");
         // Add trigger column to audit_log (idempotent migration)
-        let _ = conn.execute_batch("ALTER TABLE audit_log ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';");
+        let _ = conn.execute_batch(
+            "ALTER TABLE audit_log ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';",
+        );
 
         // Cache tables for GitHub data
         conn.execute_batch(

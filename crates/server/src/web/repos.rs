@@ -165,7 +165,11 @@ pub(super) async fn api_readme(
             }
         };
 
-    let token = match state.github_app.create_installation_token(installation_id).await {
+    let token = match state
+        .github_app
+        .create_installation_token(installation_id)
+        .await
+    {
         Ok(t) => t,
         Err(e) => {
             return (

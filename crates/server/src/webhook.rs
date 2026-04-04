@@ -221,8 +221,18 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
         let repo_a = repo.clone();
         let _ = run_blocking(move || {
             db.append_audit_entry(
-                user_id, "pr", &owner_a, &repo_a, &target_ref, "default",
-                pass, fail, review, na, &result_json, "webhook",
+                user_id,
+                "pr",
+                &owner_a,
+                &repo_a,
+                &target_ref,
+                "default",
+                pass,
+                fail,
+                review,
+                na,
+                &result_json,
+                "webhook",
             )
         })
         .await;
@@ -333,8 +343,18 @@ async fn handle_release(state: WebhookState, payload: serde_json::Value) {
         let tag = tag_name.clone();
         let _ = run_blocking(move || {
             db.append_audit_entry(
-                user_id, "repo", &owner_a, &repo_a, &tag, "default",
-                pass, fail, review, na, &result_json, "webhook",
+                user_id,
+                "repo",
+                &owner_a,
+                &repo_a,
+                &tag,
+                "default",
+                pass,
+                fail,
+                review,
+                na,
+                &result_json,
+                "webhook",
             )
         })
         .await;
