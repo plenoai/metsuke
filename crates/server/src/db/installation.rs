@@ -50,6 +50,20 @@ impl Database {
         }
     }
 
+    pub fn get_user_id_by_installation(&self, installation_id: i64) -> Result<Option<i64>> {
+        let conn = self.reader();
+        let result = conn.query_row(
+            "SELECT user_id FROM installations WHERE installation_id = ?1",
+            rusqlite::params![installation_id],
+            |row| row.get(0),
+        );
+        match result {
+            Ok(v) => Ok(Some(v)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub fn get_installations_for_user(&self, user_id: i64) -> Result<Vec<(i64, String, String)>> {
         let conn = self.reader();
         let mut stmt = conn.prepare_cached(

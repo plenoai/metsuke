@@ -1,7 +1,7 @@
 mod audit;
 mod auth;
 mod events;
-mod helpers;
+pub(crate) mod helpers;
 mod jobs;
 mod pages;
 mod repos;

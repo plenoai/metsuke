@@ -21,12 +21,13 @@ impl Database {
         review_count: i64,
         na_count: i64,
         result_json: &str,
+        trigger: &str,
     ) -> Result<()> {
         let conn = self.writer.lock().unwrap();
         conn.execute(
-            "INSERT INTO audit_log (user_id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, result_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-            rusqlite::params![user_id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, result_json],
+            "INSERT INTO audit_log (user_id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, result_json, trigger)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            rusqlite::params![user_id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, result_json, trigger],
         )?;
         Ok(())
     }
@@ -45,7 +46,7 @@ impl Database {
     ) -> Result<Vec<AuditEntry>> {
         let conn = self.reader();
         let mut sql = String::from(
-            "SELECT id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, verified_at
+            "SELECT id, verification_type, owner, repo, target_ref, policy, pass_count, fail_count, review_count, na_count, verified_at, trigger
              FROM audit_log WHERE user_id = ?1",
         );
         let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(user_id)];
@@ -99,6 +100,7 @@ impl Database {
                 review_count: row.get(8)?,
                 na_count: row.get(9)?,
                 verified_at: row.get(10)?,
+                trigger: row.get(11)?,
             })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)

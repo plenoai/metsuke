@@ -61,7 +61,7 @@ pub(super) async fn require_user(db: &Arc<Database>, headers: &HeaderMap) -> Opt
         .flatten()
 }
 
-pub(super) fn count_findings(json: &str) -> (i64, i64, i64, i64) {
+pub(crate) fn count_findings(json: &str) -> (i64, i64, i64, i64) {
     let (mut pass, mut fail, mut review, mut na) = (0i64, 0i64, 0i64, 0i64);
     if let Ok(val) = serde_json::from_str::<serde_json::Value>(json) {
         let findings = val

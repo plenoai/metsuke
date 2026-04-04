@@ -70,6 +70,7 @@ pub(super) async fn api_audit_history(
                 "review": e.review_count,
                 "na": e.na_count,
                 "verified_at": e.verified_at,
+                "trigger": e.trigger,
             })
         })
         .collect();
@@ -108,10 +109,10 @@ pub(super) async fn api_audit_export_csv(
     .await
     .unwrap_or_default();
 
-    let mut csv = String::from("Date,Type,Owner,Repo,Target,Policy,Pass,Fail,Review,N/A\n");
+    let mut csv = String::from("Date,Type,Owner,Repo,Target,Policy,Pass,Fail,Review,N/A,Trigger\n");
     for e in &entries {
         csv.push_str(&format!(
-            "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{},{},{},{}\n",
+            "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{},{},{},{},\"{}\"\n",
             e.verified_at,
             e.verification_type,
             e.owner,
@@ -122,6 +123,7 @@ pub(super) async fn api_audit_export_csv(
             e.fail_count,
             e.review_count,
             e.na_count,
+            e.trigger,
         ));
     }
 

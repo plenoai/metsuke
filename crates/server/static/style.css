@@ -1231,6 +1231,24 @@ select:focus-visible {
   color: var(--text-secondary);
   border: 1px solid var(--text-secondary-border);
 }
+.trigger-badge {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+.trigger-badge--manual {
+  background: var(--text-secondary-dim);
+  color: var(--text-secondary);
+  border: 1px solid var(--text-secondary-border);
+}
+.trigger-badge--webhook {
+  background: var(--accent-indigo-dim);
+  color: var(--color-info);
+  border: 1px solid var(--accent-indigo-border);
+}
 .pagination {
   display: flex;
   align-items: center;

@@ -20,14 +20,16 @@ const MAX_DELIVERY_IDS: usize = 1000;
 
 #[derive(Clone)]
 struct WebhookState {
+    db: Arc<Database>,
     github_app: Arc<GitHubApp>,
     webhook_secret: Option<String>,
     delivery_ids: Arc<Mutex<HashSet<String>>>,
     github_api_host: String,
 }
 
-pub fn router(_db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig) -> Router {
+pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig) -> Router {
     let state = WebhookState {
+        db,
         github_app,
         webhook_secret: config.github_webhook_secret.clone(),
         delivery_ids: Arc::new(Mutex::new(HashSet::new())),
@@ -210,6 +212,22 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
     let result_json = serde_json::to_string_pretty(&result).unwrap_or_default();
     let (conclusion, title, summary) = format_check_result(&result_json, "PR");
 
+    // Record audit entry for webhook-triggered verification
+    if let Ok(Some(user_id)) = state.db.get_user_id_by_installation(installation_id) {
+        let (pass, fail, review, na) = crate::web::helpers::count_findings(&result_json);
+        let target_ref = format!("#{pr_number}");
+        let db = state.db.clone();
+        let owner_a = owner.clone();
+        let repo_a = repo.clone();
+        let _ = run_blocking(move || {
+            db.append_audit_entry(
+                user_id, "pr", &owner_a, &repo_a, &target_ref, "default",
+                pass, fail, review, na, &result_json, "webhook",
+            )
+        })
+        .await;
+    }
+
     match state
         .github_app
         .create_check_run(
@@ -305,6 +323,22 @@ async fn handle_release(state: WebhookState, payload: serde_json::Value) {
 
     let result_json = serde_json::to_string_pretty(&result).unwrap_or_default();
     let (_conclusion, _title, summary) = format_check_result(&result_json, "Release");
+
+    // Record audit entry for webhook-triggered verification
+    if let Ok(Some(user_id)) = state.db.get_user_id_by_installation(installation_id) {
+        let (pass, fail, review, na) = crate::web::helpers::count_findings(&result_json);
+        let db = state.db.clone();
+        let owner_a = owner.clone();
+        let repo_a = repo.clone();
+        let tag = tag_name.clone();
+        let _ = run_blocking(move || {
+            db.append_audit_entry(
+                user_id, "repo", &owner_a, &repo_a, &tag, "default",
+                pass, fail, review, na, &result_json, "webhook",
+            )
+        })
+        .await;
+    }
 
     tracing::info!(%owner, %repo, %tag_name, %summary, "webhook: release verification complete");
 }

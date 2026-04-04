@@ -130,7 +130,8 @@ impl Database {
                 review_count INTEGER NOT NULL DEFAULT 0,
                 na_count INTEGER NOT NULL DEFAULT 0,
                 result_json TEXT NOT NULL,
-                verified_at TEXT NOT NULL DEFAULT (datetime('now'))
+                verified_at TEXT NOT NULL DEFAULT (datetime('now')),
+                trigger TEXT NOT NULL DEFAULT 'manual'
             );
             CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
             CREATE INDEX IF NOT EXISTS idx_audit_log_repo ON audit_log(owner, repo);
@@ -140,6 +141,8 @@ impl Database {
         )?;
         // Add github_token column to users (idempotent migration)
         let _ = conn.execute_batch("ALTER TABLE users ADD COLUMN github_token TEXT;");
+        // Add trigger column to audit_log (idempotent migration)
+        let _ = conn.execute_batch("ALTER TABLE audit_log ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';");
 
         // Cache tables for GitHub data
         conn.execute_batch(
@@ -602,10 +605,11 @@ mod tests {
             0,
             2,
             "{}",
+            "manual",
         )
         .unwrap();
         db.append_audit_entry(
-            uid, "release", "owner", "repo", "v1.0", "oss", 3, 0, 0, 0, "{}",
+            uid, "release", "owner", "repo", "v1.0", "oss", 3, 0, 0, 0, "{}", "webhook",
         )
         .unwrap();
 
@@ -614,6 +618,11 @@ mod tests {
             .get_audit_history(uid, None, None, None, None, None, 100, 0)
             .unwrap();
         assert_eq!(all.len(), 2);
+
+        // Trigger field is preserved
+        let triggers: Vec<&str> = all.iter().map(|e| e.trigger.as_str()).collect();
+        assert!(triggers.contains(&"manual"));
+        assert!(triggers.contains(&"webhook"));
 
         // Filter by type
         let prs = db
@@ -650,6 +659,7 @@ mod tests {
                 0,
                 0,
                 "{}",
+                "manual",
             )
             .unwrap();
         }

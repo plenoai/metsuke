@@ -28,6 +28,7 @@ pub struct AuditEntry {
     pub review_count: i64,
     pub na_count: i64,
     pub verified_at: String,
+    pub trigger: String,
 }
 
 #[derive(Serialize)]

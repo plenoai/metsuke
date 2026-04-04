@@ -139,6 +139,7 @@ pub(super) async fn api_verify_repo(
                         review,
                         na,
                         &json,
+                        "manual",
                     )
                 })
                 .await;
@@ -329,6 +330,7 @@ pub(super) async fn api_verify_release(
                         review,
                         na,
                         &json,
+                        "manual",
                     )
                 })
                 .await;
@@ -447,6 +449,7 @@ pub(super) async fn api_verify_pr(
                         review,
                         na,
                         &json,
+                        "manual",
                     )
                 })
                 .await;

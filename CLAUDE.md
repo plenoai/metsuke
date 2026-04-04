@@ -80,6 +80,7 @@ Spacing and text utilities use `u-` prefix:
 | `release-form` | Release verification form |
 | `audit` | Audit log section |
 | `type-badge` | Audit type indicator (--release, --pr, --repo) |
+| `trigger-badge` | Audit trigger indicator (--manual, --webhook) |
 | `install` | Settings installation item |
 | `tag` | Label tag (--org) |
 | `code-wrap` | Code block with copy button |

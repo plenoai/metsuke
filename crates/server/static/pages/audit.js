@@ -9,6 +9,11 @@ function typeBadge(type) {
   return '<span class="type-badge type-badge--repo">repo</span>';
 }
 
+function triggerBadge(trigger) {
+  if (trigger === 'webhook') return '<span class="trigger-badge trigger-badge--webhook">auto</span>';
+  return '<span class="trigger-badge trigger-badge--manual">手動</span>';
+}
+
 function resultBadges(e) {
   let b = '';
   if (e.pass > 0) b += `<span class="badge badge--pass" title="PASS">PASS ${e.pass}</span>`;
@@ -54,6 +59,7 @@ async function loadAudit() {
     const rows = entries.map(e => `<tr>
       <td class="audit__timestamp">${new Date(e.verified_at + 'Z').toLocaleString('ja-JP')}</td>
       <td>${typeBadge(e.type)}</td>
+      <td>${triggerBadge(e.trigger)}</td>
       <td><a href="/repos/${encodeURIComponent(e.owner)}/${encodeURIComponent(e.repo)}" class="audit__repo-link">${esc(e.owner)}/${esc(e.repo)}</a></td>
       <td class="audit__ref">${esc(e.target_ref)}</td>
       <td class="audit__policy">${esc(e.policy)}</td>
@@ -63,7 +69,7 @@ async function loadAudit() {
     container.setHTML(`<div class="card findings__card">
       <table class="audit__table">
         <thead>
-          <tr><th scope="col">日時</th><th scope="col">タイプ</th><th scope="col">リポジトリ</th><th scope="col">対象</th><th scope="col">ポリシー</th><th scope="col">結果</th></tr>
+          <tr><th scope="col">日時</th><th scope="col">タイプ</th><th scope="col">トリガー</th><th scope="col">リポジトリ</th><th scope="col">対象</th><th scope="col">ポリシー</th><th scope="col">結果</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
