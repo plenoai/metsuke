@@ -191,7 +191,6 @@ function renderLoadError(containerId, message, retryFnName) {
 // ---------------------------------------------------------------------------
 
 function openSidebar(title, contentHtml, metaHtml) {
-  const shell = document.getElementById('shell');
   const sidebar = document.getElementById('sidebar');
   const titleEl = document.getElementById('sidebar-title');
   const contentEl = document.getElementById('sidebar-content');
@@ -203,14 +202,14 @@ function openSidebar(title, contentHtml, metaHtml) {
   );
 
   sidebar.hidden = false;
-  shell.classList.add('has-sidebar');
+  // rAF to ensure hidden removal triggers transition
+  requestAnimationFrame(() => sidebar.classList.add('is-open'));
 }
 
 function closeSidebar() {
-  const shell = document.getElementById('shell');
   const sidebar = document.getElementById('sidebar');
-  shell.classList.remove('has-sidebar');
-  sidebar.hidden = true;
+  sidebar.classList.remove('is-open');
+  sidebar.addEventListener('transitionend', () => { sidebar.hidden = true; }, { once: true });
 }
 
 /**
@@ -273,7 +272,7 @@ async function openAuditInSidebar(entryId) {
 // Sidebar close button + Escape key
 document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape' && document.getElementById('shell').classList.contains('has-sidebar')) {
+  if (e.key === 'Escape' && document.getElementById('sidebar').classList.contains('is-open')) {
     closeSidebar();
   }
 });
