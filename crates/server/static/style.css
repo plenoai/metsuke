@@ -2,9 +2,6 @@
 
 /* Color variables are defined in themes.css */
 :root {
-  --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
-
   /* Type scale: modular scale ~1.2 (minor third) */
   --text-2xl: 1.6rem;   /* page title, hero counts */
   --text-xl: 1.3rem;    /* detail heading */

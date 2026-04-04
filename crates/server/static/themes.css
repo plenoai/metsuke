@@ -3,6 +3,9 @@
 /* ===== Default: Metsuke Dark (original) ===== */
 [data-theme="metsuke-dark"],
 :root {
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+
   --bg-deep: #0a0a0c;
   --bg-surface: #131315;
   --bg-elevated: #1a1a1e;
