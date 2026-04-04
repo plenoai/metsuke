@@ -1,0 +1,26 @@
+services:
+  - github
+
+github:
+  port: 4001
+  seed:
+    users:
+      - login: dev-user
+        id: 1
+        name: Dev User
+        email: dev@localhost
+    orgs:
+      - login: plenoai
+        id: 100
+    repos:
+      - owner: plenoai
+        name: metsuke
+        private: false
+        default_branch: main
+    apps:
+      - id: 12345
+        slug: metsuke-dev
+        client_id: Iv1.dev0000000000
+        installations:
+          - id: 1
+            account: plenoai

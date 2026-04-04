@@ -29,33 +29,42 @@ body {
 }
 
 /* Layout */
+.layout {
+  display: flex;
+  min-height: calc(100vh - 48px);
+}
 .shell {
+  flex: 1;
+  min-width: 0;
   max-width: 1280px;
   margin: 0 auto;
   padding: var(--space-xl) var(--space-xl) 4rem;
+  transition: margin 0.25s ease;
+}
+.layout.has-sidebar .shell {
+  margin-right: 0;
 }
 
 /* Sidebar — right panel for verification result details */
+.sidebar[hidden] {
+  display: none;
+}
 .sidebar {
-  position: fixed;
-  top: 48px;
-  right: 0;
-  width: 420px;
+  width: 0;
+  flex-shrink: 0;
   height: calc(100vh - 48px);
+  position: sticky;
+  top: 48px;
   background: var(--bg-surface);
-  border-left: 1px solid var(--border);
-  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
-  transform: translateX(100%);
-  transition: transform 0.25s ease, opacity 0.25s ease;
-  opacity: 0;
+  border-left: 1px solid transparent;
   display: flex;
   flex-direction: column;
-  z-index: 100;
   overflow: hidden;
+  transition: width 0.25s ease, border-color 0.25s ease;
 }
 .sidebar.is-open {
-  transform: translateX(0);
-  opacity: 1;
+  width: 420px;
+  border-left-color: var(--border);
 }
 .sidebar__header {
   display: flex;
@@ -1626,20 +1635,28 @@ select:focus-visible {
     max-width: 100%;
     padding: var(--space-xl) var(--space-lg) 3rem;
   }
+  .layout {
+    flex-direction: column;
+  }
+  .layout.has-sidebar .shell {
+    margin-right: auto;
+  }
   .sidebar {
     width: 100%;
-    height: 50vh;
+    height: 0;
+    position: fixed;
     top: auto;
     bottom: 0;
     left: 0;
     right: 0;
     border-left: none;
-    border-top: 1px solid var(--border);
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
-    transform: translateY(100%);
+    border-top: 1px solid transparent;
+    transition: height 0.25s ease, border-color 0.25s ease;
   }
   .sidebar.is-open {
-    transform: translateY(0);
+    width: 100%;
+    height: 50vh;
+    border-top-color: var(--border);
   }
   .header__inner {
     flex-wrap: wrap;
@@ -1849,7 +1866,9 @@ select:focus-visible {
     --accent-gold-dim: transparent;
   }
   body { background: #fff; color: #111; }
+  .layout { display: block; }
   .shell { max-width: 100%; padding: 0; }
+  .sidebar { display: none !important; }
 
   /* Disable animations */
   *, *::before, *::after {

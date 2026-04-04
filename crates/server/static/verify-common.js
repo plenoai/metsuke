@@ -192,6 +192,7 @@ function renderLoadError(containerId, message, retryFnName) {
 
 function openSidebar(title, contentHtml, metaHtml) {
   const sidebar = document.getElementById('sidebar');
+  const layout = document.getElementById('layout');
   const titleEl = document.getElementById('sidebar-title');
   const contentEl = document.getElementById('sidebar-content');
 
@@ -202,13 +203,17 @@ function openSidebar(title, contentHtml, metaHtml) {
   );
 
   sidebar.hidden = false;
-  // rAF to ensure hidden removal triggers transition
-  requestAnimationFrame(() => sidebar.classList.add('is-open'));
+  requestAnimationFrame(() => {
+    sidebar.classList.add('is-open');
+    layout.classList.add('has-sidebar');
+  });
 }
 
 function closeSidebar() {
   const sidebar = document.getElementById('sidebar');
+  const layout = document.getElementById('layout');
   sidebar.classList.remove('is-open');
+  layout.classList.remove('has-sidebar');
   sidebar.addEventListener('transitionend', () => { sidebar.hidden = true; }, { once: true });
 }
 

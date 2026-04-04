@@ -6,4 +6,5 @@ result
 node_modules
 test-results
 playwright-report
+dev.db
 .claude/

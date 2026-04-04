@@ -148,8 +148,16 @@ impl GitHubApp {
             http,
             jwt_cache: Arc::new(std::sync::RwLock::new(None)),
             token_cache: Arc::new(std::sync::RwLock::new(HashMap::new())),
-            api_base_url: format!("https://{api_host}"),
-            web_base_url: format!("https://{web_host}"),
+            api_base_url: if api_host.starts_with("localhost") || api_host.starts_with("127.0.0.1") {
+                format!("http://{api_host}")
+            } else {
+                format!("https://{api_host}")
+            },
+            web_base_url: if web_host.starts_with("localhost") || web_host.starts_with("127.0.0.1") {
+                format!("http://{web_host}")
+            } else {
+                format!("https://{web_host}")
+            },
         })
     }
 
