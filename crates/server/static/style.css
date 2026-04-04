@@ -107,7 +107,6 @@ body {
   position: absolute;
   right: 0;
   top: 100%;
-  margin-top: 0.3rem;
   color: var(--text-secondary);
   text-decoration: none;
   font-family: var(--font-mono);
@@ -120,6 +119,14 @@ body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
+}
+.user-badge::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 0.5rem;
 }
 .user-badge:hover .user-badge__logout,
 .user-badge:focus-within .user-badge__logout {
@@ -1690,7 +1697,6 @@ select:focus-visible {
     position: static;
     opacity: 1;
     pointer-events: auto;
-    margin-top: 0;
   }
   /* Prevent iOS zoom on form inputs */
   .form-group input,
