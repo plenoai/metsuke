@@ -56,7 +56,7 @@ async function loadAudit() {
       return;
     }
 
-    const rows = entries.map(e => `<tr>
+    const rows = entries.map(e => `<tr class="audit__row" data-action="open-audit" data-audit-id="${e.id}" role="button" tabindex="0">
       <td class="audit__timestamp">${new Date(e.verified_at + 'Z').toLocaleString('ja-JP')}</td>
       <td>${typeBadge(e.type)}</td>
       <td>${triggerBadge(e.trigger)}</td>
@@ -184,6 +184,26 @@ document.getElementById('audit-pagination').addEventListener('click', function(e
   if (prev && !prev.disabled) prevPage();
   const next = e.target.closest('[data-action="next-page"]');
   if (next && !next.disabled) nextPage();
+});
+
+// Audit row click → open sidebar with details
+document.getElementById('audit-content').addEventListener('click', function(e) {
+  // Don't intercept clicks on links inside rows
+  if (e.target.closest('a')) return;
+  const row = e.target.closest('[data-action="open-audit"]');
+  if (row) {
+    const id = Number(row.dataset.auditId);
+    openAuditInSidebar(id);
+  }
+});
+document.getElementById('audit-content').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    const row = e.target.closest('[data-action="open-audit"]');
+    if (row) {
+      e.preventDefault();
+      openAuditInSidebar(Number(row.dataset.auditId));
+    }
+  }
 });
 
 loadAudit();

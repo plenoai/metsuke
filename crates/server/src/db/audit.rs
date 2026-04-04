@@ -187,6 +187,43 @@ impl Database {
         Ok(rows)
     }
 
+    /// Get a single audit entry by ID (including result_json).
+    pub fn get_audit_entry_by_id(
+        &self,
+        user_id: i64,
+        entry_id: i64,
+    ) -> Result<Option<(AuditEntry, String)>> {
+        let conn = self.reader();
+        let mut stmt = conn.prepare_cached(
+            "SELECT id, verification_type, owner, repo, target_ref, policy,
+                    pass_count, fail_count, review_count, na_count, verified_at, trigger,
+                    result_json
+             FROM audit_log WHERE user_id = ?1 AND id = ?2",
+        )?;
+        let result = stmt
+            .query_row(rusqlite::params![user_id, entry_id], |row| {
+                Ok((
+                    AuditEntry {
+                        id: row.get(0)?,
+                        verification_type: row.get(1)?,
+                        owner: row.get(2)?,
+                        repo: row.get(3)?,
+                        target_ref: row.get(4)?,
+                        policy: row.get(5)?,
+                        pass_count: row.get(6)?,
+                        fail_count: row.get(7)?,
+                        review_count: row.get(8)?,
+                        na_count: row.get(9)?,
+                        verified_at: row.get(10)?,
+                        trigger: row.get(11)?,
+                    },
+                    row.get::<_, String>(12)?,
+                ))
+            })
+            .optional()?;
+        Ok(result)
+    }
+
     pub fn get_latest_verification_by_ref(
         &self,
         user_id: i64,

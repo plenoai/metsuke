@@ -1,6 +1,9 @@
 const OWNER = document.currentScript.dataset.owner;
 const REPO = document.currentScript.dataset.repo;
 
+let _lastRepoFindings = null;
+let _lastRepoProfile = 'default';
+
 // ---- Compliance visualization ----
 
 const CONTROL_CATEGORIES = [
@@ -80,13 +83,15 @@ async function loadDashboard() {
     swrFetch(`/api/audit-history?owner=${OWNER}&repo=${REPO}&limit=8`),
   ]);
 
-  // Repo verification → Compliance Viz only (no card)
+  // Repo verification → Compliance Viz + sidebar
   if (repoResult.status === 'fulfilled' && repoResult.value) {
     const data = repoResult.value;
     const profileName = data.profile_name || 'default';
     document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.findings), _sanitizer);
+    _lastRepoFindings = data.findings;
+    _lastRepoProfile = profileName;
     const area = document.getElementById('result-area');
-    area.setHTML(renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`), _sanitizer);
+    area.setHTML(`<button class="btn--verify" id="show-findings-btn" data-action="show-repo-findings">検証結果を表示 (${countFindings(data.findings).pass + countFindings(data.findings).fail + countFindings(data.findings).review} 件)</button>`, _sanitizer);
   }
 
   // Build audit lookup for PR/Release verification status
@@ -151,7 +156,7 @@ async function loadDashboard() {
       const list = document.getElementById('activity-list');
       list.setHTML(entries.map(e => {
         const typeLabel = e.type === 'pr' ? 'PR' : e.type === 'release' ? 'Release' : 'Repo';
-        return `<div class="activity__item">
+        return `<div class="activity__item" data-audit-id="${e.id}" role="button" tabindex="0">
           <span class="activity__time">${timeAgo(e.verified_at + 'Z')}</span>
           <span class="type-badge type-${e.type}">${typeLabel}</span>
           <span class="activity__target">${esc(e.target_ref)}</span>
@@ -173,19 +178,28 @@ async function runVerify() {
   btn.disabled = true;
   btn.textContent = '検証中…';
   btn.classList.add('is-running');
-  area.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
+  openSidebar('検証中…', '<div class="loading" role="status">検証を実行中</div>', '');
 
   try {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify?policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     const profileName = data.profile_name || policy;
-    area.setHTML(renderFindingsTable(data.findings, `検証結果 — ${esc(profileName)}`), _sanitizer);
+    _lastRepoFindings = data.findings;
+    _lastRepoProfile = profileName;
 
     // Update compliance visualization
     document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.findings), _sanitizer);
+
+    // Show in sidebar
+    openFindingsSidebar(`検証結果 — ${profileName}`, data.findings, {
+      owner: OWNER, repo: REPO, target_ref: 'HEAD', policy: profileName,
+    });
+
+    const c = countFindings(data.findings);
+    area.setHTML(`<button class="btn--verify" id="show-findings-btn" data-action="show-repo-findings">検証結果を表示 (${c.pass + c.fail + c.review} 件)</button>`, _sanitizer);
   } catch (e) {
-    area.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
+    openSidebar('エラー', renderErrorCard(classifyError(e)), '');
   }
 
   btn.disabled = false;
@@ -195,6 +209,24 @@ async function runVerify() {
 
 enhancePolicySelect(document.getElementById('policy-select'));
 document.getElementById('verify-btn').addEventListener('click', runVerify);
+
+// Show cached repo findings in sidebar
+document.getElementById('result-area').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action="show-repo-findings"]');
+  if (btn && _lastRepoFindings) {
+    openFindingsSidebar(`検証結果 — ${_lastRepoProfile}`, _lastRepoFindings, {
+      owner: OWNER, repo: REPO, target_ref: 'HEAD', policy: _lastRepoProfile,
+    });
+  }
+});
+
+// Activity item click → open audit in sidebar
+document.getElementById('activity-list').addEventListener('click', function(e) {
+  const item = e.target.closest('.activity__item');
+  if (item && item.dataset.auditId) {
+    openAuditInSidebar(Number(item.dataset.auditId));
+  }
+});
 
 // ---- Load everything ----
 loadDashboard();

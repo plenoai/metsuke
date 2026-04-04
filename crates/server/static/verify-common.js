@@ -186,6 +186,98 @@ function renderLoadError(containerId, message, retryFnName) {
   </div>`, _sanitizer);
 }
 
+// ---------------------------------------------------------------------------
+// Sidebar — global result detail panel
+// ---------------------------------------------------------------------------
+
+function openSidebar(title, contentHtml, metaHtml) {
+  const shell = document.getElementById('shell');
+  const sidebar = document.getElementById('sidebar');
+  const titleEl = document.getElementById('sidebar-title');
+  const contentEl = document.getElementById('sidebar-content');
+
+  titleEl.textContent = title;
+  contentEl.setHTML(
+    (metaHtml ? `<div class="sidebar__meta">${metaHtml}</div>` : '') + contentHtml,
+    _sanitizer
+  );
+
+  sidebar.hidden = false;
+  shell.classList.add('has-sidebar');
+}
+
+function closeSidebar() {
+  const shell = document.getElementById('shell');
+  const sidebar = document.getElementById('sidebar');
+  shell.classList.remove('has-sidebar');
+  sidebar.hidden = true;
+}
+
+/**
+ * Open sidebar with findings data.
+ * @param {string} title - Sidebar title
+ * @param {Array} findings - Array of finding objects
+ * @param {object} [meta] - Optional metadata {type, owner, repo, target_ref, policy, verified_at, trigger}
+ */
+function openFindingsSidebar(title, findings, meta) {
+  let metaHtml = '';
+  if (meta) {
+    const rows = [];
+    if (meta.owner && meta.repo) {
+      rows.push(`<div class="sidebar__meta-row"><span class="sidebar__meta-label">リポジトリ</span><span class="sidebar__meta-value">${esc(meta.owner)}/${esc(meta.repo)}</span></div>`);
+    }
+    if (meta.target_ref) {
+      rows.push(`<div class="sidebar__meta-row"><span class="sidebar__meta-label">対象</span><span class="sidebar__meta-value">${esc(meta.target_ref)}</span></div>`);
+    }
+    if (meta.policy) {
+      rows.push(`<div class="sidebar__meta-row"><span class="sidebar__meta-label">ポリシー</span><span class="sidebar__meta-value">${esc(meta.policy)}</span></div>`);
+    }
+    if (meta.verified_at) {
+      rows.push(`<div class="sidebar__meta-row"><span class="sidebar__meta-label">日時</span><span class="sidebar__meta-value">${new Date(meta.verified_at + 'Z').toLocaleString('ja-JP')}</span></div>`);
+    }
+    if (meta.trigger) {
+      rows.push(`<div class="sidebar__meta-row"><span class="sidebar__meta-label">トリガー</span><span class="sidebar__meta-value">${meta.trigger === 'webhook' ? 'auto' : '手動'}</span></div>`);
+    }
+    metaHtml = rows.join('');
+  }
+
+  const contentHtml = renderFindingsTable(findings, '');
+  openSidebar(title, contentHtml, metaHtml);
+}
+
+/**
+ * Load an audit entry by ID and show in sidebar.
+ */
+async function openAuditInSidebar(entryId) {
+  openSidebar('読み込み中…', '<div class="loading" role="status">詳細を取得中</div>', '');
+  try {
+    const resp = await fetchWithTimeout(`/api/audit-history/${entryId}`);
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+    const typeLabel = data.type === 'pr' ? 'PR' : data.type === 'release' ? 'Release' : 'Repo';
+    const title = `${typeLabel} — ${data.owner}/${data.repo}`;
+    const findings = data.result && data.result.findings ? data.result.findings : [];
+    openFindingsSidebar(title, findings, {
+      owner: data.owner,
+      repo: data.repo,
+      target_ref: data.target_ref,
+      policy: data.policy,
+      verified_at: data.verified_at,
+      trigger: data.trigger,
+    });
+  } catch (e) {
+    openSidebar('エラー', renderErrorCard(classifyError(e)), '');
+  }
+}
+
+// Sidebar close button + Escape key
+document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('shell').classList.contains('has-sidebar')) {
+    closeSidebar();
+  }
+});
+
 // Global event delegation for shared actions
 document.addEventListener('click', function(e) {
   const toggle = e.target.closest('[data-action="toggle-rationale"]');

@@ -27,14 +27,14 @@ function togglePR(num) {
 }
 
 async function loadCachedFindings(num) {
-  const findingsEl = document.getElementById(`pr-findings-${num}`);
-  if (!findingsEl) return;
   try {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}/latest`);
     if (!resp.ok) return;
     const data = await resp.json();
     if (data.findings) {
-      findingsEl.setHTML(renderFindingsTable(data.findings, `PR #${num} 検証結果`), _sanitizer);
+      openFindingsSidebar(`PR #${num} 検証結果`, data.findings, {
+        owner: OWNER, repo: REPO, target_ref: `#${num}`, policy: data.profile_name || 'default',
+      });
       const btn = document.getElementById(`pr-verify-btn-${num}`);
       if (btn) btn.textContent = '再検証';
     }
@@ -69,7 +69,6 @@ function renderPRList(prs) {
         <a href="https://github.com/${OWNER}/${REPO}/pull/${pr.pr_number}" target="_blank" rel="noopener" class="pr-detail__link">GitHub で開く ↗</a>
         <button class="btn--verify" id="pr-verify-btn-${pr.pr_number}" data-action="verify-pr" data-pr="${pr.pr_number}">検証</button>
       </div>
-      <div id="pr-findings-${pr.pr_number}"></div>
     </div>` : ''}`;
   }).join('') + '</div>', _sanitizer);
 }
@@ -144,14 +143,13 @@ async function autoVerifyIfFew() {
 async function verifyPRById(num) {
   const policy = document.getElementById('pr-policy').value;
   const btn = document.getElementById(`pr-verify-btn-${num}`);
-  const findingsEl = document.getElementById(`pr-findings-${num}`);
   const resultEl = document.getElementById(`pr-result-${num}`);
-  if (!btn || !findingsEl) return;
+  if (!btn) return;
 
   btn.disabled = true;
   btn.textContent = '検証中…';
   btn.classList.add('is-running');
-  findingsEl.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
+  openSidebar(`PR #${num} 検証中…`, '<div class="loading" role="status">検証を実行中</div>', '');
 
   try {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}?policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
@@ -159,11 +157,13 @@ async function verifyPRById(num) {
     const data = await resp.json();
     const c = countFindings(data.findings);
     if (resultEl) resultEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
-    findingsEl.setHTML(renderFindingsTable(data.findings, `PR #${num} 検証結果`), _sanitizer);
+    openFindingsSidebar(`PR #${num} 検証結果`, data.findings, {
+      owner: OWNER, repo: REPO, target_ref: `#${num}`, policy: data.profile_name || policy,
+    });
     btn.textContent = '再検証';
   } catch (e) {
     if (resultEl) resultEl.setHTML('<span class="badge badge--fail" title="ERROR">ERR</span>', _sanitizer);
-    findingsEl.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
+    openSidebar('エラー', renderErrorCard(classifyError(e)), '');
     btn.textContent = '再試行';
   }
   btn.disabled = false;

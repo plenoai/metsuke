@@ -41,7 +41,14 @@
     </div>
   </div>
 </header>
-<div class="shell">
+<div class="shell" id="shell">
+  <aside class="sidebar" id="sidebar" aria-label="検証結果詳細" hidden>
+    <div class="sidebar__header">
+      <span class="sidebar__title" id="sidebar-title">検証結果</span>
+      <button class="sidebar__close" id="sidebar-close" aria-label="サイドバーを閉じる">&times;</button>
+    </div>
+    <div class="sidebar__content" id="sidebar-content"></div>
+  </aside>
   <main id="main" role="main">
     {% block content %}{% endblock %}
   </main>

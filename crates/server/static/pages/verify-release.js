@@ -67,7 +67,6 @@ function renderReleaseDetail(rel, idx, prevTag) {
         : `<span class="release-item__initial">初回リリース</span>`}
     </div>
     ${bodySnippet}
-    <div id="release-findings-${idx}"></div>
   </div>`;
 }
 
@@ -86,12 +85,12 @@ async function loadCachedReleaseFindings(idx) {
   const prevTag = idx < allReleases.length - 1 ? allReleases[idx + 1].tag_name : null;
   if (!prevTag) return;
   const ref = `${prevTag}..${rel.tag_name}`;
-  const findingsEl = document.getElementById(`release-findings-${idx}`);
-  if (!findingsEl) return;
 
   const cached = _releaseAuditCache[ref];
   if (cached && cached.findings) {
-    findingsEl.setHTML(renderFindingsTable(cached.findings, `${esc(prevTag)} .. ${esc(rel.tag_name)} 検証結果`), _sanitizer);
+    openFindingsSidebar(`${prevTag} .. ${rel.tag_name} 検証結果`, cached.findings, {
+      owner: OWNER, repo: REPO, target_ref: ref, policy: cached.policy || 'default',
+    });
     const btn = document.getElementById(`release-verify-btn-${idx}`);
     if (btn) btn.textContent = '再検証';
     return;
@@ -102,7 +101,9 @@ async function loadCachedReleaseFindings(idx) {
     if (!resp.ok) return;
     const data = await resp.json();
     if (data.findings) {
-      findingsEl.setHTML(renderFindingsTable(data.findings, `${esc(prevTag)} .. ${esc(rel.tag_name)} 検証結果`), _sanitizer);
+      openFindingsSidebar(`${prevTag} .. ${rel.tag_name} 検証結果`, data.findings, {
+        owner: OWNER, repo: REPO, target_ref: ref, policy: data.profile_name || 'default',
+      });
       const btn = document.getElementById(`release-verify-btn-${idx}`);
       if (btn) btn.textContent = '再検証';
     }
@@ -150,24 +151,25 @@ async function verifyRelease() {
   const baseTag = document.getElementById('base-tag').value;
   const headTag = document.getElementById('head-tag').value;
   if (!baseTag || !headTag) return;
-  if (baseTag === headTag) { document.getElementById('result-area').setHTML('<div class="card validation-error">Base TagとHead Tagは異なる値を選択してください</div>', _sanitizer); return; }
+  if (baseTag === headTag) { openSidebar('エラー', '<div class="card validation-error">Base TagとHead Tagは異なる値を選択してください</div>', ''); return; }
 
   const policy = document.getElementById('release-policy').value;
   const btn = document.getElementById('verify-btn');
-  const area = document.getElementById('result-area');
 
   btn.disabled = true;
   btn.textContent = '検証中…';
   btn.classList.add('is-running');
-  area.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
+  openSidebar('検証中…', '<div class="loading" role="status">検証を実行中</div>', '');
 
   try {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-release?base_tag=${encodeURIComponent(baseTag)}&head_tag=${encodeURIComponent(headTag)}&policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
-    area.setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`), _sanitizer);
+    openFindingsSidebar(`${baseTag} .. ${headTag} 検証結果`, data.findings, {
+      owner: OWNER, repo: REPO, target_ref: `${baseTag}..${headTag}`, policy: data.profile_name || policy,
+    });
   } catch (e) {
-    area.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
+    openSidebar('エラー', renderErrorCard(classifyError(e)), '');
   }
   btn.disabled = false;
   btn.textContent = '検証を実行';
@@ -180,11 +182,7 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
   btn.textContent = '検証中…';
   btn.classList.add('is-running');
   const resultEl = document.getElementById(`release-result-${idx}`);
-  const findingsEl = document.getElementById(`release-findings-${idx}`);
-
-  if (findingsEl) {
-    findingsEl.setHTML('<div class="loading" role="status">検証を実行中</div>', _sanitizer);
-  }
+  openSidebar(`${baseTag} .. ${headTag} 検証中…`, '<div class="loading" role="status">検証を実行中</div>', '');
 
   try {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-release?base_tag=${encodeURIComponent(baseTag)}&head_tag=${encodeURIComponent(headTag)}&policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
@@ -192,13 +190,13 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
     const data = await resp.json();
     const c = countFindings(data.findings);
     if (resultEl) resultEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
-    if (findingsEl) {
-      findingsEl.setHTML(renderFindingsTable(data.findings, `${esc(baseTag)} .. ${esc(headTag)} 検証結果`), _sanitizer);
-    }
+    openFindingsSidebar(`${baseTag} .. ${headTag} 検証結果`, data.findings, {
+      owner: OWNER, repo: REPO, target_ref: `${baseTag}..${headTag}`, policy: data.profile_name || policy,
+    });
     btn.textContent = '再検証';
   } catch (e) {
     if (resultEl) resultEl.setHTML('<span class="badge badge--fail" title="ERROR">ERR</span>', _sanitizer);
-    if (findingsEl) findingsEl.setHTML(renderErrorCard(classifyError(e)), _sanitizer);
+    openSidebar('エ��ー', renderErrorCard(classifyError(e)), '');
     btn.textContent = '再試行';
   }
   btn.disabled = false;

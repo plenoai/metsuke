@@ -154,6 +154,10 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
             "/api/audit-history/export",
             axum::routing::get(audit::api_audit_export_csv),
         )
+        .route(
+            "/api/audit-history/{id}",
+            axum::routing::get(audit::api_audit_detail),
+        )
         .with_state(state)
 }
 

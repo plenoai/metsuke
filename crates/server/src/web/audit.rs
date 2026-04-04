@@ -78,6 +78,47 @@ pub(super) async fn api_audit_history(
     Json(json).into_response()
 }
 
+pub(super) async fn api_audit_detail(
+    headers: HeaderMap,
+    axum::extract::Path(entry_id): axum::extract::Path<i64>,
+    State(state): State<WebState>,
+) -> Response {
+    let (user_id, _login) = match require_user(&state.db, &headers).await {
+        Some(u) => u,
+        None => return (axum::http::StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    };
+
+    let db = state.db.clone();
+    let result = run_blocking(move || db.get_audit_entry_by_id(user_id, entry_id))
+        .await
+        .ok()
+        .flatten();
+
+    match result {
+        Some((entry, result_json)) => {
+            let parsed: serde_json::Value =
+                serde_json::from_str(&result_json).unwrap_or(serde_json::Value::Null);
+            Json(serde_json::json!({
+                "id": entry.id,
+                "type": entry.verification_type,
+                "owner": entry.owner,
+                "repo": entry.repo,
+                "target_ref": entry.target_ref,
+                "policy": entry.policy,
+                "pass": entry.pass_count,
+                "fail": entry.fail_count,
+                "review": entry.review_count,
+                "na": entry.na_count,
+                "verified_at": entry.verified_at,
+                "trigger": entry.trigger,
+                "result": parsed,
+            }))
+            .into_response()
+        }
+        None => (axum::http::StatusCode::NOT_FOUND, "Not found").into_response(),
+    }
+}
+
 pub(super) async fn api_audit_export_csv(
     headers: HeaderMap,
     Query(query): Query<AuditHistoryQuery>,
