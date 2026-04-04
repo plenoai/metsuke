@@ -1,5 +1,6 @@
 mod audit;
 mod auth;
+mod bulk;
 mod events;
 pub(crate) mod helpers;
 mod jobs;
@@ -13,6 +14,7 @@ use std::sync::Arc;
 use axum::Router;
 use serde::Serialize;
 
+use crate::bulk::BulkJobStore;
 use crate::config::AppConfig;
 use crate::db::Database;
 use crate::github_app::GitHubApp;
@@ -58,6 +60,7 @@ pub(crate) struct WebState {
     events_tx: tokio::sync::broadcast::Sender<JobEvent>,
     github_web_base_url: String,
     github_api_host: String,
+    bulk_jobs: BulkJobStore,
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +75,12 @@ fn policy_options() -> Vec<&'static str> {
 // Router
 // ---------------------------------------------------------------------------
 
-pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig) -> Router {
+pub fn router(
+    db: Arc<Database>,
+    github_app: Arc<GitHubApp>,
+    config: &AppConfig,
+    bulk_jobs: BulkJobStore,
+) -> Router {
     let (events_tx, _) = tokio::sync::broadcast::channel::<JobEvent>(256);
     let state = WebState {
         db,
@@ -81,6 +89,7 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         events_tx,
         github_web_base_url: github_app.web_base_url().to_string(),
         github_api_host: config.github_api_host.clone(),
+        bulk_jobs,
     };
 
     Router::new()
@@ -140,6 +149,14 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
         .route(
             "/api/repos/{owner}/{repo}/verify-pr/{pr_number}/latest",
             axum::routing::get(verify::api_get_latest_pr_verification),
+        )
+        .route(
+            "/api/bulk-verify",
+            axum::routing::post(bulk::api_bulk_verify),
+        )
+        .route(
+            "/api/bulk-verify/{job_id}",
+            axum::routing::get(bulk::api_bulk_verify_status),
         )
         .route(
             "/api/repos/{owner}/{repo}/readme",

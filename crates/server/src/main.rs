@@ -1,5 +1,6 @@
 mod auth;
 mod blocking;
+mod bulk;
 mod config;
 mod db;
 mod github_app;
@@ -51,15 +52,19 @@ async fn main() -> anyhow::Result<()> {
         &config.github_web_host,
     )?);
 
+    let bulk_jobs = bulk::new_job_store();
+
     let mcp_db = db.clone();
     let mcp_app = github_app.clone();
     let mcp_api_host = config.github_api_host.clone();
+    let mcp_bulk_jobs = bulk_jobs.clone();
     let service = StreamableHttpService::new(
         move || {
             Ok(MetsukeServer::with_api_host(
                 mcp_db.clone(),
                 mcp_app.clone(),
                 &mcp_api_host,
+                mcp_bulk_jobs.clone(),
             ))
         },
         LocalSessionManager::default().into(),
@@ -108,7 +113,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(db.clone())
         .merge(oauth::router(db.clone(), github_app.clone(), &config))
         .merge(webhook::router(db.clone(), github_app.clone(), &config))
-        .merge(web::router(db, github_app, &config))
+        .merge(web::router(db, github_app, &config, bulk_jobs))
         .layer(tower_http::compression::CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(SetResponseHeaderLayer::overriding(
