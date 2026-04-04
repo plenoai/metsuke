@@ -31,8 +31,8 @@ async function loadCachedFindings(num) {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}/latest`);
     if (!resp.ok) return;
     const data = await resp.json();
-    if (data.findings) {
-      openFindingsSidebar(`PR #${num} 検証結果`, data.findings, {
+    if (data.outcomes) {
+      openFindingsSidebar(`PR #${num} 検証結果`, data.outcomes, {
         owner: OWNER, repo: REPO, target_ref: `#${num}`, policy: data.profile_name || 'default',
       });
       const btn = document.getElementById(`pr-verify-btn-${num}`);
@@ -132,7 +132,7 @@ async function autoVerifyIfFew() {
       const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${pr.pr_number}?policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
       if (!resp.ok) continue;
       const data = await resp.json();
-      const c = countFindings(data.findings);
+      const c = countFindings(data.outcomes);
       _auditCache[pr.pr_number] = { pass: c.pass, fail: c.fail, review: c.review };
       const el = document.getElementById(`pr-result-${pr.pr_number}`);
       if (el) el.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
@@ -155,9 +155,9 @@ async function verifyPRById(num) {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-pr/${num}?policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
-    const c = countFindings(data.findings);
+    const c = countFindings(data.outcomes);
     if (resultEl) resultEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
-    openFindingsSidebar(`PR #${num} 検証結果`, data.findings, {
+    openFindingsSidebar(`PR #${num} 検証結果`, data.outcomes, {
       owner: OWNER, repo: REPO, target_ref: `#${num}`, policy: data.profile_name || policy,
     });
     btn.textContent = '再検証';

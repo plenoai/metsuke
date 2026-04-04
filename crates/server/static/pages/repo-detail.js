@@ -36,15 +36,15 @@ function categorizeFindings(findings) {
   return categories;
 }
 
-function statusToDotClass(status) {
-  if (status === 'satisfied') return 'control-grid__dot--pass';
-  if (status === 'violated') return 'control-grid__dot--fail';
-  if (status === 'indeterminate') return 'control-grid__dot--review';
+function decisionToDotClass(decision) {
+  if (decision === 'pass') return 'control-grid__dot--pass';
+  if (decision === 'fail') return 'control-grid__dot--fail';
+  if (decision === 'review') return 'control-grid__dot--review';
   return 'control-grid__dot--na';
 }
 
-function renderComplianceViz(findings) {
-  const c = countFindings(findings);
+function renderComplianceViz(outcomes) {
+  const c = countFindings(outcomes);
   const total = c.pass + c.fail + c.review + c.na;
   if (total === 0) return '';
 
@@ -52,11 +52,11 @@ function renderComplianceViz(findings) {
   const pctFail = (c.fail / total * 100).toFixed(1);
   const pctReview = (c.review / total * 100).toFixed(1);
 
-  const categories = categorizeFindings(findings);
+  const categories = categorizeFindings(outcomes);
   let gridHtml = '';
   for (const [label, items] of categories) {
-    const dots = items.map(f =>
-      `<span class="control-grid__dot ${statusToDotClass(f.status)}" title="${esc(f.control_id)}"></span>`
+    const dots = items.map(o =>
+      `<span class="control-grid__dot ${decisionToDotClass(o.decision)}" title="${esc(o.control_id)}"></span>`
     ).join('');
     gridHtml += `<div class="control-grid__category"><span class="control-grid__title">${esc(label)}</span><div class="control-grid__dots">${dots}</div></div>`;
   }
@@ -87,11 +87,11 @@ async function loadDashboard() {
   if (repoResult.status === 'fulfilled' && repoResult.value) {
     const data = repoResult.value;
     const profileName = data.profile_name || 'default';
-    document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.findings), _sanitizer);
-    _lastRepoFindings = data.findings;
+    document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.outcomes), _sanitizer);
+    _lastRepoFindings = data.outcomes;
     _lastRepoProfile = profileName;
     const area = document.getElementById('result-area');
-    area.setHTML(`<button class="btn--verify" id="show-findings-btn" data-action="show-repo-findings">検証結果を表示 (${countFindings(data.findings).pass + countFindings(data.findings).fail + countFindings(data.findings).review} 件)</button>`, _sanitizer);
+    area.setHTML(`<button class="btn--verify" id="show-findings-btn" data-action="show-repo-findings">検証結果を表示 (${countFindings(data.outcomes).pass + countFindings(data.outcomes).fail + countFindings(data.outcomes).review} 件)</button>`, _sanitizer);
   }
 
   // Build audit lookup for PR/Release verification status
@@ -185,18 +185,18 @@ async function runVerify() {
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     const profileName = data.profile_name || policy;
-    _lastRepoFindings = data.findings;
+    _lastRepoFindings = data.outcomes;
     _lastRepoProfile = profileName;
 
     // Update compliance visualization
-    document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.findings), _sanitizer);
+    document.getElementById('compliance-viz-area').setHTML(renderComplianceViz(data.outcomes), _sanitizer);
 
     // Show in sidebar
-    openFindingsSidebar(`検証結果 — ${profileName}`, data.findings, {
+    openFindingsSidebar(`検証結果 — ${profileName}`, data.outcomes, {
       owner: OWNER, repo: REPO, target_ref: 'HEAD', policy: profileName,
     });
 
-    const c = countFindings(data.findings);
+    const c = countFindings(data.outcomes);
     area.setHTML(`<button class="btn--verify" id="show-findings-btn" data-action="show-repo-findings">検証結果を表示 (${c.pass + c.fail + c.review} 件)</button>`, _sanitizer);
   } catch (e) {
     openSidebar('エラー', renderErrorCard(classifyError(e)), '');

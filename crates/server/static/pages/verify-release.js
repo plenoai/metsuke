@@ -87,8 +87,8 @@ async function loadCachedReleaseFindings(idx) {
   const ref = `${prevTag}..${rel.tag_name}`;
 
   const cached = _releaseAuditCache[ref];
-  if (cached && cached.findings) {
-    openFindingsSidebar(`${prevTag} .. ${rel.tag_name} 検証結果`, cached.findings, {
+  if (cached && cached.outcomes) {
+    openFindingsSidebar(`${prevTag} .. ${rel.tag_name} 検証結果`, cached.outcomes, {
       owner: OWNER, repo: REPO, target_ref: ref, policy: cached.policy || 'default',
     });
     const btn = document.getElementById(`release-verify-btn-${idx}`);
@@ -100,8 +100,8 @@ async function loadCachedReleaseFindings(idx) {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-release/latest/${encodeURIComponent(ref)}`);
     if (!resp.ok) return;
     const data = await resp.json();
-    if (data.findings) {
-      openFindingsSidebar(`${prevTag} .. ${rel.tag_name} 検証結果`, data.findings, {
+    if (data.outcomes) {
+      openFindingsSidebar(`${prevTag} .. ${rel.tag_name} 検証結果`, data.outcomes, {
         owner: OWNER, repo: REPO, target_ref: ref, policy: data.profile_name || 'default',
       });
       const btn = document.getElementById(`release-verify-btn-${idx}`);
@@ -165,7 +165,7 @@ async function verifyRelease() {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-release?base_tag=${encodeURIComponent(baseTag)}&head_tag=${encodeURIComponent(headTag)}&policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
-    openFindingsSidebar(`${baseTag} .. ${headTag} 検証結果`, data.findings, {
+    openFindingsSidebar(`${baseTag} .. ${headTag} 検証結果`, data.outcomes, {
       owner: OWNER, repo: REPO, target_ref: `${baseTag}..${headTag}`, policy: data.profile_name || policy,
     });
   } catch (e) {
@@ -188,9 +188,9 @@ async function verifyReleaseByTag(baseTag, headTag, idx, btn) {
     const resp = await fetchWithTimeout(`/api/repos/${OWNER}/${REPO}/verify-release?base_tag=${encodeURIComponent(baseTag)}&head_tag=${encodeURIComponent(headTag)}&policy=${encodeURIComponent(policy)}`, { method: 'POST' }, 60000);
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
-    const c = countFindings(data.findings);
+    const c = countFindings(data.outcomes);
     if (resultEl) resultEl.setHTML(compactBadges(c.pass, c.fail, c.review), _sanitizer);
-    openFindingsSidebar(`${baseTag} .. ${headTag} 検証結果`, data.findings, {
+    openFindingsSidebar(`${baseTag} .. ${headTag} 検証結果`, data.outcomes, {
       owner: OWNER, repo: REPO, target_ref: `${baseTag}..${headTag}`, policy: data.profile_name || policy,
     });
     btn.textContent = '再検証';

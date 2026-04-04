@@ -64,17 +64,17 @@ pub(super) async fn require_user(db: &Arc<Database>, headers: &HeaderMap) -> Opt
 pub(crate) fn count_findings(json: &str) -> (i64, i64, i64, i64) {
     let (mut pass, mut fail, mut review, mut na) = (0i64, 0i64, 0i64, 0i64);
     if let Ok(val) = serde_json::from_str::<serde_json::Value>(json) {
-        let findings = val
+        let outcomes = val
             .get("report")
-            .and_then(|r| r.get("findings"))
-            .and_then(|f| f.as_array())
-            .or_else(|| val.get("findings").and_then(|f| f.as_array()));
-        if let Some(findings) = findings {
-            for f in findings {
-                match f.get("status").and_then(|s| s.as_str()) {
-                    Some("Satisfied" | "satisfied") => pass += 1,
-                    Some("Violated" | "violated") => fail += 1,
-                    Some("Indeterminate" | "indeterminate") => review += 1,
+            .and_then(|r| r.get("outcomes"))
+            .and_then(|o| o.as_array())
+            .or_else(|| val.get("outcomes").and_then(|o| o.as_array()));
+        if let Some(outcomes) = outcomes {
+            for o in outcomes {
+                match o.get("decision").and_then(|d| d.as_str()) {
+                    Some("pass") => pass += 1,
+                    Some("fail") => fail += 1,
+                    Some("review") => review += 1,
                     _ => na += 1,
                 }
             }

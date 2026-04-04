@@ -74,42 +74,41 @@ function esc(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function countFindings(findings) {
+function countFindings(outcomes) {
   let pass = 0, fail = 0, review = 0, na = 0;
-  for (const f of (findings || [])) {
-    if (f.status === 'satisfied') pass++;
-    else if (f.status === 'violated') fail++;
-    else if (f.status === 'indeterminate') review++;
+  for (const o of (outcomes || [])) {
+    if (o.decision === 'pass') pass++;
+    else if (o.decision === 'fail') fail++;
+    else if (o.decision === 'review') review++;
     else na++;
   }
   return { pass, fail, review, na };
 }
 
-function statusBadge(status) {
-  if (status === 'satisfied') return '<span class="badge badge--pass">PASS</span>';
-  if (status === 'violated') return '<span class="badge badge--fail">FAIL</span>';
-  if (status === 'indeterminate') return '<span class="badge badge--review">REVIEW</span>';
-  if (status === 'not_applicable') return '<span class="badge badge--na">N/A</span>';
-  return '<span class="badge">' + esc(status) + '</span>';
+function decisionBadge(decision) {
+  if (decision === 'pass') return '<span class="badge badge--pass">PASS</span>';
+  if (decision === 'fail') return '<span class="badge badge--fail">FAIL</span>';
+  if (decision === 'review') return '<span class="badge badge--review">REVIEW</span>';
+  return '<span class="badge badge--na">N/A</span>';
 }
 
-function renderFindingsTable(findings, titleHtml) {
-  const counts = countFindings(findings);
+function renderFindingsTable(outcomes, titleHtml) {
+  const counts = countFindings(outcomes);
 
-  const rows = (findings || []).map(f => {
-    const longText = (f.rationale || '').length > 120;
-    const statusClass = f.status === 'violated' ? 'is-violated' : f.status === 'indeterminate' ? 'is-indeterminate' : f.status === 'satisfied' ? 'is-satisfied' : '';
+  const rows = (outcomes || []).map(o => {
+    const longText = (o.rationale || '').length > 120;
+    const statusClass = o.decision === 'fail' ? 'is-violated' : o.decision === 'review' ? 'is-indeterminate' : o.decision === 'pass' ? 'is-satisfied' : '';
     if (longText) {
       return `<tr class="${statusClass}">
-      <td class="findings__control-id">${esc(f.control_id)}</td>
-      <td>${statusBadge(f.status)}</td>
-      <td class="findings__rationale is-collapsible is-collapsed" role="button" tabindex="0" aria-expanded="false" data-action="toggle-rationale"><span class="findings__rationale-text">${esc(f.rationale)}</span><span class="findings__rationale-toggle"></span></td>
+      <td class="findings__control-id">${esc(o.control_id)}</td>
+      <td>${decisionBadge(o.decision)}</td>
+      <td class="findings__rationale is-collapsible is-collapsed" role="button" tabindex="0" aria-expanded="false" data-action="toggle-rationale"><span class="findings__rationale-text">${esc(o.rationale)}</span><span class="findings__rationale-toggle"></span></td>
     </tr>`;
     }
     return `<tr class="${statusClass}">
-      <td class="findings__control-id">${esc(f.control_id)}</td>
-      <td>${statusBadge(f.status)}</td>
-      <td class="findings__rationale">${esc(f.rationale)}</td>
+      <td class="findings__control-id">${esc(o.control_id)}</td>
+      <td>${decisionBadge(o.decision)}</td>
+      <td class="findings__rationale">${esc(o.rationale)}</td>
     </tr>`;
   }).join('');
 
@@ -260,8 +259,8 @@ async function openAuditInSidebar(entryId) {
     const data = await resp.json();
     const typeLabel = data.type === 'pr' ? 'PR' : data.type === 'release' ? 'Release' : 'Repo';
     const title = `${typeLabel} — ${data.owner}/${data.repo}`;
-    const findings = data.result && data.result.findings ? data.result.findings : [];
-    openFindingsSidebar(title, findings, {
+    const outcomes = data.result && data.result.outcomes ? data.result.outcomes : [];
+    openFindingsSidebar(title, outcomes, {
       owner: data.owner,
       repo: data.repo,
       target_ref: data.target_ref,
