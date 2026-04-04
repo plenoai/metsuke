@@ -1,8 +1,7 @@
 /* Metsuke Color Themes — inspired by GitHub's Primer color system */
 
-/* ===== Default: Metsuke Dark (original) ===== */
-[data-theme="metsuke-dark"],
-:root {
+/* ===== Metsuke Dark (original) ===== */
+[data-theme="metsuke-dark"] {
   --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
 
@@ -80,8 +79,12 @@
   color-scheme: light;
 }
 
-/* ===== GitHub Dark ===== */
-[data-theme="github-dark"] {
+/* ===== Default: GitHub Dark ===== */
+[data-theme="github-dark"],
+:root {
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+
   --bg-deep: #0d1117;
   --bg-surface: #161b22;
   --bg-elevated: #1c2128;

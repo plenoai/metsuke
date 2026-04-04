@@ -2,13 +2,13 @@
 
 /* Color variables are defined in themes.css */
 :root {
-  /* Type scale: modular scale ~1.2 (minor third) */
-  --text-2xl: 1.6rem;   /* page title, hero counts */
-  --text-xl: 1.3rem;    /* detail heading */
+  /* Type scale: GitHub-aligned */
+  --text-2xl: 1.5rem;   /* page title, hero counts */
+  --text-xl: 1.25rem;   /* detail heading */
   --text-lg: 1rem;      /* install name */
-  --text-base: 0.9rem;  /* body text, descriptions */
+  --text-base: 0.875rem;/* body text, descriptions (14px) */
   --text-sm: 0.75rem;   /* nav, breadcrumb, form labels */
-  --text-xs: 0.65rem;   /* section titles, badge text */
+  --text-xs: 0.6875rem; /* section titles, badge text (11px) */
 
   /* Spacing scale */
   --space-xs: 0.25rem;
@@ -22,7 +22,7 @@
 body {
   font-family: var(--font-display);
   font-size: var(--text-base);
-  line-height: 1.6;
+  line-height: 1.5;
   background: var(--bg-deep);
   color: var(--text-primary);
   min-height: 100vh;
@@ -50,7 +50,7 @@ main > .section__title {
 /* Header */
 .header {
   background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border);
 }
 .header__inner {
   max-width: 1280px;
@@ -58,7 +58,8 @@ main > .section__title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-sm) var(--space-xl);
+  padding: 0 var(--space-xl);
+  height: 48px;
 }
 .header__left {
   display: flex;
@@ -66,9 +67,9 @@ main > .section__title {
   gap: var(--space-lg);
 }
 .header__brand {
-  font-size: var(--text-lg);
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: 0;
   text-decoration: none;
   color: var(--text-primary);
 }
@@ -77,24 +78,27 @@ main > .section__title {
 .nav__list {
   display: flex;
   align-items: center;
-  gap: var(--space-lg);
+  gap: 0;
 }
 .nav__item {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-family: var(--font-display);
+  font-size: var(--text-base);
   color: var(--text-secondary);
   text-decoration: none;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  padding: 0 var(--space-md);
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease;
 }
-.nav__item:hover, .nav__item.is-active {
+.nav__item:hover {
   color: var(--text-primary);
-  border-color: var(--border);
 }
 .nav__item.is-active {
-  border-color: var(--accent-vermillion);
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom-color: var(--accent-vermillion);
 }
 
 /* User badge */
@@ -102,13 +106,13 @@ main > .section__title {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  font-family: var(--font-mono);
+  gap: 0.5rem;
   font-size: var(--text-base);
   color: var(--text-secondary);
 }
 .user-badge__name {
   color: var(--text-primary);
+  font-weight: 600;
   cursor: default;
 }
 .user-badge__logout {
@@ -153,33 +157,28 @@ main > .section__title {
 .section:nth-child(2) { animation-delay: 0.1s; }
 .section:nth-child(3) { animation-delay: 0.2s; }
 .section__title {
-  font-size: var(--text-xs);
-  font-family: var(--font-mono);
-  font-weight: 500;
-  line-height: 1.3;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--accent-gold);
-  margin-bottom: var(--space-lg);
+  font-size: var(--text-sm);
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
   display: flex;
   align-items: center;
   gap: var(--space-sm);
 }
 .section__title::before {
-  content: '';
-  display: inline-block;
-  width: 12px;
-  height: 2px;
-  background: var(--accent-vermillion);
+  content: none;
 }
 
 /* Card */
 .card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1.25rem 1.5rem;
-  margin-bottom: 0.75rem;
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
 }
 
 /* Badges */
@@ -187,10 +186,11 @@ main > .section__title {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1;
-  letter-spacing: 0.05em;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 2em;
   white-space: nowrap;
+  font-weight: 600;
 }
 .badge--pass {
   background: var(--accent-green-dim);
@@ -223,21 +223,22 @@ main > .section__title {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.65rem 1.3rem;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
+  padding: 5px 16px;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
   font-weight: 500;
   text-decoration: none;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-primary);
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
   cursor: pointer;
-  letter-spacing: 0.02em;
+  line-height: 20px;
 }
 .btn:hover {
-  border-color: var(--accent-vermillion);
+  background: var(--bg-surface);
+  border-color: var(--text-secondary);
 }
 .btn svg {
   width: 16px;
@@ -248,20 +249,21 @@ main > .section__title {
   margin-top: 1rem;
 }
 .btn--verify {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  padding: 0.4rem 0.8rem;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  padding: 5px 16px;
   background: var(--bg-elevated);
   color: var(--text-primary);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  letter-spacing: 0.03em;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  line-height: 20px;
   white-space: nowrap;
 }
 .btn--verify:hover {
-  border-color: var(--accent-vermillion);
+  background: var(--bg-surface);
+  border-color: var(--text-secondary);
 }
 .btn--verify:disabled {
   opacity: 0.5;
@@ -274,15 +276,16 @@ main > .section__title {
 
 /* Policy selector */
 .policy-select {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  padding: 0.35rem 0.5rem;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  padding: 5px 12px;
   background: var(--bg-deep);
   color: var(--text-primary);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.15s ease;
+  line-height: 20px;
 }
 .policy-select:hover {
   border-color: var(--accent-gold);
@@ -566,7 +569,7 @@ select:focus-visible {
   padding: 0.75rem 1rem;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 0.8rem;
   flex-wrap: wrap;
@@ -665,7 +668,7 @@ select:focus-visible {
   position: relative;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 1.25rem 1.5rem;
   min-width: 280px;
   max-width: 360px;
@@ -724,7 +727,7 @@ select:focus-visible {
 .dash-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
@@ -741,12 +744,12 @@ select:focus-visible {
   gap: 0.5rem;
 }
 .dash-card__title {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--text-xs);
-  letter-spacing: 0.2em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
 }
 .dash-card__count {
   font-size: var(--text-2xl);
@@ -817,7 +820,7 @@ select:focus-visible {
 .skeleton__item {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 1rem 1.25rem;
   display: flex;
   align-items: center;
@@ -907,7 +910,7 @@ select:focus-visible {
 .repo-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 1rem 1.25rem;
   display: flex;
   align-items: center;
@@ -961,7 +964,7 @@ select:focus-visible {
   padding: 0.6rem 0.75rem;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   transition: border-color 0.2s ease;
   gap: 0.75rem;
   cursor: pointer;
@@ -972,13 +975,13 @@ select:focus-visible {
 .pr-item.is-selected {
   border-color: var(--accent-purple-border);
   background: var(--bg-surface);
-  border-radius: 8px 8px 0 0;
+  border-radius: 6px 6px 0 0;
 }
 .pr-detail {
   padding: 0.75rem;
   border: 1px solid var(--border);
   border-top: none;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 6px 6px;
   background: var(--bg-surface);
   margin-top: -0.4rem;
   margin-bottom: 0.4rem;
@@ -1065,7 +1068,7 @@ select:focus-visible {
   padding: 0.6rem 0.75rem;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   transition: border-color 0.2s ease;
   gap: 0.75rem;
   cursor: pointer;
@@ -1076,7 +1079,7 @@ select:focus-visible {
 .release-item.is-selected {
   border-color: var(--accent-purple-border);
   background: var(--bg-surface);
-  border-radius: 8px 8px 0 0;
+  border-radius: 6px 6px 0 0;
 }
 .release-item__info {
   flex: 1;
@@ -1119,7 +1122,7 @@ select:focus-visible {
   padding: 0.75rem;
   border: 1px solid var(--accent-purple-border);
   border-top: none;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 6px 6px;
   background: var(--bg-surface);
   margin-bottom: 0.4rem;
 }
@@ -1340,7 +1343,7 @@ select:focus-visible {
   line-height: 1.5;
   background: var(--bg-deep);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 1rem 1.25rem;
   overflow-x: auto;
   color: var(--text-primary);
@@ -1395,7 +1398,7 @@ select:focus-visible {
   padding: var(--space-2xl);
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 6px;
 }
 .error-page__mark {
   font-size: var(--text-2xl);
@@ -1574,11 +1577,10 @@ select:focus-visible {
     flex-wrap: wrap;
   }
   .nav__item {
-    font-size: 0.72rem;
-    padding: 0.5rem 0.75rem;
-    min-height: 48px;
-    display: inline-flex;
-    align-items: center;
+    font-size: var(--text-sm);
+    padding: 0 var(--space-sm);
+    min-height: 44px;
+    height: 44px;
   }
   .user-badge {
     display: none;
