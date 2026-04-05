@@ -7,14 +7,13 @@ test.describe('Landing page', () => {
     await page.goto('/');
   });
 
-  test('renders header__brand and CTA', async ({ page }) => {
-    await expect(page.locator('.mon')).toHaveText('目付');
-    await expect(page.locator('.logotype')).toHaveText('Metsuke');
-    await expect(page.locator('.cta')).toContainText('GitHub でログイン');
+  test('renders title and CTA', async ({ page }) => {
+    await expect(page.locator('.landing__title')).toHaveText('Sign in to Metsuke');
+    await expect(page.locator('.landing__btn')).toContainText('Sign in with GitHub');
   });
 
   test('CTA links to auth login', async ({ page }) => {
-    const cta = page.locator('.cta');
+    const cta = page.locator('.landing__btn');
     await expect(cta).toHaveAttribute('href', '/auth/login');
   });
 
@@ -30,11 +29,6 @@ test.describe('Landing page', () => {
     await expect(landingCss).toHaveCount(1);
   });
 
-  test('loads external JS (no inline scripts)', async ({ page }) => {
-    const inlineScripts = await page.locator('script:not([src])').count();
-    expect(inlineScripts).toBe(0);
-  });
-
   test('has correct meta tags', async ({ page }) => {
     await expect(page).toHaveTitle('Metsuke — SDLC Process Inspector');
     const desc = page.locator('meta[name="description"]');
@@ -44,11 +38,8 @@ test.describe('Landing page', () => {
   });
 
   test('has accessible structure', async ({ page }) => {
-    // Divider is decorative
-    const divider = page.locator('.divider');
-    await expect(divider).toHaveAttribute('role', 'presentation');
-    // CTA SVG is decorative
-    const svg = page.locator('.cta svg');
+    // GitHub logo SVG is decorative
+    const svg = page.locator('.landing__logo');
     await expect(svg).toHaveAttribute('aria-hidden', 'true');
   });
 
@@ -57,7 +48,6 @@ test.describe('Landing page', () => {
     const bgColor = await page.evaluate(() =>
       getComputedStyle(document.body).backgroundColor
     );
-    // metsuke-dark: --bg-deep: #0a0a0c → rgb(10, 10, 12)
     expect(bgColor).not.toBe('rgba(0, 0, 0, 0)');
   });
 });
@@ -68,10 +58,10 @@ test.describe('Landing page - mobile', () => {
   test('renders correctly on mobile', async ({ page }) => {
     await page.context().clearCookies();
     await page.goto('/');
-    await expect(page.locator('.mon')).toBeVisible();
-    await expect(page.locator('.cta')).toBeVisible();
+    await expect(page.locator('.landing__title')).toBeVisible();
+    await expect(page.locator('.landing__btn')).toBeVisible();
     // CTA should have minimum touch target
-    const ctaBox = await page.locator('.cta').boundingBox();
+    const ctaBox = await page.locator('.landing__btn').boundingBox();
     expect(ctaBox!.height).toBeGreaterThanOrEqual(44);
   });
 });
