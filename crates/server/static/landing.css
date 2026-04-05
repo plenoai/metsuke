@@ -1,6 +1,5 @@
-/* Metsuke Landing Page */
+/* Metsuke Landing Page — GitHub-style */
 
-/* Landing resets (standalone page, not using style.css reset) */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -11,148 +10,136 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  position: relative;
 }
 
-/* kumiko lattice SVG background */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='%232a2d47' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M30 10L50 30L30 50L10 30Z' fill='none' stroke='%232a2d47' stroke-width='0.3' opacity='0.25'/%3E%3C/svg%3E");
-  background-size: 60px 60px;
-  z-index: 0;
-}
-
-/* radial glow */
-body::after {
-  content: '';
-  position: fixed;
-  top: 30%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, var(--accent-vermillion-glow) 0%, transparent 70%);
-  z-index: 0;
-  pointer-events: none;
-}
-
+/* Layout */
 .landing {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-  max-width: 480px;
-  padding: 2rem;
-}
-
-.mon {
-  font-size: 6rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--text-primary);
-  line-height: 1;
-  margin-bottom: 0.25rem;
-  opacity: 0;
-  animation: brushReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.logotype {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  font-weight: 500;
-  letter-spacing: 0.35em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin-bottom: 2.5rem;
-  opacity: 0;
-  animation: fadeUp 0.6s 0.3s ease-out forwards;
-}
-
-.divider {
-  width: 48px;
-  height: 2px;
-  background: var(--accent-vermillion);
-  margin: 0 auto 2rem;
-  opacity: 0;
-  animation: scaleX 0.5s 0.5s ease-out forwards;
-  transform-origin: center;
-}
-
-.tagline {
-  font-size: 1.05rem;
-  color: var(--text-secondary);
-  line-height: 1.7;
-  margin-bottom: 3rem;
-  opacity: 0;
-  animation: fadeUp 0.6s 0.6s ease-out forwards;
-}
-.tagline strong {
-  color: var(--accent-gold);
-  font-weight: 700;
-}
-
-.cta {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.9rem 2rem;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  text-decoration: none;
+  width: 100%;
+  max-width: 308px;
+  padding: 1rem;
+}
+
+/* GitHub mark */
+.landing__header {
+  margin-bottom: 1.25rem;
+}
+
+.landing__logo {
+  width: 48px;
+  height: 48px;
+  fill: var(--text-primary);
+}
+
+/* Sign-in card */
+.landing__card {
+  width: 100%;
+  background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  transition: all 0.25s ease;
-  opacity: 0;
-  animation: fadeUp 0.6s 0.8s ease-out forwards;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
 }
-.cta:hover {
-  border-color: var(--accent-vermillion);
-  box-shadow: 0 0 24px var(--accent-vermillion-glow), inset 0 0 12px var(--accent-vermillion-glow);
-  transform: translateY(-1px);
+
+.landing__title {
+  font-size: 1.5rem;
+  font-weight: 300;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  letter-spacing: -0.01em;
 }
-.cta:focus-visible {
-  outline: 2px solid var(--accent-gold);
+
+.landing__card-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.landing__btn {
+  display: block;
+  width: 100%;
+  padding: 0.625rem 1rem;
+  background: var(--accent-green);
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.landing__btn:hover {
+  background: var(--accent-green);
+  filter: brightness(1.1);
+}
+.landing__btn:focus-visible {
+  outline: 2px solid var(--accent-indigo);
   outline-offset: 2px;
 }
-.cta svg {
-  width: 20px;
-  height: 20px;
-  fill: currentColor;
+
+/* Sub-card (description) */
+.landing__sub-card {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
 }
 
-.footer-note {
-  margin-top: 3rem;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
+.landing__description {
+  font-size: 0.8125rem;
   color: var(--text-secondary);
-  opacity: 0;
-  animation: fadeUp 0.6s 1s ease-out forwards;
-  letter-spacing: 0.05em;
+  line-height: 1.6;
+}
+.landing__description strong {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
-/* Animations */
-@keyframes brushReveal {
-  from { opacity: 0; transform: scale(0.92); filter: blur(4px); }
-  to { opacity: 1; transform: scale(1); filter: blur(0); }
+/* Footer links */
+.landing__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
 }
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+
+.landing__footer-link {
+  font-size: 0.75rem;
+  color: var(--accent-indigo);
+  text-decoration: none;
 }
-@keyframes scaleX {
-  from { opacity: 0; transform: scaleX(0); }
-  to { opacity: 1; transform: scaleX(1); }
+.landing__footer-link:hover {
+  text-decoration: underline;
+}
+
+.landing__footer-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.landing__footer-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
 }
 
 /* Responsive */
 @media (max-width: 600px) {
-  .mon { font-size: 4rem; }
-  .tagline { font-size: 0.95rem; }
-  .cta { padding: 0.9rem 1.5rem; min-height: 48px; }
+  .landing {
+    max-width: 100%;
+    padding: 1rem;
+  }
+  .landing__btn {
+    min-height: 48px;
+    font-size: 1rem;
+  }
 }
