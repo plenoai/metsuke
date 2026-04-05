@@ -38,9 +38,9 @@ test.describe('Landing page', () => {
   });
 
   test('has accessible structure', async ({ page }) => {
-    // GitHub logo SVG is decorative
-    const svg = page.locator('.landing__logo');
-    await expect(svg).toHaveAttribute('aria-hidden', 'true');
+    // Logo has alt text
+    const logo = page.locator('.landing__logo');
+    await expect(logo).toHaveAttribute('alt', 'Metsuke');
   });
 
   test('theme variables are applied', async ({ page }) => {
