@@ -63,9 +63,6 @@ body {
   transition: width 0.25s ease, border-color 0.25s ease;
 }
 .sidebar.is-open {
-  width: fit-content;
-  min-width: 320px;
-  max-width: 50vw;
   border-left-color: var(--border);
 }
 .sidebar__header {

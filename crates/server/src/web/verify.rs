@@ -114,7 +114,15 @@ pub(super) async fn api_verify_repo(
             host: state.github_api_host.clone(),
         };
         let client = libverify_github::GitHubClient::new(&config)?;
-        libverify_github::verify_repo(&client, &owner_c, &repo_c, "HEAD", policy.as_deref(), false, vec![])
+        libverify_github::verify_repo(
+            &client,
+            &owner_c,
+            &repo_c,
+            "HEAD",
+            policy.as_deref(),
+            false,
+            vec![],
+        )
     })
     .await;
 

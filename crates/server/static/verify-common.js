@@ -203,6 +203,13 @@ function openSidebar(title, contentHtml, metaHtml) {
 
   sidebar.hidden = false;
   requestAnimationFrame(() => {
+    // Measure content width and size sidebar to fit the table
+    const table = contentEl.querySelector('table');
+    const pad = 48; // sidebar padding (--space-lg * 2)
+    const need = table ? table.scrollWidth + pad : 320;
+    const w = Math.max(320, Math.min(need, window.innerWidth * 0.5));
+    sidebar.style.width = w + 'px';
+
     sidebar.classList.add('is-open');
     layout.classList.add('has-sidebar');
   });
@@ -211,6 +218,7 @@ function openSidebar(title, contentHtml, metaHtml) {
 function closeSidebar() {
   const sidebar = document.getElementById('sidebar');
   const layout = document.getElementById('layout');
+  sidebar.style.width = '0';
   sidebar.classList.remove('is-open');
   layout.classList.remove('has-sidebar');
   sidebar.addEventListener('transitionend', () => { sidebar.hidden = true; }, { once: true });
