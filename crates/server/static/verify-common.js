@@ -94,41 +94,55 @@ function decisionBadge(decision) {
 
 function renderFindingsTable(outcomes, titleHtml) {
   const counts = countFindings(outcomes);
+  const total = (outcomes || []).length;
 
-  const rows = (outcomes || []).map(o => {
-    const longText = (o.rationale || '').length > 120;
-    const statusClass = o.decision === 'fail' ? 'is-violated' : o.decision === 'review' ? 'is-indeterminate' : o.decision === 'pass' ? 'is-satisfied' : '';
-    if (longText) {
-      return `<tr class="${statusClass}">
-      <td class="findings__control-id">${esc(o.control_id)}</td>
-      <td>${decisionBadge(o.decision)}</td>
-      <td class="findings__rationale is-collapsible is-collapsed" role="button" tabindex="0" aria-expanded="false" data-action="toggle-rationale"><span class="findings__rationale-text">${esc(o.rationale)}</span><span class="findings__rationale-toggle"></span></td>
-    </tr>`;
-    }
-    return `<tr class="${statusClass}">
-      <td class="findings__control-id">${esc(o.control_id)}</td>
-      <td>${decisionBadge(o.decision)}</td>
-      <td class="findings__rationale">${esc(o.rationale)}</td>
-    </tr>`;
-  }).join('');
+  // Group outcomes by decision
+  const groups = { fail: [], review: [], pass: [], na: [] };
+  for (const o of (outcomes || [])) {
+    const key = o.decision === 'fail' ? 'fail' : o.decision === 'review' ? 'review' : o.decision === 'pass' ? 'pass' : 'na';
+    groups[key].push(o);
+  }
+
+  const groupMeta = {
+    fail:   { icon: '\u2717', label: 'failing',        css: 'fail' },
+    review: { icon: '\u25CF', label: 'needs review',   css: 'review' },
+    pass:   { icon: '\u2713', label: 'passing',         css: 'pass' },
+    na:     { icon: '\u2014', label: 'not applicable',  css: 'na' },
+  };
+
+  function renderItem(o) {
+    const rationale = esc(o.rationale || '');
+    return `<li class="checks-group__item">
+      <span class="checks-group__control">${esc(o.control_id)}</span>
+      <span class="checks-group__rationale">${rationale}</span>
+    </li>`;
+  }
+
+  function renderGroup(key) {
+    const items = groups[key];
+    if (items.length === 0) return '';
+    const meta = groupMeta[key];
+    const isOpen = key === 'fail' || key === 'review' ? ' open' : '';
+    return `<details class="checks-group checks-group--${meta.css}"${isOpen}>
+      <summary class="checks-group__header">
+        <span class="checks-group__icon checks-group__icon--${meta.css}">${meta.icon}</span>
+        <span class="checks-group__label">${items.length} ${meta.label}</span>
+      </summary>
+      <ul class="checks-group__list">${items.map(renderItem).join('')}</ul>
+    </details>`;
+  }
+
+  // Summary line: "4 / 23 checks passed" style
+  const summaryText = `${counts.pass} / ${total} checks passed`;
 
   return `
-    <div class="findings">
-      <div class="section__title">${titleHtml}</div>
-      <div class="summary">
-        <div class="summary__item"><span class="badge badge--pass">PASS</span> ${counts.pass}</div>
-        <div class="summary__item"><span class="badge badge--review">REVIEW</span> ${counts.review}</div>
-        <div class="summary__item"><span class="badge badge--fail">FAIL</span> ${counts.fail}</div>
-        ${counts.na > 0 ? `<div class="summary__item"><span class="badge badge--na">N/A</span> ${counts.na}</div>` : ''}
-      </div>
-      <div class="card findings__card">
-        <table class="findings__table" aria-label="検証結果">
-          <thead>
-            <tr><th scope="col">コントロール</th><th scope="col">ステータス</th><th scope="col">根拠</th></tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
+    <div class="checks">
+      ${titleHtml ? `<div class="section__title">${titleHtml}</div>` : ''}
+      <div class="checks__summary">${summaryText}</div>
+      ${renderGroup('fail')}
+      ${renderGroup('review')}
+      ${renderGroup('pass')}
+      ${renderGroup('na')}
     </div>
   `;
 }
@@ -206,9 +220,9 @@ function openSidebar(title, contentHtml, metaHtml) {
   sidebar.style.width = '50vw';
   sidebar.style.overflow = 'hidden';
   requestAnimationFrame(() => {
-    const table = contentEl.querySelector('table');
+    const content = contentEl.querySelector('table, .checks');
     const pad = 48; // sidebar padding (--space-lg * 2)
-    const need = table ? table.scrollWidth + pad : 320;
+    const need = content ? content.scrollWidth + pad : 320;
     const w = Math.max(320, Math.min(need, window.innerWidth * 0.5));
     sidebar.style.width = w + 'px';
     sidebar.style.overflow = '';
