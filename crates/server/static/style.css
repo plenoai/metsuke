@@ -17,6 +17,9 @@
   --space-lg: 1rem;
   --space-xl: 1.5rem;
   --space-2xl: 2.5rem;
+
+  /* Layout */
+  --content-max-width: 1280px;
 }
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -36,7 +39,7 @@ body {
 .shell {
   flex: 1;
   min-width: 0;
-  max-width: 1280px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   padding: var(--space-xl) var(--space-xl) 4rem;
   transition: margin 0.25s ease;
@@ -157,7 +160,7 @@ main > .section__title {
   border-bottom: 1px solid var(--border);
 }
 .header__inner {
-  max-width: 1280px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   display: flex;
   align-items: center;
