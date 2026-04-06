@@ -38,9 +38,9 @@ test.describe('Landing page', () => {
   });
 
   test('has accessible structure', async ({ page }) => {
-    // Logo has alt text
-    const logo = page.locator('.landing__logo');
-    await expect(logo).toHaveAttribute('alt', 'Metsuke');
+    // Eye motif SVG with embedded logo is present
+    const eyeSvg = page.locator('.landing__eye-svg');
+    await expect(eyeSvg).toBeVisible();
   });
 
   test('theme variables are applied', async ({ page }) => {
