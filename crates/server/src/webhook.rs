@@ -208,7 +208,7 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
                     &repo,
                     &head_sha,
                     "metsuke / verify-pr",
-                    "failure",
+                    "neutral",
                     "Verification Error",
                     &format!("Failed to run verification: {e}"),
                 )
