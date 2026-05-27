@@ -12,19 +12,13 @@ importers:
         specifier: ^1.60.0
         version: 1.60.0
       emulate:
-        specifier: ^0.4.1
-        version: 0.4.1(hono@4.12.10)
+        specifier: ^0.6.0
+        version: 0.6.0
       playwright:
         specifier: ^1.60.0
         version: 1.60.0
 
 packages:
-
-  '@hono/node-server@1.19.12':
-    resolution: {integrity: sha512-txsUW4SQ1iilgE0l9/e9VQWmELXifEFvmdA1j6WFh/aFPj99hIntrSsq/if0UWyGVkmrRPKA1wCeP+UCr1B9Uw==}
-    engines: {node: '>=18.14.1'}
-    peerDependencies:
-      hono: ^4
 
   '@playwright/test@1.60.0':
     resolution: {integrity: sha512-O71yZIbAh/PxDMNGns37GHBIfrVkEVyn+AXyIa5dOTfb4/xNvRWV+Vv/NMbNCtODB/pO7vLlF2OTmMVLhmr7Ag==}
@@ -35,8 +29,8 @@ packages:
     resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
     engines: {node: '>=20'}
 
-  emulate@0.4.1:
-    resolution: {integrity: sha512-96CEZB96M7fC5na1lFl9sL7AS5d2lRgJkZVb/e8ufbLMLLxEy2oHhN4E9d7+eJbtABne/CeumSRX2j7A9UDlEQ==}
+  emulate@0.6.0:
+    resolution: {integrity: sha512-UcuKgskLUCD4TnqMw/EHJRUw8y3E11ks4lzx5MkAq0jJbfl3031aFgJeR3AArl4xB0aABC9Q9RZw00srZbcHgw==}
     hasBin: true
 
   fsevents@2.3.2:
@@ -44,25 +38,11 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
-  hono@4.12.10:
-    resolution: {integrity: sha512-mx/p18PLy5og9ufies2GOSUqep98Td9q4i/EF6X7yJgAiIopxqdfIO3jbqsi3jRgTgw88jMDEzVKi+V2EF+27w==}
-    engines: {node: '>=16.9.0'}
-
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
-  playwright-core@1.59.1:
-    resolution: {integrity: sha512-HBV/RJg81z5BiiZ9yPzIiClYV/QMsDCKUyogwH9p3MCP6IYjUFu/MActgYAvK0oWyV9NlwM3GLBjADyWgydVyg==}
-    engines: {node: '>=18'}
-    hasBin: true
-
   playwright-core@1.60.0:
     resolution: {integrity: sha512-9bW6zvX/m0lEbgTKJ6YppOKx8H3VOPBMOCFh2irXFOT4BbHgrx5hPjwJYLT40Lu+4qtD36qKc/Hn56StUW57IA==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.59.1:
-    resolution: {integrity: sha512-C8oWjPR3F81yljW9o5OxcWzfh6avkVwDD2VYdwIGqTkl+OGFISgypqzfu7dOe4QNLL2aqcWBmI3PMtLIK233lw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -71,16 +51,12 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  yaml@2.8.3:
-    resolution: {integrity: sha512-AvbaCLOO2Otw/lW5bmh9d/WEdcDFdQp2Z2ZUH3pX9U2ihyUY0nvLv7J6TrWowklRGPYbB/IuIMfYgxaCPg5Bpg==}
+  yaml@2.9.0:
+    resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
     engines: {node: '>= 14.6'}
     hasBin: true
 
 snapshots:
-
-  '@hono/node-server@1.19.12(hono@4.12.10)':
-    dependencies:
-      hono: 4.12.10
 
   '@playwright/test@1.60.0':
     dependencies:
@@ -88,31 +64,18 @@ snapshots:
 
   commander@14.0.3: {}
 
-  emulate@0.4.1(hono@4.12.10):
+  emulate@0.6.0:
     dependencies:
-      '@hono/node-server': 1.19.12(hono@4.12.10)
       commander: 14.0.3
       picocolors: 1.1.1
-      yaml: 2.8.3
-    transitivePeerDependencies:
-      - hono
+      yaml: 2.9.0
 
   fsevents@2.3.2:
     optional: true
 
-  hono@4.12.10: {}
-
   picocolors@1.1.1: {}
 
-  playwright-core@1.59.1: {}
-
   playwright-core@1.60.0: {}
-
-  playwright@1.59.1:
-    dependencies:
-      playwright-core: 1.59.1
-    optionalDependencies:
-      fsevents: 2.3.2
 
   playwright@1.60.0:
     dependencies:
@@ -120,4 +83,4 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.2
 
-  yaml@2.8.3: {}
+  yaml@2.9.0: {}
