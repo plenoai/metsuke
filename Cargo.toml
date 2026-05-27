@@ -26,8 +26,8 @@ reqwest = { version = "0.12", features = ["json"] }
 rusqlite = { version = "0.33", features = ["bundled"] }
 jsonwebtoken = { version = "10", features = ["use_pem", "rust_crypto"] }
 uuid = { version = "1", features = ["v4"] }
-sha2 = "0.10"
-hmac = "0.12"
+sha2 = "0.11"
+hmac = "0.13"
 base64 = "0.22"
 rand = "0.9"
 urlencoding = "2"
