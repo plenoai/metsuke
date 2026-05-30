@@ -602,18 +602,10 @@ async fn mcp_verify_single(
 #[tool_handler]
 impl ServerHandler for MetsukeServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            protocol_version: ProtocolVersion::V_2025_03_26,
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            server_info: Implementation {
-                name: "metsuke".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-                ..Default::default()
-            },
-            instructions: Some(
-                "Metsuke (目付) — SDLC process inspector powered by libverify.".into(),
-            ),
-        }
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_protocol_version(ProtocolVersion::V_2025_03_26)
+            .with_server_info(Implementation::new("metsuke", env!("CARGO_PKG_VERSION")))
+            .with_instructions("Metsuke (目付) — SDLC process inspector powered by libverify.")
     }
 }
 
