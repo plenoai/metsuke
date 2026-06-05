@@ -23,7 +23,7 @@ http-body-util = "0.1"
 bytes = "1"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
-rusqlite = { version = "0.33", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 jsonwebtoken = { version = "10", features = ["use_pem", "rust_crypto"] }
 uuid = { version = "1", features = ["v4"] }
 sha2 = "0.11"
