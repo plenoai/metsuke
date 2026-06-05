@@ -22,7 +22,7 @@ askama_web = { version = "0.16", features = ["axum-0.8"] }
 http-body-util = "0.1"
 bytes = "1"
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.13", features = ["json", "query"] }
+reqwest = { version = "0.13", features = ["json", "query", "form"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 jsonwebtoken = { version = "10", features = ["use_pem", "rust_crypto"] }
 uuid = { version = "1", features = ["v4"] }
