@@ -2,6 +2,7 @@ mod auth;
 mod blocking;
 mod bulk;
 mod config;
+mod content_security;
 mod db;
 mod github_app;
 mod oauth;

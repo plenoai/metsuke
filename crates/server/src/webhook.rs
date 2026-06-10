@@ -11,6 +11,7 @@ use sha2::Sha256;
 
 use crate::blocking::run_blocking;
 use crate::config::AppConfig;
+use crate::content_security;
 use crate::db::Database;
 use crate::github_app::GitHubApp;
 
@@ -266,6 +267,92 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
         }
         Err(e) => {
             tracing::error!(%owner, %repo, pr_number, "webhook: failed to create check run: {e:#}")
+        }
+    }
+
+    // Content security scan — runs independently of verify-pr
+    tokio::spawn(run_content_security_scan(
+        state,
+        owner,
+        repo,
+        pr_number,
+        head_sha,
+        installation_id,
+    ));
+}
+
+async fn run_content_security_scan(
+    state: WebhookState,
+    owner: String,
+    repo: String,
+    pr_number: u32,
+    head_sha: String,
+    installation_id: i64,
+) {
+    let diff = match state
+        .github_app
+        .get_pull_request_diff(installation_id, &owner, &repo, pr_number)
+        .await
+    {
+        Ok(d) => d,
+        Err(e) => {
+            tracing::error!(
+                %owner, %repo, pr_number,
+                "webhook: failed to fetch PR diff for content scan: {e:#}"
+            );
+            let _ = state
+                .github_app
+                .create_check_run(
+                    installation_id,
+                    &owner,
+                    &repo,
+                    &head_sha,
+                    "metsuke / content-security",
+                    "neutral",
+                    "Content Security: error",
+                    &format!("Failed to fetch PR diff: {e}"),
+                )
+                .await;
+            return;
+        }
+    };
+
+    let findings = content_security::scan_diff(&diff);
+    let (conclusion, title, summary) = content_security::format_check_summary(&findings);
+
+    if !findings.is_empty() {
+        tracing::warn!(
+            %owner, %repo, pr_number,
+            count = findings.len(),
+            "webhook: content security findings detected"
+        );
+    }
+
+    match state
+        .github_app
+        .create_check_run(
+            installation_id,
+            &owner,
+            &repo,
+            &head_sha,
+            "metsuke / content-security",
+            &conclusion,
+            &title,
+            &summary,
+        )
+        .await
+    {
+        Ok(_) => {
+            tracing::info!(
+                %owner, %repo, pr_number, %conclusion,
+                "webhook: content security check run created"
+            )
+        }
+        Err(e) => {
+            tracing::error!(
+                %owner, %repo, pr_number,
+                "webhook: failed to create content security check run: {e:#}"
+            )
         }
     }
 }
