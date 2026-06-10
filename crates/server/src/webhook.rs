@@ -179,47 +179,75 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
         }
     };
 
-    let verify_owner = owner.clone();
-    let verify_repo = repo.clone();
-    let verify_token = token;
-    let result = match run_blocking(move || {
-        let config = libverify_github::GitHubConfig {
-            token: verify_token,
-            repo: format!("{verify_owner}/{verify_repo}"),
-            host: state.github_api_host.clone(),
+    let is_fork = payload["pull_request"]["head"]["repo"]["fork"]
+        .as_bool()
+        .unwrap_or(false)
+        || payload["pull_request"]["head"]["repo"]["full_name"].as_str()
+            != payload["repository"]["full_name"].as_str();
+
+    // libverify cannot access fork repo data via the installation token,
+    // so skip verify-pr for fork PRs and report a neutral check instead.
+    if is_fork {
+        tracing::info!(
+            %owner, %repo, pr_number,
+            "webhook: skipping verify-pr for fork PR (no access to fork repo data)"
+        );
+        let _ = state
+            .github_app
+            .create_check_run(
+                installation_id,
+                &owner,
+                &repo,
+                &head_sha,
+                "metsuke / verify-pr",
+                "neutral",
+                "Skipped (fork PR)",
+                "SDLC verification is not available for fork PRs because the \
+                 GitHub App installation does not have access to the fork repository.",
+            )
+            .await;
+    } else {
+        let verify_owner = owner.clone();
+        let verify_repo = repo.clone();
+        let verify_token = token;
+        let result = match run_blocking(move || {
+            let config = libverify_github::GitHubConfig {
+                token: verify_token,
+                repo: format!("{verify_owner}/{verify_repo}"),
+                host: state.github_api_host.clone(),
+            };
+            let client = libverify_github::GitHubClient::new(&config)?;
+            libverify_github::verify_pr(
+                &client,
+                &verify_owner,
+                &verify_repo,
+                pr_number,
+                None,
+                false,
+                vec![],
+            )
+        })
+        .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::error!("webhook: verify_pr failed for {owner}/{repo}#{pr_number}: {e:#}");
+                let _ = state
+                    .github_app
+                    .create_check_run(
+                        installation_id,
+                        &owner,
+                        &repo,
+                        &head_sha,
+                        "metsuke / verify-pr",
+                        "neutral",
+                        "Verification Error",
+                        &format!("Failed to run verification: {e}"),
+                    )
+                    .await;
+                return;
+            }
         };
-        let client = libverify_github::GitHubClient::new(&config)?;
-        libverify_github::verify_pr(
-            &client,
-            &verify_owner,
-            &verify_repo,
-            pr_number,
-            None,
-            false,
-            vec![],
-        )
-    })
-    .await
-    {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::error!("webhook: verify_pr failed for {owner}/{repo}#{pr_number}: {e:#}");
-            let _ = state
-                .github_app
-                .create_check_run(
-                    installation_id,
-                    &owner,
-                    &repo,
-                    &head_sha,
-                    "metsuke / verify-pr",
-                    "neutral",
-                    "Verification Error",
-                    &format!("Failed to run verification: {e}"),
-                )
-                .await;
-            return;
-        }
-    };
 
     let result_json = serde_json::to_string_pretty(&result).unwrap_or_default();
     let (conclusion, title, summary) = format_check_result(&result_json, "PR");
@@ -271,6 +299,7 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
             tracing::error!(%owner, %repo, pr_number, "webhook: failed to create check run: {e:#}")
         }
     }
+    } // end else (non-fork PR)
 
     let author_login = payload["pull_request"]["user"]["login"]
         .as_str()
