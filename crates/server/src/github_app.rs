@@ -486,6 +486,31 @@ impl GitHubApp {
         Ok(())
     }
 
+    /// Fetch the unified diff for a pull request.
+    pub async fn get_pull_request_diff(
+        &self,
+        installation_id: i64,
+        owner: &str,
+        repo: &str,
+        pr_number: u32,
+    ) -> Result<String> {
+        let token = self.create_installation_token(installation_id).await?;
+        self.http
+            .get(format!(
+                "{}/repos/{owner}/{repo}/pulls/{pr_number}",
+                self.api_base_url
+            ))
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github.v3.diff")
+            .send()
+            .await?
+            .error_for_status()
+            .context("Failed to fetch PR diff")?
+            .text()
+            .await
+            .context("Failed to read PR diff body")
+    }
+
     pub async fn get_user(&self, access_token: &str) -> Result<GitHubUser> {
         self.http
             .get(format!("{}/user", self.api_base_url))
