@@ -13,7 +13,6 @@ pub struct Finding {
 pub enum FindingKind {
     InvisibleUnicode,
     BiDiOverride,
-    HomoglyphInIdentifier,
 }
 
 impl FindingKind {
@@ -21,7 +20,6 @@ impl FindingKind {
         match self {
             Self::InvisibleUnicode => "invisible-unicode",
             Self::BiDiOverride => "bidi-override",
-            Self::HomoglyphInIdentifier => "homoglyph",
         }
     }
 

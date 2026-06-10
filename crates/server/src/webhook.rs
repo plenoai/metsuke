@@ -314,10 +314,6 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
         .as_str()
         .unwrap_or("")
         .to_string();
-    let pr_title = payload["pull_request"]["title"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
     let changed_files = payload["pull_request"]["changed_files"]
         .as_u64()
         .unwrap_or(0) as u32;
@@ -349,7 +345,6 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
             head_sha,
             installation_id,
             author_login,
-            pr_title,
             pr_body,
             changed_files,
             additions,
@@ -443,7 +438,6 @@ async fn run_pr_quality_and_report(
     head_sha: String,
     installation_id: i64,
     author_login: String,
-    pr_title: String,
     pr_body: String,
     changed_files: u32,
     additions: u32,
@@ -483,25 +477,21 @@ async fn run_pr_quality_and_report(
 
     let merge_ratio = merge_ratio_result.unwrap_or(None);
 
-    let (account_age_days, profile_signals) = match &user_result {
-        Ok(user) => (user.account_age_days(), user.profile_signal_count()),
-        Err(_) => (0, 0),
+    let account_age_days = match &user_result {
+        Ok(user) => user.account_age_days(),
+        Err(_) => 0,
     };
 
     // --- PR Quality Check ---
     let config = pr_quality::QualityConfig::default();
     let pr_info = pr_quality::PrInfo {
-        title: pr_title,
         body: pr_body,
         changed_files,
         additions,
         deletions,
-        author_login: author_login.clone(),
-        author_association: "NONE".into(),
         file_paths,
         author_account_age_days: account_age_days,
         author_global_merge_ratio: merge_ratio,
-        author_profile_signals: profile_signals,
     };
 
     let report = pr_quality::run_quality_checks(&pr_info, &config);

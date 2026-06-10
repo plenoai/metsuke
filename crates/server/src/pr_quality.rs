@@ -91,17 +91,13 @@ impl QualityReport {
 
 /// Information extracted from the PR webhook payload + API calls.
 pub struct PrInfo {
-    pub title: String,
     pub body: String,
     pub changed_files: u32,
     pub additions: u32,
     pub deletions: u32,
-    pub author_login: String,
-    pub author_association: String,
     pub file_paths: Vec<String>,
     pub author_account_age_days: u32,
     pub author_global_merge_ratio: Option<f64>,
-    pub author_profile_signals: u32,
 }
 
 pub fn run_quality_checks(pr: &PrInfo, config: &QualityConfig) -> QualityReport {
@@ -373,17 +369,13 @@ mod tests {
 
     fn default_pr() -> PrInfo {
         PrInfo {
-            title: "fix: something".into(),
             body: "Fixes a bug.".into(),
             changed_files: 3,
             additions: 50,
             deletions: 10,
-            author_login: "contributor".into(),
-            author_association: "NONE".into(),
             file_paths: vec!["src/main.rs".into(), "src/lib.rs".into()],
             author_account_age_days: 365,
             author_global_merge_ratio: Some(0.8),
-            author_profile_signals: 5,
         }
     }
 
