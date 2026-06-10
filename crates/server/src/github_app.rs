@@ -206,6 +206,27 @@ impl GitHubApp {
         Ok(token)
     }
 
+    pub async fn get_repo_installation_id(&self, owner: &str, repo: &str) -> Result<i64> {
+        let jwt = self.generate_jwt()?;
+        let resp: serde_json::Value = self
+            .http
+            .get(format!(
+                "{}/repos/{owner}/{repo}/installation",
+                self.api_base_url
+            ))
+            .header("Authorization", format!("Bearer {jwt}"))
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await?
+            .error_for_status()
+            .context("Failed to get repo installation")?
+            .json()
+            .await?;
+        resp["id"]
+            .as_i64()
+            .context("installation response missing id")
+    }
+
     pub async fn create_installation_token(&self, installation_id: i64) -> Result<String> {
         const TOKEN_TTL: std::time::Duration = std::time::Duration::from_secs(50 * 60);
 

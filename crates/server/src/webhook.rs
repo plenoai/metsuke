@@ -42,6 +42,10 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
 
     Router::new()
         .route("/webhook", axum::routing::post(handle_webhook))
+        .route(
+            "/webhook/rerun/:owner/:repo/:pr_number",
+            axum::routing::post(handle_rerun),
+        )
         .with_state(state)
 }
 
@@ -148,6 +152,111 @@ async fn handle_webhook(
     }
 
     StatusCode::OK
+}
+
+async fn handle_rerun(
+    State(state): State<WebhookState>,
+    axum::extract::Path((owner, repo, pr_number)): axum::extract::Path<(String, String, u32)>,
+    headers: HeaderMap,
+) -> StatusCode {
+    let token = match headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+    {
+        Some(t) => t.to_string(),
+        None => return StatusCode::UNAUTHORIZED,
+    };
+
+    let http = reqwest::Client::builder()
+        .user_agent("metsuke")
+        .build()
+        .unwrap();
+    let api_base = format!("https://{}", state.github_api_host);
+
+    let user_resp = http
+        .get(format!("{api_base}/user"))
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await;
+
+    let login = match user_resp {
+        Ok(resp) => match resp.json::<serde_json::Value>().await {
+            Ok(v) => v["login"].as_str().unwrap_or("").to_string(),
+            Err(_) => return StatusCode::UNAUTHORIZED,
+        },
+        Err(_) => return StatusCode::UNAUTHORIZED,
+    };
+
+    let perm_resp = http
+        .get(format!(
+            "{api_base}/repos/{owner}/{repo}/collaborators/{login}/permission"
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await;
+
+    let is_admin = match perm_resp {
+        Ok(resp) => match resp.json::<serde_json::Value>().await {
+            Ok(v) => matches!(v["permission"].as_str(), Some("admin" | "write")),
+            Err(_) => false,
+        },
+        Err(_) => false,
+    };
+
+    if !is_admin {
+        return StatusCode::FORBIDDEN;
+    }
+
+    let installation_id = match state
+        .github_app
+        .get_repo_installation_id(&owner, &repo)
+        .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!(%owner, %repo, "rerun: failed to get installation: {e:#}");
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    };
+
+    let app_token = match state
+        .github_app
+        .create_installation_token(installation_id)
+        .await
+    {
+        Ok(t) => t,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+    };
+
+    let pr_data: serde_json::Value = match http
+        .get(format!("{api_base}/repos/{owner}/{repo}/pulls/{pr_number}"))
+        .header("Authorization", format!("Bearer {app_token}"))
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+    {
+        Ok(resp) => match resp.json().await {
+            Ok(v) => v,
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+        },
+        Err(_) => return StatusCode::NOT_FOUND,
+    };
+
+    let repo_data = pr_data["base"]["repo"].clone();
+    let synthetic = serde_json::json!({
+        "action": "reopened",
+        "pull_request": pr_data,
+        "repository": repo_data,
+        "installation": { "id": installation_id },
+    });
+
+    tracing::info!(%owner, %repo, pr_number, %login, "webhook: manual rerun triggered");
+    tokio::spawn(handle_pull_request(state, synthetic));
+    StatusCode::ACCEPTED
 }
 
 async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
