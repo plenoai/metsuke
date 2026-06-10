@@ -43,7 +43,7 @@ pub fn router(db: Arc<Database>, github_app: Arc<GitHubApp>, config: &AppConfig)
     Router::new()
         .route("/webhook", axum::routing::post(handle_webhook))
         .route(
-            "/webhook/rerun/:owner/:repo/:pr_number",
+            "/webhook/rerun/{owner}/{repo}/{pr_number}",
             axum::routing::post(handle_rerun),
         )
         .with_state(state)
