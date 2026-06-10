@@ -12,8 +12,10 @@ use sha2::Sha256;
 use crate::blocking::run_blocking;
 use crate::config::AppConfig;
 use crate::content_security;
+use crate::contributor_report;
 use crate::db::Database;
 use crate::github_app::GitHubApp;
+use crate::pr_quality;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -270,15 +272,58 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
         }
     }
 
+    let author_login = payload["pull_request"]["user"]["login"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let author_association = payload["pull_request"]["author_association"]
+        .as_str()
+        .unwrap_or("NONE")
+        .to_string();
+    let pr_body = payload["pull_request"]["body"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let pr_title = payload["pull_request"]["title"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let changed_files = payload["pull_request"]["changed_files"].as_u64().unwrap_or(0) as u32;
+    let additions = payload["pull_request"]["additions"].as_u64().unwrap_or(0) as u32;
+    let deletions = payload["pull_request"]["deletions"].as_u64().unwrap_or(0) as u32;
+
+    let is_external = !matches!(
+        author_association.as_str(),
+        "OWNER" | "MEMBER" | "COLLABORATOR"
+    );
+
     // Content security scan — runs independently of verify-pr
     tokio::spawn(run_content_security_scan(
-        state,
-        owner,
-        repo,
+        state.clone(),
+        owner.clone(),
+        repo.clone(),
         pr_number,
-        head_sha,
+        head_sha.clone(),
         installation_id,
     ));
+
+    // PR quality + contributor report — only for external contributors
+    if is_external {
+        tokio::spawn(run_pr_quality_and_report(
+            state,
+            owner,
+            repo,
+            pr_number,
+            head_sha,
+            installation_id,
+            author_login,
+            pr_title,
+            pr_body,
+            changed_files,
+            additions,
+            deletions,
+        ));
+    }
 }
 
 async fn run_content_security_scan(
@@ -353,6 +398,145 @@ async fn run_content_security_scan(
                 %owner, %repo, pr_number,
                 "webhook: failed to create content security check run: {e:#}"
             )
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_pr_quality_and_report(
+    state: WebhookState,
+    owner: String,
+    repo: String,
+    pr_number: u32,
+    head_sha: String,
+    installation_id: i64,
+    author_login: String,
+    pr_title: String,
+    pr_body: String,
+    changed_files: u32,
+    additions: u32,
+    deletions: u32,
+) {
+    let token = match state
+        .github_app
+        .create_installation_token(installation_id)
+        .await
+    {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!(
+                %owner, %repo, pr_number,
+                "webhook: failed to get token for quality check: {e:#}"
+            );
+            return;
+        }
+    };
+
+    let api_base = format!("https://{}", state.github_api_host);
+    let http = reqwest::Client::builder()
+        .user_agent("metsuke")
+        .build()
+        .unwrap();
+
+    // Fetch contributor info and PR files concurrently
+    let (user_result, files_result, merge_ratio_result) = tokio::join!(
+        pr_quality::fetch_github_user(&http, &token, &api_base, &author_login),
+        pr_quality::fetch_pr_files(&http, &token, &api_base, &owner, &repo, pr_number),
+        pr_quality::fetch_global_merge_ratio(&http, &token, &api_base, &author_login),
+    );
+
+    let file_paths: Vec<String> = files_result
+        .map(|files| files.into_iter().map(|f| f.filename).collect())
+        .unwrap_or_default();
+
+    let merge_ratio = merge_ratio_result.unwrap_or(None);
+
+    let (account_age_days, profile_signals) = match &user_result {
+        Ok(user) => (user.account_age_days(), user.profile_signal_count()),
+        Err(_) => (0, 0),
+    };
+
+    // --- PR Quality Check ---
+    let config = pr_quality::QualityConfig::default();
+    let pr_info = pr_quality::PrInfo {
+        title: pr_title,
+        body: pr_body,
+        changed_files,
+        additions,
+        deletions,
+        author_login: author_login.clone(),
+        author_association: "NONE".into(),
+        file_paths,
+        author_account_age_days: account_age_days,
+        author_global_merge_ratio: merge_ratio,
+        author_profile_signals: profile_signals,
+    };
+
+    let report = pr_quality::run_quality_checks(&pr_info, &config);
+    let (q_conclusion, q_title, q_summary) = report.format_check_summary(&config);
+
+    match state
+        .github_app
+        .create_check_run(
+            installation_id,
+            &owner,
+            &repo,
+            &head_sha,
+            "metsuke / pr-quality",
+            &q_conclusion,
+            &q_title,
+            &q_summary,
+        )
+        .await
+    {
+        Ok(_) => {
+            tracing::info!(
+                %owner, %repo, pr_number, conclusion = %q_conclusion,
+                failed = report.failed_count(),
+                "webhook: pr-quality check run created"
+            )
+        }
+        Err(e) => {
+            tracing::error!(
+                %owner, %repo, pr_number,
+                "webhook: failed to create pr-quality check run: {e:#}"
+            )
+        }
+    }
+
+    // --- Contributor Report ---
+    if let Ok(user) = &user_result {
+        let metrics =
+            contributor_report::ContributorMetrics::from_user(user, merge_ratio, config.min_account_age_days);
+        let (c_conclusion, c_title, c_summary) =
+            contributor_report::format_contributor_report(&metrics);
+
+        match state
+            .github_app
+            .create_check_run(
+                installation_id,
+                &owner,
+                &repo,
+                &head_sha,
+                "metsuke / contributor-report",
+                &c_conclusion,
+                &c_title,
+                &c_summary,
+            )
+            .await
+        {
+            Ok(_) => {
+                tracing::info!(
+                    %owner, %repo, pr_number, %author_login,
+                    "webhook: contributor-report check run created"
+                )
+            }
+            Err(e) => {
+                tracing::error!(
+                    %owner, %repo, pr_number,
+                    "webhook: failed to create contributor-report check run: {e:#}"
+                )
+            }
         }
     }
 }
