@@ -15,7 +15,7 @@ COPY . .
 RUN git init && git config user.email "build@build" && git config user.name "build" && git commit --allow-empty -m "build"
 RUN cargo build --release --bin metsuke
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -u 1000 metsuke
 COPY --from=builder /app/target/release/metsuke /usr/local/bin/
