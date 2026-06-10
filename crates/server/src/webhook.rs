@@ -449,10 +449,10 @@ async fn handle_check_suite_rerequest(state: WebhookState, payload: serde_json::
             "installation": payload["installation"],
         });
 
-        if let Some(obj) = synthetic["pull_request"]["base"]["repo"].as_object() {
-            if !synthetic["repository"].is_object() {
-                synthetic["repository"] = serde_json::Value::Object(obj.clone());
-            }
+        if let Some(obj) = synthetic["pull_request"]["base"]["repo"].as_object()
+            && !synthetic["repository"].is_object()
+        {
+            synthetic["repository"] = serde_json::Value::Object(obj.clone());
         }
 
         tracing::info!(
