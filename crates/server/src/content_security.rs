@@ -80,10 +80,7 @@ fn scan_line(line: &str, file: &str, line_number: u32, findings: &mut Vec<Findin
                 file: file.to_string(),
                 line: line_number,
                 kind: FindingKind::InvisibleUnicode,
-                detail: format!(
-                    "U+{cp:04X} at column {i} — {}",
-                    invisible_name(cp)
-                ),
+                detail: format!("U+{cp:04X} at column {i} — {}", invisible_name(cp)),
             });
         }
 
@@ -92,9 +89,7 @@ fn scan_line(line: &str, file: &str, line_number: u32, findings: &mut Vec<Findin
                 file: file.to_string(),
                 line: line_number,
                 kind: FindingKind::BiDiOverride,
-                detail: format!(
-                    "U+{cp:04X} at column {i} — BiDi override (Trojan Source vector)",
-                ),
+                detail: format!("U+{cp:04X} at column {i} — BiDi override (Trojan Source vector)",),
             });
         }
     }
@@ -315,6 +310,9 @@ diff --git a/src/main.rs b/src/main.rs
     fn hunk_line_number_parsing() {
         assert_eq!(parse_hunk_line_number("@@ -10,5 +20,7 @@"), Some(20));
         assert_eq!(parse_hunk_line_number("@@ -1 +1 @@"), Some(1));
-        assert_eq!(parse_hunk_line_number("@@ -0,0 +1,100 @@ fn foo()"), Some(1));
+        assert_eq!(
+            parse_hunk_line_number("@@ -0,0 +1,100 @@ fn foo()"),
+            Some(1)
+        );
     }
 }

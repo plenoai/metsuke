@@ -65,7 +65,9 @@ impl QualityReport {
 
         let title = format!("PR Quality: {passed}/{total} passed, {failed} failed");
 
-        let mut summary = String::from("## PR Quality Checks\n\n| Check | Status | Detail |\n|-------|--------|--------|\n");
+        let mut summary = String::from(
+            "## PR Quality Checks\n\n| Check | Status | Detail |\n|-------|--------|--------|\n",
+        );
         for c in &self.checks {
             let icon = if c.passed { "✅" } else { "❌" };
             let _ = writeln!(summary, "| {} | {} | {} |", c.name, icon, c.detail);
@@ -195,7 +197,12 @@ pub fn run_quality_checks(pr: &PrInfo, config: &QualityConfig) -> QualityReport 
         let blocked: Vec<&str> = pr
             .file_paths
             .iter()
-            .filter(|p| config.blocked_paths.iter().any(|b| p.starts_with(b.as_str())))
+            .filter(|p| {
+                config
+                    .blocked_paths
+                    .iter()
+                    .any(|b| p.starts_with(b.as_str()))
+            })
             .map(|p| p.as_str())
             .collect();
         let passed = blocked.is_empty();
@@ -251,7 +258,11 @@ impl GitHubUser {
         if self.blog.as_ref().is_some_and(|s| !s.is_empty()) {
             count += 1;
         }
-        if self.twitter_username.as_ref().is_some_and(|s| !s.is_empty()) {
+        if self
+            .twitter_username
+            .as_ref()
+            .is_some_and(|s| !s.is_empty())
+        {
             count += 1;
         }
         count
@@ -389,7 +400,12 @@ mod tests {
         let mut pr = default_pr();
         pr.body = String::new();
         let report = run_quality_checks(&pr, &QualityConfig::default());
-        assert!(report.checks.iter().any(|c| c.name == "Description present" && !c.passed));
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|c| c.name == "Description present" && !c.passed)
+        );
     }
 
     #[test]
@@ -397,7 +413,12 @@ mod tests {
         let mut pr = default_pr();
         pr.changed_files = 100;
         let report = run_quality_checks(&pr, &QualityConfig::default());
-        assert!(report.checks.iter().any(|c| c.name == "Changed files count" && !c.passed));
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|c| c.name == "Changed files count" && !c.passed)
+        );
     }
 
     #[test]
@@ -405,7 +426,12 @@ mod tests {
         let mut pr = default_pr();
         pr.additions = 20000;
         let report = run_quality_checks(&pr, &QualityConfig::default());
-        assert!(report.checks.iter().any(|c| c.name == "Changed lines count" && !c.passed));
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|c| c.name == "Changed lines count" && !c.passed)
+        );
     }
 
     #[test]
@@ -413,7 +439,12 @@ mod tests {
         let mut pr = default_pr();
         pr.author_account_age_days = 5;
         let report = run_quality_checks(&pr, &QualityConfig::default());
-        assert!(report.checks.iter().any(|c| c.name == "Account age" && !c.passed));
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|c| c.name == "Account age" && !c.passed)
+        );
     }
 
     #[test]
@@ -421,7 +452,12 @@ mod tests {
         let mut pr = default_pr();
         pr.author_global_merge_ratio = Some(0.1);
         let report = run_quality_checks(&pr, &QualityConfig::default());
-        assert!(report.checks.iter().any(|c| c.name == "Global merge ratio" && !c.passed));
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|c| c.name == "Global merge ratio" && !c.passed)
+        );
     }
 
     #[test]
@@ -429,7 +465,12 @@ mod tests {
         let mut pr = default_pr();
         pr.file_paths = vec![".github/workflows/ci.yml".into()];
         let report = run_quality_checks(&pr, &QualityConfig::default());
-        assert!(report.checks.iter().any(|c| c.name == "Protected paths" && !c.passed));
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|c| c.name == "Protected paths" && !c.passed)
+        );
     }
 
     #[test]

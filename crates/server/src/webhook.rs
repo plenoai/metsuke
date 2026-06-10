@@ -249,56 +249,56 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
             }
         };
 
-    let result_json = serde_json::to_string_pretty(&result).unwrap_or_default();
-    let (conclusion, title, summary) = format_check_result(&result_json, "PR");
+        let result_json = serde_json::to_string_pretty(&result).unwrap_or_default();
+        let (conclusion, title, summary) = format_check_result(&result_json, "PR");
 
-    // Record audit entry for webhook-triggered verification
-    if let Ok(Some(user_id)) = state.db.get_user_id_by_installation(installation_id) {
-        let (pass, fail, review, na) = crate::web::helpers::count_findings(&result_json);
-        let target_ref = format!("#{pr_number}");
-        let db = state.db.clone();
-        let owner_a = owner.clone();
-        let repo_a = repo.clone();
-        let _ = run_blocking(move || {
-            db.append_audit_entry(
-                user_id,
-                "pr",
-                &owner_a,
-                &repo_a,
-                &target_ref,
-                "default",
-                pass,
-                fail,
-                review,
-                na,
-                &result_json,
-                "webhook",
+        // Record audit entry for webhook-triggered verification
+        if let Ok(Some(user_id)) = state.db.get_user_id_by_installation(installation_id) {
+            let (pass, fail, review, na) = crate::web::helpers::count_findings(&result_json);
+            let target_ref = format!("#{pr_number}");
+            let db = state.db.clone();
+            let owner_a = owner.clone();
+            let repo_a = repo.clone();
+            let _ = run_blocking(move || {
+                db.append_audit_entry(
+                    user_id,
+                    "pr",
+                    &owner_a,
+                    &repo_a,
+                    &target_ref,
+                    "default",
+                    pass,
+                    fail,
+                    review,
+                    na,
+                    &result_json,
+                    "webhook",
+                )
+            })
+            .await;
+        }
+
+        match state
+            .github_app
+            .create_check_run(
+                installation_id,
+                &owner,
+                &repo,
+                &head_sha,
+                "metsuke / verify-pr",
+                &conclusion,
+                &title,
+                &summary,
             )
-        })
-        .await;
-    }
-
-    match state
-        .github_app
-        .create_check_run(
-            installation_id,
-            &owner,
-            &repo,
-            &head_sha,
-            "metsuke / verify-pr",
-            &conclusion,
-            &title,
-            &summary,
-        )
-        .await
-    {
-        Ok(_) => {
-            tracing::info!(%owner, %repo, pr_number, %conclusion, "webhook: check run created")
+            .await
+        {
+            Ok(_) => {
+                tracing::info!(%owner, %repo, pr_number, %conclusion, "webhook: check run created")
+            }
+            Err(e) => {
+                tracing::error!(%owner, %repo, pr_number, "webhook: failed to create check run: {e:#}")
+            }
         }
-        Err(e) => {
-            tracing::error!(%owner, %repo, pr_number, "webhook: failed to create check run: {e:#}")
-        }
-    }
     } // end else (non-fork PR)
 
     let author_login = payload["pull_request"]["user"]["login"]
@@ -317,7 +317,9 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
         .as_str()
         .unwrap_or("")
         .to_string();
-    let changed_files = payload["pull_request"]["changed_files"].as_u64().unwrap_or(0) as u32;
+    let changed_files = payload["pull_request"]["changed_files"]
+        .as_u64()
+        .unwrap_or(0) as u32;
     let additions = payload["pull_request"]["additions"].as_u64().unwrap_or(0) as u32;
     let deletions = payload["pull_request"]["deletions"].as_u64().unwrap_or(0) as u32;
 
@@ -535,8 +537,11 @@ async fn run_pr_quality_and_report(
 
     // --- Contributor Report ---
     if let Ok(user) = &user_result {
-        let metrics =
-            contributor_report::ContributorMetrics::from_user(user, merge_ratio, config.min_account_age_days);
+        let metrics = contributor_report::ContributorMetrics::from_user(
+            user,
+            merge_ratio,
+            config.min_account_age_days,
+        );
         let (c_conclusion, c_title, c_summary) =
             contributor_report::format_contributor_report(&metrics);
 
