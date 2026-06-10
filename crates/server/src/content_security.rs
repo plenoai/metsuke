@@ -26,7 +26,6 @@ impl FindingKind {
     pub fn severity(self) -> &'static str {
         match self {
             Self::InvisibleUnicode | Self::BiDiOverride => "high",
-            Self::HomoglyphInIdentifier => "medium",
         }
     }
 }
