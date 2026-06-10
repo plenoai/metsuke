@@ -116,6 +116,25 @@ async fn handle_webhook(
             tracing::info!(delivery_id, event, "webhook: dispatching event");
             tokio::spawn(handle_pull_request(state, payload));
         }
+        "check_suite" => {
+            let action = payload["action"].as_str().unwrap_or("");
+            if action == "rerequested" {
+                tracing::info!(
+                    delivery_id,
+                    event,
+                    action,
+                    "webhook: dispatching check_suite rerequested"
+                );
+                tokio::spawn(handle_check_suite_rerequest(state, payload));
+            } else {
+                tracing::debug!(
+                    delivery_id,
+                    event,
+                    action,
+                    "webhook: ignoring check_suite action"
+                );
+            }
+        }
         "release" => {
             tracing::info!(delivery_id, event, "webhook: dispatching event");
             tokio::spawn(handle_release(state, payload));
@@ -350,6 +369,97 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
             additions,
             deletions,
         ));
+    }
+}
+
+async fn handle_check_suite_rerequest(state: WebhookState, payload: serde_json::Value) {
+    let owner = match payload["repository"]["owner"]["login"].as_str() {
+        Some(s) => s.to_string(),
+        None => return,
+    };
+    let repo = match payload["repository"]["name"].as_str() {
+        Some(s) => s.to_string(),
+        None => return,
+    };
+    let installation_id = match payload["installation"]["id"].as_i64() {
+        Some(id) => id,
+        None => {
+            tracing::warn!("webhook: check_suite rerequested missing installation.id");
+            return;
+        }
+    };
+
+    let pull_requests = match payload["check_suite"]["pull_requests"].as_array() {
+        Some(prs) if !prs.is_empty() => prs.clone(),
+        _ => {
+            tracing::debug!("webhook: check_suite rerequested has no pull_requests");
+            return;
+        }
+    };
+
+    let token = match state
+        .github_app
+        .create_installation_token(installation_id)
+        .await
+    {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!("webhook: failed to create installation token for rerequested: {e:#}");
+            return;
+        }
+    };
+
+    let http = reqwest::Client::builder()
+        .user_agent("metsuke")
+        .build()
+        .unwrap();
+    let api_base = format!("https://{}", state.github_api_host);
+
+    for pr_ref in &pull_requests {
+        let pr_number = match pr_ref["number"].as_u64() {
+            Some(n) => n as u32,
+            None => continue,
+        };
+
+        let pr_data: serde_json::Value = match http
+            .get(format!("{api_base}/repos/{owner}/{repo}/pulls/{pr_number}"))
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .and_then(|r| r.error_for_status())
+        {
+            Ok(resp) => match resp.json().await {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::error!(%owner, %repo, pr_number, "webhook: failed to parse PR data: {e:#}");
+                    continue;
+                }
+            },
+            Err(e) => {
+                tracing::error!(%owner, %repo, pr_number, "webhook: failed to fetch PR data: {e:#}");
+                continue;
+            }
+        };
+
+        let mut synthetic = serde_json::json!({
+            "action": "reopened",
+            "pull_request": pr_data,
+            "repository": payload["repository"],
+            "installation": payload["installation"],
+        });
+
+        if let Some(obj) = synthetic["pull_request"]["base"]["repo"].as_object() {
+            if !synthetic["repository"].is_object() {
+                synthetic["repository"] = serde_json::Value::Object(obj.clone());
+            }
+        }
+
+        tracing::info!(
+            %owner, %repo, pr_number,
+            "webhook: re-running checks via check_suite rerequested"
+        );
+        handle_pull_request(state.clone(), synthetic).await;
     }
 }
 
