@@ -210,11 +210,12 @@ async fn handle_pull_request(state: WebhookState, payload: serde_json::Value) {
         let verify_owner = owner.clone();
         let verify_repo = repo.clone();
         let verify_token = token;
+        let verify_host = state.github_api_host.clone();
         let result = match run_blocking(move || {
             let config = libverify_github::GitHubConfig {
                 token: verify_token,
                 repo: format!("{verify_owner}/{verify_repo}"),
-                host: state.github_api_host.clone(),
+                host: verify_host,
             };
             let client = libverify_github::GitHubClient::new(&config)?;
             libverify_github::verify_pr(
