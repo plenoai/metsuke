@@ -13,6 +13,7 @@ pub struct Finding {
 pub enum FindingKind {
     InvisibleUnicode,
     BiDiOverride,
+    PrivateUseArea,
 }
 
 impl FindingKind {
@@ -20,12 +21,13 @@ impl FindingKind {
         match self {
             Self::InvisibleUnicode => "invisible-unicode",
             Self::BiDiOverride => "bidi-override",
+            Self::PrivateUseArea => "private-use-area",
         }
     }
 
     pub fn severity(self) -> &'static str {
         match self {
-            Self::InvisibleUnicode | Self::BiDiOverride => "high",
+            Self::InvisibleUnicode | Self::BiDiOverride | Self::PrivateUseArea => "high",
         }
     }
 }
@@ -89,6 +91,17 @@ fn scan_line(line: &str, file: &str, line_number: u32, findings: &mut Vec<Findin
                 detail: format!("U+{cp:04X} at column {i} — BiDi override (Trojan Source vector)",),
             });
         }
+
+        if is_private_use_area(cp) {
+            findings.push(Finding {
+                file: file.to_string(),
+                line: line_number,
+                kind: FindingKind::PrivateUseArea,
+                detail: format!(
+                    "U+{cp:04X} at column {i} — Private Use Area character (supply-chain vector)"
+                ),
+            });
+        }
     }
 }
 
@@ -107,6 +120,14 @@ fn is_bidi_override(cp: u32) -> bool {
     matches!(cp,
         0x202A..=0x202E |  // LRE, RLE, PDF, LRO, RLO
         0x2066..=0x2069    // LRI, RLI, FSI, PDI
+    )
+}
+
+fn is_private_use_area(cp: u32) -> bool {
+    matches!(cp,
+        0xE000..=0xF8FF |       // BMP PUA
+        0xF0000..=0xFFFFF |     // Supplementary PUA-A
+        0x100000..=0x10FFFF     // Supplementary PUA-B
     )
 }
 
@@ -144,7 +165,7 @@ pub fn format_check_summary(findings: &[Finding]) -> (String, String, String) {
         return (
             "success".to_string(),
             "Content Security: clean".to_string(),
-            "No invisible characters, BiDi overrides, or homoglyphs detected in added lines."
+            "No invisible characters, BiDi overrides, or Private Use Area characters detected in added lines."
                 .to_string(),
         );
     }
@@ -311,5 +332,44 @@ diff --git a/src/main.rs b/src/main.rs
             parse_hunk_line_number("@@ -0,0 +1,100 @@ fn foo()"),
             Some(1)
         );
+    }
+
+    #[test]
+    fn detect_pua_bmp() {
+        // U+E000 is the first BMP PUA character
+        let diff = format!(
+            "diff --git a/x.rs b/x.rs\n\
+             @@ -1,1 +1,2 @@\n\
+             +let x\u{E000} = 1;",
+        );
+        let findings = scan_diff(&diff);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].kind, FindingKind::PrivateUseArea);
+        assert!(findings[0].detail.contains("E000"));
+    }
+
+    #[test]
+    fn detect_pua_supplementary() {
+        // U+F0000 is the first Supplementary PUA-A character
+        let diff = format!(
+            "diff --git a/x.rs b/x.rs\n\
+             @@ -1,1 +1,2 @@\n\
+             +let x\u{F0000} = 1;",
+        );
+        let findings = scan_diff(&diff);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].kind, FindingKind::PrivateUseArea);
+    }
+
+    #[test]
+    fn pua_not_flagged_in_context_line() {
+        let diff = format!(
+            "diff --git a/x.rs b/x.rs\n\
+             @@ -1,2 +1,3 @@\n\
+              let old\u{E001} = 1;\n\
+             +let new = 2;",
+        );
+        let findings = scan_diff(&diff);
+        assert!(findings.is_empty(), "context lines must not be scanned");
     }
 }
