@@ -12,8 +12,8 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
       emulate:
-        specifier: ^0.7.0
-        version: 0.7.0
+        specifier: ^0.8.0
+        version: 0.8.0
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
@@ -29,8 +29,8 @@ packages:
     resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
     engines: {node: '>=20'}
 
-  emulate@0.7.0:
-    resolution: {integrity: sha512-v2/Gefv+i/TUzjEkDQkfE8myS0O0T/rJXeOIpgEpldxNQEYileesaWSmMsmB2DBZ8VHO9Pmqe7R9q+81E8PciA==}
+  emulate@0.8.0:
+    resolution: {integrity: sha512-UMbzvyrSgBVpWciS/I6/XbvsG6CAabKeSctweC328yaMcw5cT86ms50lOjcEWUcGPiXZTefxL4UY2s6tZR8IXA==}
     hasBin: true
 
   fsevents@2.3.2:
@@ -41,18 +41,8 @@ packages:
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
-  playwright-core@1.61.0:
-    resolution: {integrity: sha512-caX7TrY3Ml6egyDX0WUcTHDxodl/b51y5wJOdCEA36QviK/s2g081hvmGs8eaE3DWb6NYZQ6BjO/QkNRPenoPA==}
-    engines: {node: '>=18'}
-    hasBin: true
-
   playwright-core@1.61.1:
     resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.61.0:
-    resolution: {integrity: sha512-Z+7BeeqQPRRzklHsVFP4KTGIyMxKUmfeRA4WisM6G3/XW6nwGeX6fX9qYaDa+CiUqpOkb2f6X3nar05R3kSuJQ==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -74,7 +64,7 @@ snapshots:
 
   commander@14.0.3: {}
 
-  emulate@0.7.0:
+  emulate@0.8.0:
     dependencies:
       commander: 14.0.3
       picocolors: 1.1.1
@@ -85,15 +75,7 @@ snapshots:
 
   picocolors@1.1.1: {}
 
-  playwright-core@1.61.0: {}
-
   playwright-core@1.61.1: {}
-
-  playwright@1.61.0:
-    dependencies:
-      playwright-core: 1.61.0
-    optionalDependencies:
-      fsevents: 2.3.2
 
   playwright@1.61.1:
     dependencies:
