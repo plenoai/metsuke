@@ -31,7 +31,7 @@ pub struct MetsukeServer {
 }
 
 fn tool_error(msg: impl std::fmt::Display) -> CallToolResult {
-    let mut result = CallToolResult::success(vec![Content::text(msg.to_string())]);
+    let mut result = CallToolResult::success(vec![ContentBlock::text(msg.to_string())]);
     result.is_error = Some(true);
     result
 }
@@ -226,7 +226,7 @@ impl MetsukeServer {
 
         let json = serde_json::to_string_pretty(&result)
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        Ok(CallToolResult::success(vec![ContentBlock::text(json)]))
     }
 
     #[tool(
@@ -284,7 +284,7 @@ impl MetsukeServer {
 
         let json = serde_json::to_string_pretty(&result)
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        Ok(CallToolResult::success(vec![ContentBlock::text(json)]))
     }
 
     #[tool(
@@ -341,7 +341,7 @@ impl MetsukeServer {
 
         let json = serde_json::to_string_pretty(&result)
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        Ok(CallToolResult::success(vec![ContentBlock::text(json)]))
     }
 
     #[tool(
@@ -493,7 +493,7 @@ impl MetsukeServer {
         });
 
         let response = serde_json::json!({ "job_id": job_id });
-        Ok(CallToolResult::success(vec![Content::text(
+        Ok(CallToolResult::success(vec![ContentBlock::text(
             serde_json::to_string_pretty(&response).unwrap(),
         )]))
     }
@@ -512,7 +512,7 @@ impl MetsukeServer {
             Some(job) => {
                 let json = serde_json::to_string_pretty(job)
                     .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-                Ok(CallToolResult::success(vec![Content::text(json)]))
+                Ok(CallToolResult::success(vec![ContentBlock::text(json)]))
             }
             None => Ok(tool_error(format!("Job '{}' not found", args.job_id))),
         }
