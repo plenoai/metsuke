@@ -12,8 +12,8 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
       emulate:
-        specifier: ^0.8.0
-        version: 0.8.0
+        specifier: ^0.9.0
+        version: 0.9.0
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
@@ -29,8 +29,8 @@ packages:
     resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
     engines: {node: '>=20'}
 
-  emulate@0.8.0:
-    resolution: {integrity: sha512-UMbzvyrSgBVpWciS/I6/XbvsG6CAabKeSctweC328yaMcw5cT86ms50lOjcEWUcGPiXZTefxL4UY2s6tZR8IXA==}
+  emulate@0.9.0:
+    resolution: {integrity: sha512-wgOFQSrjAt0NqPDnYUFyCcCwAVw01aNS3M24SZ2C5ViLQW8ECi0qIyUsW+y2uvflBD48JFqomB+jRox+ktKK/w==}
     hasBin: true
 
   fsevents@2.3.2:
@@ -64,7 +64,7 @@ snapshots:
 
   commander@14.0.3: {}
 
-  emulate@0.8.0:
+  emulate@0.9.0:
     dependencies:
       commander: 14.0.3
       picocolors: 1.1.1
