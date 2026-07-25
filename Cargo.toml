@@ -24,7 +24,7 @@ bytes = "1"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.13", features = ["json", "query", "form"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
-jsonwebtoken = { version = "10", features = ["use_pem", "rust_crypto"] }
+jsonwebtoken = { version = "11", features = ["use_pem", "rust_crypto"] }
 uuid = { version = "1", features = ["v4"] }
 sha2 = "0.11"
 hmac = "0.13"
