@@ -13,7 +13,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.27.0",
   "devDependencies": {
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": "^1.62.1",
     "emulate": "^0.9.0",
     "playwright": "^1.62.1"
   }
